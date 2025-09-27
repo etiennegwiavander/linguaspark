@@ -262,23 +262,46 @@ export default function LessonGenerator({
             </div>
           )}
 
-          <Button
-            onClick={handleGenerateLesson}
-            disabled={!lessonType || !studentLevel || !targetLanguage || !selectedText.trim() || isGenerating}
-            className="w-full"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating AI Lesson...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate AI Lesson
-              </>
+          <div className="space-y-2">
+            <Button
+              onClick={handleGenerateLesson}
+              disabled={!lessonType || !studentLevel || !targetLanguage || !selectedText.trim() || isGenerating}
+              className="w-full"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating AI Lesson...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate AI Lesson
+                </>
+              )}
+            </Button>
+            
+            {process.env.NODE_ENV === 'development' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const response = await fetch("/api/test-ai", { method: "POST" })
+                    const result = await response.json()
+                    console.log("AI Test Result:", result)
+                    alert(result.success ? `AI Working: ${result.response}` : `AI Error: ${result.error}`)
+                  } catch (error) {
+                    console.error("Test failed:", error)
+                    alert("Test failed: " + error.message)
+                  }
+                }}
+                className="w-full text-xs"
+              >
+                Test AI Connection
+              </Button>
             )}
-          </Button>
+          </div>
 
           {user && (
             <p className="text-xs text-muted-foreground text-center">

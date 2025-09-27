@@ -75,32 +75,50 @@ export class LessonAIServerGenerator {
       readingTime
     } = params
 
+    console.log("🚀 Starting AI lesson generation with params:", {
+      textLength: sourceText.length,
+      lessonType,
+      studentLevel,
+      targetLanguage,
+      hasMetadata: !!contentMetadata,
+      hasStructuredContent: !!structuredContent
+    })
+
     try {
       // Step 1: Analyze content context and complexity
+      console.log("📊 Step 1: Analyzing content context...")
       const contentAnalysis = await this.analyzeContentContext(
         sourceText,
         contentMetadata,
         structuredContent,
         studentLevel
       )
+      console.log("✅ Content analysis complete:", contentAnalysis)
 
       // Step 2: Create contextual summary based on lesson type and content analysis
+      console.log("📝 Step 2: Creating contextual summary...")
       const contextualSummary = await this.createContextualSummary(
         sourceText,
         contentAnalysis,
         lessonType,
         studentLevel
       )
+      console.log("✅ Contextual summary created, length:", contextualSummary.length)
 
       // Step 3: Translate if needed (for non-English target languages)
       let translatedContent = contextualSummary
       if (targetLanguage !== "english") {
+        console.log("🌐 Step 3: Translating to", targetLanguage)
         translatedContent = await this.getGoogleAI().translate(contextualSummary, {
           targetLanguage: this.getLanguageCode(targetLanguage),
         })
+        console.log("✅ Translation complete, length:", translatedContent.length)
+      } else {
+        console.log("⏭️ Step 3: Skipping translation (target is English)")
       }
 
       // Step 4: Generate contextual lesson structure
+      console.log("🏗️ Step 4: Generating lesson structure...")
       const lessonStructure = await this.generateContextualLessonStructure(
         translatedContent,
         contentAnalysis,
@@ -109,8 +127,10 @@ export class LessonAIServerGenerator {
         targetLanguage,
         contentMetadata
       )
+      console.log("✅ Lesson structure generated:", Object.keys(lessonStructure))
 
       // Step 5: Generate detailed content for each section with context
+      console.log("🔧 Step 5: Enhancing lesson content...")
       const detailedLesson = await this.generateDetailedContextualContent(
         lessonStructure,
         translatedContent,
@@ -120,13 +140,17 @@ export class LessonAIServerGenerator {
         targetLanguage,
         structuredContent
       )
+      console.log("✅ Detailed content generated")
 
       // Step 6: Proofread and polish the final lesson
+      console.log("✨ Step 6: Proofreading lesson...")
       const polishedLesson = await this.proofreadLesson(detailedLesson)
+      console.log("🎉 AI lesson generation complete!")
 
       return polishedLesson
     } catch (error) {
-      console.error("Error in AI lesson generation:", error)
+      console.error("❌ Error in AI lesson generation:", error)
+      console.log("🔄 Falling back to enhanced template generation...")
       // Fallback to enhanced template-based generation with context
       return this.generateEnhancedFallbackLesson(params)
     }
@@ -139,6 +163,8 @@ export class LessonAIServerGenerator {
     structuredContent?: any,
     studentLevel?: string
   ) {
+    console.log("🔍 Analyzing content context...")
+    
     const analysis = {
       contentType: metadata?.contentType || 'general',
       domain: metadata?.domain || '',
@@ -152,7 +178,7 @@ export class LessonAIServerGenerator {
 
     // Analyze content complexity based on text characteristics
     const sentences = sourceText.split(/[.!?]+/).filter(s => s.trim().length > 10)
-    const avgSentenceLength = sentences.reduce((sum, s) => sum + s.split(' ').length, 0) / sentences.length
+    const avgSentenceLength = sentences.length > 0 ? sentences.reduce((sum, s) => sum + s.split(' ').length, 0) / sentences.length : 0
     const complexWords = sourceText.match(/\b\w{8,}\b/g)?.length || 0
     const totalWords = sourceText.split(/\s+/).length
 
@@ -162,35 +188,65 @@ export class LessonAIServerGenerator {
       analysis.complexity = 'low'
     }
 
+    console.log("📈 Text complexity analysis:", {
+      avgSentenceLength,
+      complexWords,
+      totalWords,
+      complexity: analysis.complexity
+    })
+
     // Extract key topics using AI
     try {
-      const topicsPrompt = `Analyze this content and identify 3-5 main topics or themes. Content: "${sourceText.substring(0, 1000)}"`
+      console.log("🎯 Extracting topics using AI...")
+      const topicsPrompt = `Analyze this content and identify 3-5 main topics or themes. Return only the topics, one per line:
+
+"${sourceText.substring(0, 1000)}"
+
+Topics:`
+      
       const topicsResponse = await this.getGoogleAI().prompt(topicsPrompt, {
         temperature: 0.3,
         maxTokens: 200,
       })
+      
+      console.log("🤖 AI topics response:", topicsResponse)
       analysis.topics = this.parseListFromText(topicsResponse).slice(0, 5)
+      console.log("✅ Extracted topics:", analysis.topics)
     } catch (error) {
+      console.warn("⚠️ AI topic extraction failed, using fallback:", error.message)
       // Fallback topic extraction
       analysis.topics = this.extractTopicsFromHeadings(structuredContent?.headings || [])
+      console.log("🔄 Fallback topics:", analysis.topics)
     }
 
     // Extract key vocabulary for the target level
     try {
-      const vocabPrompt = `Extract 8-10 key vocabulary words from this content that would be appropriate for ${studentLevel} level language learners. Focus on useful, practical words. Content: "${sourceText.substring(0, 800)}"`
+      console.log("📚 Extracting vocabulary using AI...")
+      const vocabPrompt = `Extract 8-10 key vocabulary words from this content that would be appropriate for ${studentLevel} level language learners. Focus on useful, practical words. Return only the words, one per line:
+
+"${sourceText.substring(0, 800)}"
+
+Vocabulary words:`
+      
       const vocabResponse = await this.getGoogleAI().prompt(vocabPrompt, {
         temperature: 0.2,
         maxTokens: 300,
       })
+      
+      console.log("🤖 AI vocabulary response:", vocabResponse)
       analysis.keyVocabulary = this.parseListFromText(vocabResponse).slice(0, 10)
+      console.log("✅ Extracted vocabulary:", analysis.keyVocabulary)
     } catch (error) {
+      console.warn("⚠️ AI vocabulary extraction failed, using fallback:", error.message)
       // Fallback vocabulary extraction
       analysis.keyVocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
+      console.log("🔄 Fallback vocabulary:", analysis.keyVocabulary)
     }
 
     // Determine cultural context
     if (metadata?.domain) {
       analysis.culturalContext = this.determineCulturalContext(metadata.domain, sourceText)
+      console.log("🌍 Cultural context:", analysis.culturalContext)
     }
 
     // Generate learning objectives based on content type and lesson type
@@ -199,6 +255,7 @@ export class LessonAIServerGenerator {
       analysis.topics,
       studentLevel
     )
+    console.log("🎯 Learning objectives:", analysis.learningObjectives)
 
     return analysis
   }
@@ -210,32 +267,46 @@ export class LessonAIServerGenerator {
     lessonType: string,
     studentLevel: string
   ) {
-    const summaryPrompt = `
-Create a focused summary of this content for a ${lessonType} lesson at ${studentLevel} level.
+    console.log("📝 Creating contextual summary...")
+    
+    const summaryPrompt = `Create a focused summary of this content for a ${lessonType} lesson at ${studentLevel} level.
+
 Content type: ${contentAnalysis.contentType}
 Main topics: ${contentAnalysis.topics.join(', ')}
 Complexity: ${contentAnalysis.complexity}
 
 Focus on aspects most relevant for ${lessonType} learning objectives.
 Keep the summary appropriate for ${studentLevel} CEFR level students.
+Write 4-6 sentences that capture the key information.
 
-Content: "${sourceText}"
+Content: "${sourceText.substring(0, 1500)}"
 
-Summary:
-`
+Summary:`
 
     try {
-      return await this.getGoogleAI().prompt(summaryPrompt, {
+      console.log("🤖 Calling AI for contextual summary...")
+      const summary = await this.getGoogleAI().prompt(summaryPrompt, {
         temperature: 0.4,
         maxTokens: 500,
       })
+      console.log("✅ AI contextual summary created:", summary.substring(0, 100) + "...")
+      return summary
     } catch (error) {
+      console.warn("⚠️ AI contextual summary failed, trying basic summarization:", error.message)
       // Fallback to basic summarization
-      return await this.getGoogleAI().summarize(sourceText, {
-        type: "key-points",
-        length: this.getSummaryLength(studentLevel),
-        format: "plain-text",
-      })
+      try {
+        const basicSummary = await this.getGoogleAI().summarize(sourceText, {
+          type: "key-points",
+          length: this.getSummaryLength(studentLevel),
+          format: "plain-text",
+        })
+        console.log("✅ Basic AI summary created:", basicSummary.substring(0, 100) + "...")
+        return basicSummary
+      } catch (summaryError) {
+        console.warn("⚠️ All AI summarization failed, using text truncation:", summaryError.message)
+        // Final fallback to simple truncation
+        return sourceText.substring(0, 800) + "..."
+      }
     }
   }
 
@@ -248,8 +319,9 @@ Summary:
     targetLanguage: string,
     metadata?: any
   ) {
-    const prompt = `
-Create a highly contextual ${lessonType} lesson for ${studentLevel} level students learning ${targetLanguage}.
+    console.log("🏗️ Generating contextual lesson structure...")
+    
+    const prompt = `Create a highly contextual ${lessonType} lesson for ${studentLevel} level students learning ${targetLanguage}.
 
 CONTENT CONTEXT:
 - Content Type: ${contentAnalysis.contentType}
@@ -259,38 +331,71 @@ CONTENT CONTEXT:
 - Key Vocabulary: ${contentAnalysis.keyVocabulary.slice(0, 5).join(', ')}
 - Cultural Context: ${contentAnalysis.culturalContext}
 
-LESSON CONTENT: "${content}"
+LESSON CONTENT: "${content.substring(0, 1000)}"
 
 Create a JSON structure with these sections, making each section highly relevant to the source content:
 
-- warmup: 3 engaging warm-up questions that directly relate to the content topics and activate prior knowledge
-- vocabulary: 6-8 key vocabulary words from the actual content with contextual meanings and authentic examples
-- reading: A level-appropriate adaptation of the original content that maintains its essence and context
-- comprehension: 4-5 reading comprehension questions that test understanding of the specific content
-- discussion: 3-4 discussion questions that encourage conversation about the actual topics covered
-- grammar: Grammar focus derived from patterns in the source content, with examples from the text
-- pronunciation: One challenging word from the actual content with IPA and contextual practice
-- wrapup: 3 reflection questions that connect the lesson to real-world applications of the content
+{
+  "warmup": ["question 1", "question 2", "question 3"],
+  "vocabulary": [
+    {"word": "word1", "meaning": "definition", "example": "example sentence"},
+    {"word": "word2", "meaning": "definition", "example": "example sentence"}
+  ],
+  "reading": "adapted reading passage",
+  "comprehension": ["question 1", "question 2", "question 3", "question 4"],
+  "discussion": ["question 1", "question 2", "question 3"],
+  "grammar": {
+    "focus": "grammar topic",
+    "examples": ["example 1", "example 2"],
+    "exercise": ["exercise 1", "exercise 2"]
+  },
+  "pronunciation": {
+    "word": "challenging word",
+    "ipa": "/pronunciation/",
+    "practice": "practice sentence"
+  },
+  "wrapup": ["reflection 1", "reflection 2", "reflection 3"]
+}
 
 IMPORTANT: 
 - All content must be directly related to and derived from the source material
 - Vocabulary should come from the actual text, not generic word lists
 - Examples should reference the specific content, not generic scenarios
 - Questions should be about the actual topics discussed, not general themes
-- Maintain the cultural and contextual authenticity of the source
 
-Return only valid JSON.
-`
-
-    const response = await this.getGoogleAI().prompt(prompt, {
-      temperature: 0.7,
-      maxTokens: 2000,
-    })
+Return only valid JSON:`
 
     try {
-      return JSON.parse(response)
-    } catch {
-      // If JSON parsing fails, return a structured fallback
+      console.log("🤖 Calling AI for lesson structure...")
+      const response = await this.getGoogleAI().prompt(prompt, {
+        temperature: 0.7,
+        maxTokens: 2000,
+      })
+      
+      console.log("🤖 AI lesson structure response:", response.substring(0, 200) + "...")
+      
+      try {
+        const parsed = JSON.parse(response)
+        console.log("✅ Successfully parsed lesson structure JSON")
+        return parsed
+      } catch (parseError) {
+        console.warn("⚠️ Failed to parse JSON, attempting to clean response...")
+        // Try to extract JSON from the response
+        const jsonMatch = response.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          try {
+            const cleaned = JSON.parse(jsonMatch[0])
+            console.log("✅ Successfully parsed cleaned JSON")
+            return cleaned
+          } catch (cleanError) {
+            console.warn("⚠️ Failed to parse cleaned JSON, using fallback")
+          }
+        }
+        // If JSON parsing fails, return a structured fallback
+        return this.createStructuredFallback(content, lessonType, studentLevel)
+      }
+    } catch (error) {
+      console.warn("⚠️ AI lesson structure generation failed, using fallback:", error.message)
       return this.createStructuredFallback(content, lessonType, studentLevel)
     }
   }
@@ -500,16 +605,29 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
   }
 
   private createStructuredFallback(content: string, lessonType: string, studentLevel: string) {
-    return {
+    console.log("🔄 Creating structured fallback lesson...")
+    
+    // Extract some basic information from content for better fallback
+    const words = content.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
+    const uniqueWords = [...new Set(words)].slice(0, 6)
+    
+    const fallback = {
       warmup: this.getTemplateWarmup(lessonType, studentLevel),
-      vocabulary: this.extractVocabulary(content, studentLevel),
-      reading: content.substring(0, 500),
+      vocabulary: uniqueWords.map(word => ({
+        word: word,
+        meaning: `Definition of ${word}`,
+        example: `Example sentence with ${word}.`
+      })),
+      reading: this.simplifyText(content, studentLevel),
       comprehension: this.getTemplateComprehension(lessonType, studentLevel),
       discussion: this.getTemplateDiscussion(lessonType, studentLevel),
       grammar: this.getTemplateGrammar(studentLevel),
       pronunciation: this.getTemplatePronunciation(content),
       wrapup: this.getTemplateWrapup(lessonType),
     }
+    
+    console.log("✅ Structured fallback created")
+    return fallback
   }
 
   private getTemplateWarmup(lessonType: string, studentLevel: string): string[] {
