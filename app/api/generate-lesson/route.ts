@@ -5,7 +5,17 @@ import { createServerSupabaseClient } from "@/lib/supabase-server"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { sourceText, lessonType, studentLevel, targetLanguage, sourceUrl } = body
+    const { 
+      sourceText, 
+      lessonType, 
+      studentLevel, 
+      targetLanguage, 
+      sourceUrl,
+      contentMetadata,
+      structuredContent,
+      wordCount,
+      readingTime
+    } = body
 
     // Validate required fields
     if (!sourceText || !lessonType || !studentLevel || !targetLanguage) {
@@ -23,13 +33,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Generate lesson using AI pipeline (server-side only)
+    // Generate lesson using enhanced AI pipeline with contextual information
     const lesson = await lessonAIServerGenerator.generateLesson({
       sourceText,
       lessonType,
       studentLevel,
       targetLanguage,
       sourceUrl,
+      contentMetadata,
+      structuredContent,
+      wordCount,
+      readingTime,
     })
 
     // Save lesson to database

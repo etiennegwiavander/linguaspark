@@ -78,17 +78,44 @@ export default function LessonGenerator({
 
     try {
       const steps = [
-        { step: "Analyzing and summarizing content...", progress: 20 },
-        { step: "Translating to target language...", progress: 40 },
+        { step: "Analyzing content context and complexity...", progress: 15 },
+        { step: "Extracting key topics and vocabulary...", progress: 30 },
+        { step: "Creating contextual summary...", progress: 45 },
         { step: "Generating lesson structure...", progress: 60 },
-        { step: "Creating detailed exercises...", progress: 80 },
+        { step: "Creating detailed contextual exercises...", progress: 80 },
         { step: "Proofreading and finalizing...", progress: 100 },
       ]
 
       for (const { step, progress } of steps) {
         setGenerationStep(step)
         setGenerationProgress(progress)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 800))
+      }
+
+      // Get enhanced content data if available
+      let enhancedContent = null
+      if (typeof window !== "undefined" && window.chrome?.storage) {
+        const result = await new Promise((resolve) => {
+          window.chrome.storage.local.get(["enhancedContent"], resolve)
+        })
+        enhancedContent = result.enhancedContent
+      }
+
+      // Prepare request body with enhanced content data
+      const requestBody = {
+        sourceText: selectedText,
+        lessonType,
+        studentLevel,
+        targetLanguage,
+        sourceUrl,
+      }
+
+      // Add enhanced content data if available
+      if (enhancedContent) {
+        requestBody.contentMetadata = enhancedContent.metadata
+        requestBody.structuredContent = enhancedContent.structuredContent
+        requestBody.wordCount = enhancedContent.wordCount
+        requestBody.readingTime = enhancedContent.readingTime
       }
 
       // Call the AI generation API
@@ -97,13 +124,7 @@ export default function LessonGenerator({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          sourceText: selectedText,
-          lessonType,
-          studentLevel,
-          targetLanguage,
-          sourceUrl,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {

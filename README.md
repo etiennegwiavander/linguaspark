@@ -5,6 +5,7 @@ Transform any webpage into interactive language lesson material with AI-powered 
 ## Features
 
 ### 🎯 Core Functionality
+
 - **Content Extraction**: Extract text from any webpage or selected content
 - **AI-Powered Generation**: Uses Google AI APIs for intelligent lesson creation
 - **Multi-Level Support**: Supports CEFR levels A1-C1
@@ -12,6 +13,7 @@ Transform any webpage into interactive language lesson material with AI-powered 
 - **Professional Export**: Export lessons as PDF or Word documents
 
 ### 🤖 AI Pipeline
+
 - **Summarizer API**: Extracts key points from source content
 - **Translator API**: Translates content to target language
 - **Prompt API**: Generates structured lesson frameworks
@@ -20,12 +22,14 @@ Transform any webpage into interactive language lesson material with AI-powered 
 - **Proofreader API**: Ensures grammar and style quality
 
 ### 🔐 Backend Integration
+
 - **Supabase Authentication**: Secure tutor accounts
 - **Lesson Storage**: Save and manage generated lessons
 - **Student Management**: Track student progress and preferences
 - **Export Tracking**: Monitor lesson usage and exports
 
 ### 📱 Extension Features
+
 - **Chrome Extension**: Manifest v3 compatible
 - **Context Menu**: Right-click to generate lessons from selected text
 - **Popup Interface**: Clean, intuitive lesson generation UI
@@ -34,6 +38,7 @@ Transform any webpage into interactive language lesson material with AI-powered 
 ## Installation
 
 ### Prerequisites
+
 - Node.js 18+ and npm
 - Chrome browser for extension testing
 - Supabase account for backend services
@@ -79,16 +84,19 @@ Transform any webpage into interactive language lesson material with AI-powered 
 ### For Tutors
 
 1. **Authentication**
+
    - Sign up or sign in through the extension popup
    - Your lessons are automatically saved to your account
 
 2. **Generate Lessons**
+
    - Navigate to any webpage with educational content
    - Click the LinguaSpark extension icon
    - Select lesson type, student level, and target language
    - Click "Generate AI Lesson"
 
 3. **Customize Lessons**
+
    - Toggle lesson sections on/off
    - Review and modify generated content
    - Export as PDF or Word document
@@ -116,22 +124,26 @@ Transform any webpage into interactive language lesson material with AI-powered 
 ## Technical Architecture
 
 ### Frontend
+
 - **Next.js 14**: React framework with App Router
 - **Tailwind CSS**: Utility-first styling
 - **Shadcn UI**: Component library
 - **TypeScript**: Type-safe development
 
 ### Backend
+
 - **Supabase**: Authentication, database, and storage
 - **Row Level Security**: Data protection and privacy
 - **PostgreSQL**: Relational database with JSONB support
 
 ### AI Integration
+
 - **Google AI APIs**: Complete pipeline for content processing
 - **Fallback System**: Template-based generation when APIs fail
 - **Error Handling**: Graceful degradation and user feedback
 
 ### Export System
+
 - **jsPDF**: Client-side PDF generation
 - **docx**: Professional Word document creation
 - **Custom Formatting**: Engoo-style lesson layouts
@@ -139,24 +151,27 @@ Transform any webpage into interactive language lesson material with AI-powered 
 ## Development
 
 ### Project Structure
+
 \`\`\`
-├── app/                    # Next.js app directory
-├── components/            # React components
-├── lib/                   # Utility libraries
-├── scripts/              # Database scripts
-├── public/               # Static assets
-├── manifest.json         # Chrome extension manifest
-├── background.js         # Extension background script
-└── content.js           # Extension content script
+├── app/ # Next.js app directory
+├── components/ # React components
+├── lib/ # Utility libraries
+├── scripts/ # Database scripts
+├── public/ # Static assets
+├── manifest.json # Chrome extension manifest
+├── background.js # Extension background script
+└── content.js # Extension content script
 \`\`\`
 
 ### Key Components
+
 - `lesson-generator.tsx`: AI-powered lesson generation interface
 - `lesson-display.tsx`: Interactive lesson viewer with export
 - `auth-wrapper.tsx`: Authentication and user management
 - `export-utils.ts`: PDF and Word export functionality
 
 ### API Routes
+
 - `/api/generate-lesson`: AI lesson generation endpoint
 - `/api/export-lesson`: Export tracking and preparation
 
@@ -175,6 +190,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 For support and questions:
+
 - Open an issue on GitHub
 - Contact the development team
 - Check the documentation wiki

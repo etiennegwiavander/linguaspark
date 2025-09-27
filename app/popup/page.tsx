@@ -50,8 +50,20 @@ export default function PopupPage() {
         if (tabs[0]?.id) {
           window.chrome.tabs.sendMessage(tabs[0].id, { action: "getPageContent" }, (response: any) => {
             if (response && response.content) {
-              setSelectedText(response.content.substring(0, 2000))
-              setSourceUrl(tabs[0].url)
+              // Handle enhanced content extraction
+              if (typeof response.content === 'object') {
+                setSelectedText(response.content.text.substring(0, 2000))
+                setSourceUrl(tabs[0].url)
+                // Store enhanced content data for lesson generation
+                window.chrome.storage.local.set({
+                  enhancedContent: response.content,
+                  sourceUrl: tabs[0].url,
+                })
+              } else {
+                // Fallback for simple text content
+                setSelectedText(response.content.substring(0, 2000))
+                setSourceUrl(tabs[0].url)
+              }
             }
           })
         }
