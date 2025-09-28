@@ -1,5 +1,5 @@
 {
   "/page": "app/page.js",
   "/popup/page": "app/popup/page.js",
-  "/api/export-lesson/route": "app/api/export-lesson/route.js"
+  "/api/generate-lesson/route": "app/api/generate-lesson/route.js"
 }

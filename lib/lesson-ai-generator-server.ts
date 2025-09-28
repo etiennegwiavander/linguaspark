@@ -174,6 +174,8 @@ export class LessonAIServerGenerator {
       culturalContext: '',
       learningObjectives: [],
       difficulty: studentLevel || 'B1',
+      title: metadata?.title || '',
+      sourceCountry: this.determineSourceCountry(metadata?.domain || ''),
     }
 
     // Analyze content complexity based on text characteristics
@@ -310,6 +312,108 @@ Summary:`
     }
   }
 
+  // Generate CEFR-adapted warm-up questions
+  private async generateContextualWarmupQuestions(
+    content: string,
+    contentAnalysis: any,
+    studentLevel: string,
+    metadata?: any
+  ) {
+    console.log("🔥 Generating CEFR-adapted warm-up questions...")
+    
+    const levelInstructions = {
+      'A1': `
+Create 3 warm-up questions for A1 (beginner) level:
+- Use simple present tense and basic vocabulary
+- Ask yes/no questions or simple choice questions
+- Focus on familiar, concrete concepts
+- Keep questions short and direct
+- Use vocabulary the student likely knows
+Example: "Do you use [topic] in your daily life? Yes or No?"`,
+      
+      'A2': `
+Create 3 warm-up questions for A2 (elementary) level:
+- Use simple past tense and personal experiences
+- Ask for short, simple answers
+- Include basic comparisons with "different" or "same"
+- Focus on personal experiences and familiar situations
+- Use simple connecting words like "and", "but"
+Example: "Have you ever [experienced topic]? How was it?"`,
+      
+      'B1': `
+Create 3 warm-up questions for B1 (intermediate) level:
+- Ask for opinions with "What do you think...?"
+- Include comparisons between countries/cultures
+- Ask students to explain reasons with "because" or "why"
+- Discuss advantages and disadvantages
+- Use more varied vocabulary but keep structure clear
+Example: "What do you think about [topic]? How is it different in your country?"`,
+      
+      'B2': `
+Create 3 warm-up questions for B2 (upper intermediate) level:
+- Ask students to analyze situations and predict outcomes
+- Include complex opinions and explanations
+- Discuss implications and consequences
+- Use conditional language ("What would happen if...?")
+- Encourage detailed responses with examples
+Example: "What challenges do you think [specific group] face with [topic]?"`,
+      
+      'C1': `
+Create 3 warm-up questions for C1 (advanced) level:
+- Ask students to evaluate arguments and consider multiple perspectives
+- Include abstract concepts and societal implications
+- Use sophisticated vocabulary and complex structures
+- Encourage critical thinking and nuanced discussion
+- Ask about broader cultural and social contexts
+Example: "How do cultural attitudes toward [concept] influence [topic] in different societies?"`
+    }
+
+    const warmupPrompt = `Generate 3 contextual warm-up questions for a ${studentLevel} level student learning English.
+
+CONTENT CONTEXT:
+- Title: ${metadata?.title || 'Content'}
+- Source: ${contentAnalysis.sourceCountry} (${contentAnalysis.domain})
+- Content Type: ${contentAnalysis.contentType}
+- Main Topics: ${contentAnalysis.topics.slice(0, 3).join(', ')}
+- Key Vocabulary: ${contentAnalysis.keyVocabulary.slice(0, 4).join(', ')}
+- Cultural Context: ${contentAnalysis.culturalContext}
+
+LEVEL REQUIREMENTS:
+${levelInstructions[studentLevel] || levelInstructions['B1']}
+
+CONTENT PREVIEW: "${content.substring(0, 500)}"
+
+Generate 3 warm-up questions that:
+1. Reference specific details from the content (title, topics, or key concepts)
+2. Connect to the student's personal experience and cultural background
+3. Are appropriate for ${studentLevel} level complexity
+4. Prepare students for the vocabulary and concepts they'll encounter
+5. Create curiosity about the specific material
+
+Return only the 3 questions, one per line:`
+
+    try {
+      console.log("🤖 Calling AI for contextual warm-up questions...")
+      const response = await this.getGoogleAI().prompt(warmupPrompt, {
+        temperature: 0.6,
+        maxTokens: 300,
+      })
+      
+      console.log("✅ AI warm-up questions generated")
+      const questions = this.parseListFromText(response).slice(0, 3)
+      
+      // Ensure we have 3 questions, add fallbacks if needed
+      while (questions.length < 3) {
+        questions.push(this.getFallbackWarmupQuestion(studentLevel, contentAnalysis, questions.length))
+      }
+      
+      return questions
+    } catch (error) {
+      console.warn("⚠️ AI warm-up generation failed, using contextual fallbacks:", error.message)
+      return this.getContextualWarmupFallback(studentLevel, contentAnalysis, metadata)
+    }
+  }
+
   // Enhanced contextual lesson structure generation
   private async generateContextualLessonStructure(
     content: string,
@@ -320,6 +424,14 @@ Summary:`
     metadata?: any
   ) {
     console.log("🏗️ Generating contextual lesson structure...")
+    
+    // Generate contextual warm-up questions first
+    const contextualWarmup = await this.generateContextualWarmupQuestions(
+      content,
+      contentAnalysis,
+      studentLevel,
+      metadata
+    )
     
     const prompt = `Create a highly contextual ${lessonType} lesson for ${studentLevel} level students learning ${targetLanguage}.
 
@@ -336,7 +448,7 @@ LESSON CONTENT: "${content.substring(0, 1000)}"
 Create a JSON structure with these sections, making each section highly relevant to the source content:
 
 {
-  "warmup": ["question 1", "question 2", "question 3"],
+  "warmup": ${JSON.stringify(contextualWarmup)},
   "vocabulary": [
     {"word": "word1", "meaning": "definition", "example": "example sentence"},
     {"word": "word2", "meaning": "definition", "example": "example sentence"}
@@ -901,17 +1013,14 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
   }
 
   private getContextualWarmup(lessonType: string, studentLevel: string, topics: string[], contentType: string): string[] {
-    const baseQuestions = this.getTemplateWarmup(lessonType, studentLevel)
-    
-    if (topics.length > 0) {
-      return [
-        `What do you know about ${topics[0]?.toLowerCase()}?`,
-        `Have you experienced anything related to ${topics[1]?.toLowerCase() || topics[0]?.toLowerCase()}?`,
-        `What would you like to learn about this ${contentType} content?`,
-      ]
+    // Use the same contextual fallback logic
+    const mockAnalysis = {
+      topics: topics,
+      contentType: contentType,
+      sourceCountry: 'International'
     }
     
-    return baseQuestions
+    return this.getContextualWarmupFallback(studentLevel, mockAnalysis, { title: topics[0] || 'Content' })
   }
 
   private extractContextualVocabulary(text: string, studentLevel: string, topics: string[]) {
@@ -968,6 +1077,105 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     }
     
     return this.getTemplateWrapup(lessonType)
+  }
+
+  // Helper method to determine source country from domain
+  private determineSourceCountry(domain: string): string {
+    const countryMap = {
+      'bbc.com': 'United Kingdom',
+      'bbc.co.uk': 'United Kingdom', 
+      'cnn.com': 'United States',
+      'nytimes.com': 'United States',
+      'theguardian.com': 'United Kingdom',
+      'washingtonpost.com': 'United States',
+      'reuters.com': 'International',
+      'ap.org': 'United States',
+      'npr.org': 'United States',
+      'abc.net.au': 'Australia',
+      'cbc.ca': 'Canada',
+    }
+    
+    for (const [domainKey, country] of Object.entries(countryMap)) {
+      if (domain.includes(domainKey)) {
+        return country
+      }
+    }
+    
+    return 'International'
+  }
+
+  // Fallback warm-up question generator
+  private getFallbackWarmupQuestion(level: string, contentAnalysis: any, questionIndex: number): string {
+    const topic = contentAnalysis.topics[0] || 'this topic'
+    const contentType = contentAnalysis.contentType
+    
+    const fallbackQuestions = {
+      'A1': [
+        `Do you know about ${topic.toLowerCase()}?`,
+        `Is ${topic.toLowerCase()} important in your country?`,
+        `Do you like to read about ${topic.toLowerCase()}?`
+      ],
+      'A2': [
+        `Have you heard about ${topic.toLowerCase()} before?`,
+        `What do you know about ${topic.toLowerCase()}?`,
+        `Is ${topic.toLowerCase()} different in your country?`
+      ],
+      'B1': [
+        `What do you think about ${topic.toLowerCase()}?`,
+        `How is ${topic.toLowerCase()} important in your daily life?`,
+        `What would you like to know about ${topic.toLowerCase()}?`
+      ],
+      'B2': [
+        `What are your thoughts on ${topic.toLowerCase()}?`,
+        `How might ${topic.toLowerCase()} affect people in different countries?`,
+        `What questions would you ask about ${topic.toLowerCase()}?`
+      ],
+      'C1': [
+        `How do cultural perspectives influence attitudes toward ${topic.toLowerCase()}?`,
+        `What are the broader implications of ${topic.toLowerCase()} in modern society?`,
+        `How might ${topic.toLowerCase()} evolve in the coming years?`
+      ]
+    }
+    
+    const levelQuestions = fallbackQuestions[level] || fallbackQuestions['B1']
+    return levelQuestions[questionIndex] || levelQuestions[0]
+  }
+
+  // Contextual warm-up fallback when AI fails
+  private getContextualWarmupFallback(level: string, contentAnalysis: any, metadata?: any): string[] {
+    const topic = contentAnalysis.topics[0] || 'this topic'
+    const sourceCountry = contentAnalysis.sourceCountry || 'this country'
+    const title = metadata?.title || 'this content'
+    
+    const fallbackSets = {
+      'A1': [
+        `Do you know about ${topic.toLowerCase()}?`,
+        `Is this topic common in your country?`,
+        `Do you want to learn about ${topic.toLowerCase()}?`
+      ],
+      'A2': [
+        `Have you experienced ${topic.toLowerCase()} before?`,
+        `What is ${topic.toLowerCase()} like in your country?`,
+        `Why is ${topic.toLowerCase()} interesting to you?`
+      ],
+      'B1': [
+        `What do you think about ${topic.toLowerCase()}?`,
+        `How is ${topic.toLowerCase()} different in your country compared to ${sourceCountry}?`,
+        `What would you expect to learn from this ${contentAnalysis.contentType}?`
+      ],
+      'B2': [
+        `What are your thoughts on how ${topic.toLowerCase()} is presented in ${sourceCountry} media?`,
+        `What challenges do you think people face with ${topic.toLowerCase()}?`,
+        `How might your perspective on ${topic.toLowerCase()} differ from the author's?`
+      ],
+      'C1': [
+        `How do cultural attitudes toward ${topic.toLowerCase()} vary between ${sourceCountry} and your country?`,
+        `What are the broader societal implications of ${topic.toLowerCase()}?`,
+        `How might the perspective in this ${contentAnalysis.contentType} reflect ${sourceCountry} values?`
+      ]
+    }
+    
+    return fallbackSets[level] || fallbackSets['B1']
   }
 }
 
