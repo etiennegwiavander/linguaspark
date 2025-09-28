@@ -42,14 +42,35 @@ interface ProofreaderOptions {
 
 class GoogleAIServerService {
   private config: GoogleAIConfig
-  private model: string = "gemini-1.5-flash"
+  private model: string = "models/gemini-2.5-flash" // Use actual available model
 
   constructor(config: GoogleAIConfig) {
     this.config = config
   }
 
   private async makeGeminiRequest(prompt: string, options: any = {}) {
-    const url = `${this.config.baseUrl}/v1beta/models/${this.model}:generateContent?key=${this.config.apiKey}`
+    // Try different model names based on actual available models from API
+    const modelsToTry = [
+      'models/gemini-2.5-flash',
+      'models/gemini-2.5-pro', 
+      'models/gemini-2.0-flash',
+      'models/gemini-flash-latest',
+      'models/gemini-pro-latest',
+      'models/gemini-2.0-flash-001',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-2.0-flash',
+      'gemini-flash-latest',
+      'gemini-pro-latest'
+    ]
+    
+    const possibleUrls = []
+    
+    // Generate URLs for different combinations
+    for (const model of modelsToTry) {
+      possibleUrls.push(`${this.config.baseUrl}/v1beta/models/${model}:generateContent?key=${this.config.apiKey}`)
+      possibleUrls.push(`${this.config.baseUrl}/v1/models/${model}:generateContent?key=${this.config.apiKey}`)
+    }
     
     const requestBody = {
       contents: [{
@@ -64,27 +85,52 @@ class GoogleAIServerService {
       }
     }
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    })
+    console.log("🔗 Trying Gemini API endpoints...")
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Gemini API Error:", errorText)
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`)
+    // Try each URL until one works
+    for (let i = 0; i < possibleUrls.length; i++) {
+      const url = possibleUrls[i]
+      console.log(`🌐 Attempt ${i + 1}: ${url.replace(this.config.apiKey, 'API_KEY_HIDDEN')}`)
+      
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        })
+
+        console.log(`📡 Response status: ${response.status} ${response.statusText}`)
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log("✅ Successful API response received")
+          
+          if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+            return result.candidates[0].content.parts[0].text
+          } else {
+            console.warn("⚠️ Invalid response structure:", result)
+            throw new Error("Invalid response structure from Gemini API")
+          }
+        } else {
+          const errorText = await response.text()
+          console.warn(`❌ Attempt ${i + 1} failed:`, response.status, errorText)
+          
+          // If this is the last attempt, throw the error
+          if (i === possibleUrls.length - 1) {
+            throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`)
+          }
+        }
+      } catch (error) {
+        console.warn(`❌ Attempt ${i + 1} exception:`, error.message)
+        
+        // If this is the last attempt, throw the error
+        if (i === possibleUrls.length - 1) {
+          throw error
+        }
+      }
     }
-
-    const result = await response.json()
-    
-    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
-      throw new Error("Invalid response from Gemini API")
-    }
-
-    return result.candidates[0].content.parts[0].text
   }
 
   async summarize(text: string, options: SummarizerOptions = {}) {

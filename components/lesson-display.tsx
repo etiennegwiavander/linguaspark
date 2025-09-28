@@ -63,6 +63,29 @@ interface LessonDisplayProps {
 }
 
 export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNewLesson }: LessonDisplayProps) {
+  // Ensure lesson has proper structure with fallbacks
+  const safeLesson = {
+    ...lesson,
+    sections: {
+      warmup: lesson.sections?.warmup || [],
+      vocabulary: lesson.sections?.vocabulary || [],
+      reading: lesson.sections?.reading || "",
+      comprehension: lesson.sections?.comprehension || [],
+      discussion: lesson.sections?.discussion || [],
+      grammar: lesson.sections?.grammar || {
+        focus: "Grammar Focus",
+        examples: [],
+        exercise: []
+      },
+      pronunciation: lesson.sections?.pronunciation || {
+        word: "example",
+        ipa: "/ɪɡˈzæmpəl/",
+        practice: "This is an example sentence."
+      },
+      wrapup: lesson.sections?.wrapup || []
+    }
+  }
+
   const [sectionStates, setSectionStates] = useState<Record<string, boolean>>({
     warmup: true,
     vocabulary: true,
@@ -90,7 +113,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     setExportError("")
 
     try {
-      await lessonExporter.exportToPDF(lesson, sectionStates)
+      await lessonExporter.exportToPDF(safeLesson, sectionStates)
 
       if (lesson.id) {
         await fetch("/api/export-lesson", {
@@ -115,7 +138,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     setExportError("")
 
     try {
-      await lessonExporter.exportToWord(lesson, sectionStates)
+      await lessonExporter.exportToWord(safeLesson, sectionStates)
 
       if (lesson.id) {
         await fetch("/api/export-lesson", {
@@ -143,7 +166,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.warmup,
       content: (
         <div className="space-y-2">
-          {lesson.sections.warmup.map((question, index) => (
+          {safeLesson.sections.warmup.map((question, index) => (
             <div key={index} className="flex items-start gap-2">
               <span className="text-primary font-medium text-sm">{index + 1}.</span>
               <p className="text-sm">{question}</p>
@@ -159,7 +182,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.vocabulary,
       content: (
         <div className="space-y-3">
-          {lesson.sections.vocabulary.map((item, index) => (
+          {safeLesson.sections.vocabulary.map((item, index) => (
             <div key={index} className="border rounded-lg p-3 bg-muted/30">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-primary">{item.word}</span>
@@ -182,7 +205,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       content: (
         <div className="prose prose-sm max-w-none">
           <div className="bg-muted/30 rounded-lg p-4 border">
-            <p className="text-sm leading-relaxed">{lesson.sections.reading}</p>
+            <p className="text-sm leading-relaxed">{safeLesson.sections.reading}</p>
           </div>
         </div>
       ),
@@ -194,7 +217,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.comprehension,
       content: (
         <div className="space-y-2">
-          {lesson.sections.comprehension.map((question, index) => (
+          {safeLesson.sections.comprehension.map((question, index) => (
             <div key={index} className="flex items-start gap-2">
               <span className="text-primary font-medium text-sm">{index + 1}.</span>
               <p className="text-sm">{question}</p>
@@ -210,7 +233,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.discussion,
       content: (
         <div className="space-y-2">
-          {lesson.sections.discussion.map((question, index) => (
+          {safeLesson.sections.discussion.map((question, index) => (
             <div key={index} className="flex items-start gap-2">
               <span className="text-primary font-medium text-sm">{index + 1}.</span>
               <p className="text-sm">{question}</p>
@@ -227,9 +250,9 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       content: (
         <div className="space-y-4">
           <div>
-            <h4 className="font-medium text-sm mb-2">Focus: {lesson.sections.grammar.focus}</h4>
+            <h4 className="font-medium text-sm mb-2">Focus: {safeLesson.sections.grammar.focus}</h4>
             <div className="space-y-1">
-              {lesson.sections.grammar.examples.map((example, index) => (
+              {safeLesson.sections.grammar.examples.map((example, index) => (
                 <p key={index} className="text-sm bg-muted/30 rounded px-2 py-1">
                   {example}
                 </p>
@@ -239,7 +262,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           <div>
             <h4 className="font-medium text-sm mb-2">Practice Exercise</h4>
             <div className="space-y-1">
-              {lesson.sections.grammar.exercise.map((exercise, index) => (
+              {safeLesson.sections.grammar.exercise.map((exercise, index) => (
                 <p key={index} className="text-sm font-mono bg-accent/30 rounded px-2 py-1">
                   {exercise}
                 </p>
@@ -257,15 +280,15 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       content: (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <span className="font-semibold text-lg">{lesson.sections.pronunciation.word}</span>
-            <span className="text-muted-foreground font-mono">{lesson.sections.pronunciation.ipa}</span>
+            <span className="font-semibold text-lg">{safeLesson.sections.pronunciation.word}</span>
+            <span className="text-muted-foreground font-mono">{safeLesson.sections.pronunciation.ipa}</span>
             <Button variant="outline" size="sm">
               <Volume2 className="h-4 w-4" />
             </Button>
           </div>
           <div className="bg-muted/30 rounded-lg p-3">
             <p className="text-sm">Practice sentence:</p>
-            <p className="text-sm font-medium mt-1">"{lesson.sections.pronunciation.practice}"</p>
+            <p className="text-sm font-medium mt-1">"{safeLesson.sections.pronunciation.practice}"</p>
           </div>
         </div>
       ),
@@ -277,7 +300,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.wrapup,
       content: (
         <div className="space-y-2">
-          {lesson.sections.wrapup.map((question, index) => (
+          {safeLesson.sections.wrapup.map((question, index) => (
             <div key={index} className="flex items-start gap-2">
               <span className="text-primary font-medium text-sm">{index + 1}.</span>
               <p className="text-sm">{question}</p>
@@ -288,16 +311,46 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     },
   ]
 
+  // Debug logging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log("🎓 Lesson Display - Received lesson:", {
+      hasLesson: !!lesson,
+      hasSections: !!lesson?.sections,
+      sectionKeys: lesson?.sections ? Object.keys(lesson.sections) : [],
+      lessonStructure: lesson
+    })
+    console.log("🛡️ Safe lesson structure:", safeLesson)
+  }
+
   return (
     <div className="space-y-4">
+      {/* Debug Info in Development */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-yellow-800">Debug Info (Development Only)</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-xs text-yellow-700 space-y-1">
+              <div>Lesson Type: {safeLesson.lessonType}</div>
+              <div>Student Level: {safeLesson.studentLevel}</div>
+              <div>Target Language: {safeLesson.targetLanguage}</div>
+              <div>Sections: {Object.keys(safeLesson.sections).join(', ')}</div>
+              <div>Warmup Items: {safeLesson.sections.warmup.length}</div>
+              <div>Vocabulary Items: {safeLesson.sections.vocabulary.length}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Generated Lesson</h2>
           <div className="flex gap-2 mt-1">
-            <Badge variant="default">{lesson.lessonType}</Badge>
-            <Badge variant="outline">{lesson.studentLevel}</Badge>
-            <Badge variant="secondary">{lesson.targetLanguage}</Badge>
+            <Badge variant="default">{safeLesson.lessonType}</Badge>
+            <Badge variant="outline">{safeLesson.studentLevel}</Badge>
+            <Badge variant="secondary">{safeLesson.targetLanguage}</Badge>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={onNewLesson}>

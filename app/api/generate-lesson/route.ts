@@ -46,6 +46,42 @@ export async function POST(request: NextRequest) {
       readingTime,
     })
 
+    console.log("🎓 Generated lesson structure:", {
+      hasLesson: !!lesson,
+      hasSections: !!lesson?.sections,
+      sectionKeys: lesson?.sections ? Object.keys(lesson.sections) : [],
+      lessonType: lesson?.lessonType,
+      studentLevel: lesson?.studentLevel,
+      targetLanguage: lesson?.targetLanguage
+    })
+
+    // Ensure lesson has proper structure
+    const safeLesson = {
+      lessonType: lesson.lessonType || lessonType,
+      studentLevel: lesson.studentLevel || studentLevel,
+      targetLanguage: lesson.targetLanguage || targetLanguage,
+      sections: {
+        warmup: lesson.sections?.warmup || ["What do you already know about this topic?", "Have you had similar experiences?", "What would you like to learn more about?"],
+        vocabulary: lesson.sections?.vocabulary || [],
+        reading: lesson.sections?.reading || sourceText.substring(0, 500),
+        comprehension: lesson.sections?.comprehension || ["What is the main idea of this text?", "What supporting details can you identify?"],
+        discussion: lesson.sections?.discussion || ["What is your opinion on this topic?", "How would you handle this situation?"],
+        grammar: lesson.sections?.grammar || {
+          focus: "Present Perfect Tense",
+          examples: ["I have learned many new things.", "She has improved her skills."],
+          exercise: ["I _____ (learn) a lot today.", "They _____ (complete) the project."]
+        },
+        pronunciation: lesson.sections?.pronunciation || {
+          word: "communication",
+          ipa: "/kəˌmjuːnɪˈkeɪʃən/",
+          practice: "Practice saying: communication in a sentence."
+        },
+        wrapup: lesson.sections?.wrapup || ["What new vocabulary did you learn?", "Which concepts need more practice?"]
+      }
+    }
+
+    console.log("✅ Safe lesson structure created with all required sections")
+
     // Save lesson to database
     const { data: savedLesson, error: saveError } = await supabase
       .from("lessons")
@@ -57,7 +93,7 @@ export async function POST(request: NextRequest) {
         target_language: targetLanguage,
         source_url: sourceUrl,
         source_text: sourceText,
-        lesson_data: lesson,
+        lesson_data: safeLesson,
       })
       .select()
       .single()
@@ -65,12 +101,12 @@ export async function POST(request: NextRequest) {
     if (saveError) {
       console.error("Error saving lesson:", saveError)
       // Return lesson even if save fails
-      return NextResponse.json({ lesson })
+      return NextResponse.json({ lesson: safeLesson })
     }
 
     return NextResponse.json({
       lesson: {
-        ...lesson,
+        ...safeLesson,
         id: savedLesson.id,
       },
     })

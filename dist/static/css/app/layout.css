@@ -145,6 +145,10 @@
     --color-red-300: oklch(80.8% 0.114 19.571);
     --color-red-400: oklch(70.4% 0.191 22.216);
     --color-red-600: oklch(57.7% 0.245 27.325);
+    --color-yellow-50: oklch(98.7% 0.026 102.212);
+    --color-yellow-200: oklch(94.5% 0.129 101.54);
+    --color-yellow-700: oklch(55.4% 0.135 66.442);
+    --color-yellow-800: oklch(47.6% 0.114 61.907);
     --color-black: #000;
     --color-white: #fff;
     --spacing: 0.25rem;
@@ -1342,6 +1346,9 @@
   .border-transparent {
     border-color: transparent;
   }
+  .border-yellow-200 {
+    border-color: var(--color-yellow-200);
+  }
   .border-t-transparent {
     border-top-color: transparent;
   }
@@ -1419,6 +1426,9 @@
   }
   .bg-transparent {
     background-color: transparent;
+  }
+  .bg-yellow-50 {
+    background-color: var(--color-yellow-50);
   }
   .bg-repeat {
     background-repeat: repeat;
@@ -1674,6 +1684,12 @@
   }
   .text-white {
     color: var(--color-white);
+  }
+  .text-yellow-700 {
+    color: var(--color-yellow-700);
+  }
+  .text-yellow-800 {
+    color: var(--color-yellow-800);
   }
   .capitalize {
     text-transform: capitalize;
