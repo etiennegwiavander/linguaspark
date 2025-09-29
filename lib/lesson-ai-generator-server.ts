@@ -63,11 +63,11 @@ export class LessonAIServerGenerator {
   }
 
   async generateLesson(params: LessonGenerationParams): Promise<GeneratedLesson> {
-    const { 
-      sourceText, 
-      lessonType, 
-      studentLevel, 
-      targetLanguage, 
+    const {
+      sourceText,
+      lessonType,
+      studentLevel,
+      targetLanguage,
       sourceUrl,
       contentMetadata,
       structuredContent,
@@ -75,7 +75,7 @@ export class LessonAIServerGenerator {
       readingTime
     } = params
 
-    console.log("🚀 Starting AI lesson generation with params:", {
+    console.log("🚀 Starting optimized AI lesson generation with params:", {
       textLength: sourceText.length,
       lessonType,
       studentLevel,
@@ -85,75 +85,318 @@ export class LessonAIServerGenerator {
     })
 
     try {
-      // Step 1: Analyze content context and complexity
-      console.log("📊 Step 1: Analyzing content context...")
-      const contentAnalysis = await this.analyzeContentContext(
+      // Use ultra-minimal AI approach to avoid MAX_TOKENS
+      console.log("🤖 Step 1: Generating lesson with ultra-minimal AI prompts...")
+      const lessonStructure = await this.generateMinimalAILesson(
         sourceText,
-        contentMetadata,
-        structuredContent,
-        studentLevel
-      )
-      console.log("✅ Content analysis complete:", contentAnalysis)
-
-      // Step 2: Create contextual summary based on lesson type and content analysis
-      console.log("📝 Step 2: Creating contextual summary...")
-      const contextualSummary = await this.createContextualSummary(
-        sourceText,
-        contentAnalysis,
-        lessonType,
-        studentLevel
-      )
-      console.log("✅ Contextual summary created, length:", contextualSummary.length)
-
-      // Step 3: Translate if needed (for non-English target languages)
-      let translatedContent = contextualSummary
-      if (targetLanguage !== "english") {
-        console.log("🌐 Step 3: Translating to", targetLanguage)
-        translatedContent = await this.getGoogleAI().translate(contextualSummary, {
-          targetLanguage: this.getLanguageCode(targetLanguage),
-        })
-        console.log("✅ Translation complete, length:", translatedContent.length)
-      } else {
-        console.log("⏭️ Step 3: Skipping translation (target is English)")
-      }
-
-      // Step 4: Generate contextual lesson structure
-      console.log("🏗️ Step 4: Generating lesson structure...")
-      const lessonStructure = await this.generateContextualLessonStructure(
-        translatedContent,
-        contentAnalysis,
         lessonType,
         studentLevel,
         targetLanguage,
         contentMetadata
       )
-      console.log("✅ Lesson structure generated:", Object.keys(lessonStructure))
+      console.log("✅ Minimal AI lesson generated:", Object.keys(lessonStructure))
 
-      // Step 5: Generate detailed content for each section with context
-      console.log("🔧 Step 5: Enhancing lesson content...")
-      const detailedLesson = await this.generateDetailedContextualContent(
-        lessonStructure,
-        translatedContent,
-        contentAnalysis,
+      // Return properly structured GeneratedLesson object
+      const finalLesson: GeneratedLesson = {
         lessonType,
         studentLevel,
         targetLanguage,
-        structuredContent
-      )
-      console.log("✅ Detailed content generated")
+        sections: lessonStructure
+      }
 
-      // Step 6: Proofread and polish the final lesson
-      console.log("✨ Step 6: Proofreading lesson...")
-      const polishedLesson = await this.proofreadLesson(detailedLesson)
-      console.log("🎉 AI lesson generation complete!")
+      console.log("🎯 Returning AI-generated lesson:", {
+        lessonType: finalLesson.lessonType,
+        studentLevel: finalLesson.studentLevel,
+        targetLanguage: finalLesson.targetLanguage,
+        sectionsCount: Object.keys(finalLesson.sections).length,
+        warmupCount: finalLesson.sections.warmup?.length || 0,
+        vocabularyCount: finalLesson.sections.vocabulary?.length || 0
+      })
 
-      return polishedLesson
+      console.log("🎉 Optimized AI lesson generation complete!")
+      return finalLesson
     } catch (error) {
       console.error("❌ Error in AI lesson generation:", error)
-      console.log("🔄 Falling back to enhanced template generation...")
-      // Fallback to enhanced template-based generation with context
-      return this.generateEnhancedFallbackLesson(params)
+      console.log("🔄 Falling back to smart template generation...")
+      // Fallback to smart templates if AI fails
+      return this.generateSmartTemplateFallback(params)
     }
+  }
+
+  // Ultra-minimal AI lesson generation to avoid MAX_TOKENS
+  private async generateMinimalAILesson(
+    sourceText: string,
+    lessonType: string,
+    studentLevel: string,
+    targetLanguage: string,
+    metadata?: any
+  ) {
+    console.log("🎯 Using ultra-minimal AI prompts to avoid token limits...")
+
+    // Step 1: Generate just the essential parts with minimal prompts
+    const warmupQuestions = await this.generateMinimalWarmup(sourceText, studentLevel)
+    const vocabulary = await this.generateMinimalVocabulary(sourceText, studentLevel)
+    const comprehensionQuestions = await this.generateMinimalComprehension(sourceText, studentLevel)
+
+    // Step 2: Use hybrid approach - AI for key parts, templates for the rest
+    return {
+      warmup: this.addWarmupInstructions(warmupQuestions, studentLevel),
+      vocabulary: vocabulary,
+      reading: this.generateSmartReading(sourceText, studentLevel),
+      comprehension: this.addComprehensionInstructions(comprehensionQuestions, studentLevel),
+      discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(this.extractBetterTopics(sourceText), lessonType, studentLevel), studentLevel),
+      grammar: this.generateSmartGrammar(studentLevel, sourceText),
+      pronunciation: this.generateSmartPronunciation(vocabulary.map(v => v.word)),
+      wrapup: this.addWrapupInstructions(this.generateSmartWrapup(this.extractBetterTopics(sourceText), studentLevel), studentLevel)
+    }
+  }
+
+  // Ultra-minimal warmup generation
+  private async generateMinimalWarmup(sourceText: string, studentLevel: string): Promise<string[]> {
+    // Extract better context for topic identification
+    const topics = this.extractBetterTopics(sourceText)
+    const mainTopic = topics[0] || 'this topic'
+
+    // Create a more specific prompt that avoids content assumptions
+    const prompt = `Write 3 ${studentLevel} warm-up questions about ${mainTopic}. Ask about students' prior knowledge and experience. Do not mention any specific events or results. Format: just the questions, one per line:`
+
+    try {
+      console.log("🔥 Minimal warmup prompt:", prompt.length, "chars")
+      console.log("🎯 Topic identified:", mainTopic)
+      const response = await this.getGoogleAI().prompt(prompt)
+
+      // Extract only actual questions (must end with ?)
+      const questions = response.split('\n')
+        .map(line => line.trim())
+        .filter(line => {
+          // Must be a question (ends with ?) and not an instruction
+          return line.endsWith('?') &&
+            line.length > 10 &&
+            !line.toLowerCase().includes('here are') &&
+            !line.toLowerCase().includes('based on') &&
+            !line.toLowerCase().includes('headline mentions') &&
+            !line.toLowerCase().includes('the text') &&
+            !line.toLowerCase().includes('the article') &&
+            !line.toLowerCase().includes('according to') &&
+            !line.toLowerCase().includes('the passage')
+        })
+        .map(line => line.replace(/^\d+\.?\s*/, '').replace(/^-\s*/, '').trim())
+        .slice(0, 3)
+
+      console.log("🎯 Extracted warmup questions:", questions)
+
+      return questions.length >= 3 ? questions : this.generateSmartWarmupQuestions(
+        topics,
+        studentLevel,
+        {}
+      )
+    } catch (error) {
+      console.log("⚠️ Minimal warmup failed, using template")
+      return this.generateSmartWarmupQuestions(
+        this.extractBetterTopics(sourceText),
+        studentLevel,
+        {}
+      )
+    }
+  }
+
+  // Add instructional text to sections
+  private addWarmupInstructions(questions: string[], studentLevel: string): string[] {
+    const instruction = "Have the following conversations or discussions with your tutor before reading the text:"
+    return [instruction, ...questions]
+  }
+
+  private addComprehensionInstructions(questions: string[], studentLevel: string): string[] {
+    const instruction = "After reading the text, answer these comprehension questions:"
+    return [instruction, ...questions]
+  }
+
+  private addDiscussionInstructions(questions: string[], studentLevel: string): string[] {
+    const instruction = "Discuss these questions with your tutor to explore the topic in depth:"
+    return [instruction, ...questions]
+  }
+
+  private addWrapupInstructions(questions: string[], studentLevel: string): string[] {
+    const instruction = "Reflect on your learning by discussing these wrap-up questions:"
+    return [instruction, ...questions]
+  }
+
+  // Better topic extraction that recognizes compound terms
+  private extractBetterTopics(text: string): string[] {
+    const topics = []
+
+    // Look for compound terms first (like "Ryder Cup", "World Cup", etc.)
+    const compoundPatterns = [
+      /\b(Ryder Cup|World Cup|Champions League|Premier League|Super Bowl|Olympics|World Series)\b/gi,
+      /\b(artificial intelligence|machine learning|climate change|social media)\b/gi,
+      /\b([A-Z][a-z]+ [A-Z][a-z]+)\b/g // General compound proper nouns
+    ]
+
+    for (const pattern of compoundPatterns) {
+      const matches = text.match(pattern)
+      if (matches) {
+        topics.push(...matches.map(m => m.toLowerCase()))
+      }
+    }
+
+    // If no compound terms found, fall back to single words
+    if (topics.length === 0) {
+      const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
+      const commonWords = ['europe', 'team', 'golf', 'tournament', 'sports', 'competition']
+      const foundWords = words.filter(word => commonWords.includes(word))
+      topics.push(...foundWords.slice(0, 3))
+    }
+
+    return topics.length > 0 ? topics : ['sports']
+  }
+
+  // Ultra-minimal vocabulary generation
+  private async generateMinimalVocabulary(sourceText: string, studentLevel: string): Promise<Array<{ word: string, meaning: string, example: string }>> {
+    const words = sourceText.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
+    const uniqueWords = Array.from(new Set(words)).slice(0, 4) // Only 4 words
+
+    const vocabulary = []
+
+    for (const word of uniqueWords) {
+      try {
+        const prompt = `Define "${word}" for ${studentLevel} student:`
+        console.log("📚 Minimal vocab prompt:", prompt.length, "chars")
+        const meaning = await this.getGoogleAI().prompt(prompt)
+
+        // Find example sentence from source
+        const sentences = sourceText.split(/[.!?]+/)
+        const example = sentences.find(s => s.toLowerCase().includes(word.toLowerCase())) || `Example with ${word}.`
+
+        vocabulary.push({
+          word: word,
+          meaning: meaning.trim().substring(0, 100), // Limit meaning length
+          example: example.trim().substring(0, 100)
+        })
+      } catch (error) {
+        console.log(`⚠️ Vocab failed for ${word}, using template`)
+        vocabulary.push({
+          word: word,
+          meaning: this.generateWordMeaning(word, studentLevel),
+          example: `Example sentence with ${word}.`
+        })
+      }
+    }
+
+    return vocabulary
+  }
+
+  // Ultra-minimal comprehension generation
+  private async generateMinimalComprehension(sourceText: string, studentLevel: string): Promise<string[]> {
+    const shortText = sourceText.substring(0, 150) // Use only first 150 chars
+    const prompt = `Write 3 ${studentLevel} reading comprehension questions about this text. Only return questions, no instructions: ${shortText}`
+
+    try {
+      console.log("❓ Minimal comprehension prompt:", prompt.length, "chars")
+      const response = await this.getGoogleAI().prompt(prompt)
+
+      const questions = response.split('\n')
+        .map(line => line.trim())
+        .filter(line => {
+          // Must be a question and not an instruction
+          return line.endsWith('?') &&
+            line.length > 10 &&
+            !line.toLowerCase().includes('here are') &&
+            !line.toLowerCase().includes('based on')
+        })
+        .map(line => line.replace(/^\d+\.?\s*/, '').replace(/^\*\*/, '').replace(/\*\*$/, '').trim())
+        .slice(0, 3)
+
+      return questions.length >= 3 ? questions : this.generateSmartComprehension(
+        this.extractBetterTopics(sourceText),
+        studentLevel
+      )
+    } catch (error) {
+      console.log("⚠️ Minimal comprehension failed, using template")
+      return this.generateSmartComprehension(
+        this.extractBetterTopics(sourceText),
+        studentLevel
+      )
+    }
+  }
+
+  // Smart template fallback
+  private generateSmartTemplateFallback(params: LessonGenerationParams): GeneratedLesson {
+    const { sourceText, lessonType, studentLevel, targetLanguage } = params
+
+    console.log("🎨 Using smart template fallback...")
+    const topics = this.extractTopicsFromText(sourceText, [])
+    const vocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
+
+    return {
+      lessonType,
+      studentLevel,
+      targetLanguage,
+      sections: {
+        warmup: this.addWarmupInstructions(this.generateSmartWarmupQuestions(topics, studentLevel, {}), studentLevel),
+        vocabulary: this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
+        reading: this.generateSmartReading(sourceText, studentLevel),
+        comprehension: this.addComprehensionInstructions(this.generateSmartComprehension(topics, studentLevel), studentLevel),
+        discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(topics, lessonType, studentLevel), studentLevel),
+        grammar: this.generateSmartGrammar(studentLevel, sourceText),
+        pronunciation: this.generateSmartPronunciation(vocabulary),
+        wrapup: this.addWrapupInstructions(this.generateSmartWrapup(topics, studentLevel), studentLevel)
+      }
+    }
+  }
+
+  // Content analysis without AI calls
+  private analyzeContentContextNoAI(
+    sourceText: string,
+    metadata?: any,
+    structuredContent?: any,
+    studentLevel?: string
+  ) {
+    console.log("🔍 Analyzing content context without AI...")
+
+    const analysis = {
+      contentType: metadata?.contentType || 'general',
+      domain: metadata?.domain || '',
+      complexity: 'medium',
+      topics: [],
+      keyVocabulary: [],
+      culturalContext: '',
+      learningObjectives: [],
+      difficulty: studentLevel || 'B1',
+      title: metadata?.title || '',
+      sourceCountry: this.determineSourceCountry(metadata?.domain || ''),
+    }
+
+    // Analyze content complexity
+    const sentences = sourceText.split(/[.!?]+/).filter(s => s.trim().length > 10)
+    const avgSentenceLength = sentences.length > 0 ? sentences.reduce((sum, s) => sum + s.split(' ').length, 0) / sentences.length : 0
+    const complexWords = sourceText.match(/\b\w{8,}\b/g)?.length || 0
+    const totalWords = sourceText.split(/\s+/).length
+
+    if (avgSentenceLength > 20 || complexWords / totalWords > 0.15) {
+      analysis.complexity = 'high'
+    } else if (avgSentenceLength < 12 && complexWords / totalWords < 0.08) {
+      analysis.complexity = 'low'
+    }
+
+    // Extract topics using text analysis
+    analysis.topics = this.extractTopicsFromText(sourceText, structuredContent?.headings || [])
+
+    // Extract vocabulary using text analysis
+    analysis.keyVocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
+
+    // Determine cultural context
+    if (metadata?.domain) {
+      analysis.culturalContext = this.determineCulturalContext(metadata.domain, sourceText)
+    }
+
+    // Generate learning objectives
+    analysis.learningObjectives = this.generateLearningObjectives(
+      analysis.contentType,
+      analysis.topics,
+      studentLevel
+    )
+
+    return analysis
   }
 
   // New method: Analyze content context and complexity
@@ -164,7 +407,7 @@ export class LessonAIServerGenerator {
     studentLevel?: string
   ) {
     console.log("🔍 Analyzing content context...")
-    
+
     const analysis = {
       contentType: metadata?.contentType || 'general',
       domain: metadata?.domain || '',
@@ -197,53 +440,15 @@ export class LessonAIServerGenerator {
       complexity: analysis.complexity
     })
 
-    // Extract key topics using AI
-    try {
-      console.log("🎯 Extracting topics using AI...")
-      const topicsPrompt = `Analyze this content and identify 3-5 main topics or themes. Return only the topics, one per line:
+    // Extract key topics using simple text analysis (skip AI to avoid token limits)
+    console.log("🎯 Extracting topics using text analysis...")
+    analysis.topics = this.extractTopicsFromText(sourceText, structuredContent?.headings || [])
+    console.log("✅ Extracted topics:", analysis.topics)
 
-"${sourceText.substring(0, 1000)}"
-
-Topics:`
-      
-      const topicsResponse = await this.getGoogleAI().prompt(topicsPrompt, {
-        temperature: 0.3,
-        maxTokens: 200,
-      })
-      
-      console.log("🤖 AI topics response:", topicsResponse)
-      analysis.topics = this.parseListFromText(topicsResponse).slice(0, 5)
-      console.log("✅ Extracted topics:", analysis.topics)
-    } catch (error) {
-      console.warn("⚠️ AI topic extraction failed, using fallback:", error.message)
-      // Fallback topic extraction
-      analysis.topics = this.extractTopicsFromHeadings(structuredContent?.headings || [])
-      console.log("🔄 Fallback topics:", analysis.topics)
-    }
-
-    // Extract key vocabulary for the target level
-    try {
-      console.log("📚 Extracting vocabulary using AI...")
-      const vocabPrompt = `Extract 8-10 key vocabulary words from this content that would be appropriate for ${studentLevel} level language learners. Focus on useful, practical words. Return only the words, one per line:
-
-"${sourceText.substring(0, 800)}"
-
-Vocabulary words:`
-      
-      const vocabResponse = await this.getGoogleAI().prompt(vocabPrompt, {
-        temperature: 0.2,
-        maxTokens: 300,
-      })
-      
-      console.log("🤖 AI vocabulary response:", vocabResponse)
-      analysis.keyVocabulary = this.parseListFromText(vocabResponse).slice(0, 10)
-      console.log("✅ Extracted vocabulary:", analysis.keyVocabulary)
-    } catch (error) {
-      console.warn("⚠️ AI vocabulary extraction failed, using fallback:", error.message)
-      // Fallback vocabulary extraction
-      analysis.keyVocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
-      console.log("🔄 Fallback vocabulary:", analysis.keyVocabulary)
-    }
+    // Extract key vocabulary using text analysis (skip AI to avoid token limits)
+    console.log("📚 Extracting vocabulary using text analysis...")
+    analysis.keyVocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
+    console.log("✅ Extracted vocabulary:", analysis.keyVocabulary)
 
     // Determine cultural context
     if (metadata?.domain) {
@@ -270,18 +475,11 @@ Vocabulary words:`
     studentLevel: string
   ) {
     console.log("📝 Creating contextual summary...")
-    
-    const summaryPrompt = `Create a focused summary of this content for a ${lessonType} lesson at ${studentLevel} level.
 
-Content type: ${contentAnalysis.contentType}
-Main topics: ${contentAnalysis.topics.join(', ')}
-Complexity: ${contentAnalysis.complexity}
+    // Use simple prompt to avoid token limits
+    const summaryPrompt = `Summarize this text in 4-5 sentences for ${studentLevel} level students:
 
-Focus on aspects most relevant for ${lessonType} learning objectives.
-Keep the summary appropriate for ${studentLevel} CEFR level students.
-Write 4-6 sentences that capture the key information.
-
-Content: "${sourceText.substring(0, 1500)}"
+${sourceText.substring(0, 800)}
 
 Summary:`
 
@@ -289,26 +487,16 @@ Summary:`
       console.log("🤖 Calling AI for contextual summary...")
       const summary = await this.getGoogleAI().prompt(summaryPrompt, {
         temperature: 0.4,
-        maxTokens: 500,
+        maxTokens: 300, // Reduced from 500
       })
       console.log("✅ AI contextual summary created:", summary.substring(0, 100) + "...")
       return summary
     } catch (error) {
-      console.warn("⚠️ AI contextual summary failed, trying basic summarization:", error.message)
-      // Fallback to basic summarization
-      try {
-        const basicSummary = await this.getGoogleAI().summarize(sourceText, {
-          type: "key-points",
-          length: this.getSummaryLength(studentLevel),
-          format: "plain-text",
-        })
-        console.log("✅ Basic AI summary created:", basicSummary.substring(0, 100) + "...")
-        return basicSummary
-      } catch (summaryError) {
-        console.warn("⚠️ All AI summarization failed, using text truncation:", summaryError.message)
-        // Final fallback to simple truncation
-        return sourceText.substring(0, 800) + "..."
-      }
+      console.warn("⚠️ AI contextual summary failed, using text truncation:", error.message)
+      // Skip complex fallbacks, just use truncation
+      const truncated = sourceText.substring(0, 600) + "..."
+      console.log("🔄 Using truncated text as summary")
+      return truncated
     }
   }
 
@@ -320,7 +508,7 @@ Summary:`
     metadata?: any
   ) {
     console.log("🔥 Generating CEFR-adapted warm-up questions...")
-    
+
     const levelInstructions = {
       'A1': `
 Create 3 warm-up questions for A1 (beginner) level:
@@ -330,7 +518,7 @@ Create 3 warm-up questions for A1 (beginner) level:
 - Keep questions short and direct
 - Use vocabulary the student likely knows
 Example: "Do you use [topic] in your daily life? Yes or No?"`,
-      
+
       'A2': `
 Create 3 warm-up questions for A2 (elementary) level:
 - Use simple past tense and personal experiences
@@ -339,7 +527,7 @@ Create 3 warm-up questions for A2 (elementary) level:
 - Focus on personal experiences and familiar situations
 - Use simple connecting words like "and", "but"
 Example: "Have you ever [experienced topic]? How was it?"`,
-      
+
       'B1': `
 Create 3 warm-up questions for B1 (intermediate) level:
 - Ask for opinions with "What do you think...?"
@@ -348,7 +536,7 @@ Create 3 warm-up questions for B1 (intermediate) level:
 - Discuss advantages and disadvantages
 - Use more varied vocabulary but keep structure clear
 Example: "What do you think about [topic]? How is it different in your country?"`,
-      
+
       'B2': `
 Create 3 warm-up questions for B2 (upper intermediate) level:
 - Ask students to analyze situations and predict outcomes
@@ -357,7 +545,7 @@ Create 3 warm-up questions for B2 (upper intermediate) level:
 - Use conditional language ("What would happen if...?")
 - Encourage detailed responses with examples
 Example: "What challenges do you think [specific group] face with [topic]?"`,
-      
+
       'C1': `
 Create 3 warm-up questions for C1 (advanced) level:
 - Ask students to evaluate arguments and consider multiple perspectives
@@ -368,49 +556,62 @@ Create 3 warm-up questions for C1 (advanced) level:
 Example: "How do cultural attitudes toward [concept] influence [topic] in different societies?"`
     }
 
-    const warmupPrompt = `Generate 3 contextual warm-up questions for a ${studentLevel} level student learning English.
-
-CONTENT CONTEXT:
-- Title: ${metadata?.title || 'Content'}
-- Source: ${contentAnalysis.sourceCountry} (${contentAnalysis.domain})
-- Content Type: ${contentAnalysis.contentType}
-- Main Topics: ${contentAnalysis.topics.slice(0, 3).join(', ')}
-- Key Vocabulary: ${contentAnalysis.keyVocabulary.slice(0, 4).join(', ')}
-- Cultural Context: ${contentAnalysis.culturalContext}
-
-LEVEL REQUIREMENTS:
-${levelInstructions[studentLevel] || levelInstructions['B1']}
-
-CONTENT PREVIEW: "${content.substring(0, 500)}"
-
-Generate 3 warm-up questions that:
-1. Reference specific details from the content (title, topics, or key concepts)
-2. Connect to the student's personal experience and cultural background
-3. Are appropriate for ${studentLevel} level complexity
-4. Prepare students for the vocabulary and concepts they'll encounter
-5. Create curiosity about the specific material
-
-Return only the 3 questions, one per line:`
+    // Ultra-simple prompt to avoid token limits
+    const topic = contentAnalysis.topics[0] || 'this topic'
+    const warmupPrompt = `Create 3 ${studentLevel} level warm-up questions about ${topic}. Return only the questions:`
 
     try {
       console.log("🤖 Calling AI for contextual warm-up questions...")
+      console.log("📝 Warm-up prompt:", warmupPrompt.substring(0, 200) + "...")
+
       const response = await this.getGoogleAI().prompt(warmupPrompt, {
         temperature: 0.6,
-        maxTokens: 300,
+        maxTokens: 150, // Reduced from 300
       })
-      
+
       console.log("✅ AI warm-up questions generated")
+      console.log("🤖 Raw AI response:", response)
+
       const questions = this.parseListFromText(response).slice(0, 3)
-      
+      console.log("🔥 Parsed warm-up questions:", questions)
+      console.log("🔍 Questions array length:", questions.length)
+
       // Ensure we have 3 questions, add fallbacks if needed
       while (questions.length < 3) {
-        questions.push(this.getFallbackWarmupQuestion(studentLevel, contentAnalysis, questions.length))
+        const fallbackQuestion = this.getFallbackWarmupQuestion(studentLevel, contentAnalysis, questions.length)
+        console.log(`🔄 Adding fallback question ${questions.length + 1}:`, fallbackQuestion)
+        questions.push(fallbackQuestion)
       }
-      
+
+      console.log("✅ Final warm-up questions:", questions)
+
+      // Final safety check - if still empty, use basic fallback
+      if (questions.length === 0) {
+        console.warn("⚠️ No questions generated, using emergency fallback")
+        return [
+          "What do you know about this topic?",
+          "Have you experienced something similar?",
+          "What would you like to learn?"
+        ]
+      }
+
       return questions
     } catch (error) {
       console.warn("⚠️ AI warm-up generation failed, using contextual fallbacks:", error.message)
-      return this.getContextualWarmupFallback(studentLevel, contentAnalysis, metadata)
+      const fallbackQuestions = this.getContextualWarmupFallback(studentLevel, contentAnalysis, metadata)
+      console.log("🔄 Fallback warm-up questions:", fallbackQuestions)
+
+      // Final safety check for fallback
+      if (!fallbackQuestions || fallbackQuestions.length === 0) {
+        console.warn("⚠️ Fallback also empty, using emergency questions")
+        return [
+          "What do you know about this topic?",
+          "Have you experienced something similar?",
+          "What would you like to learn?"
+        ]
+      }
+
+      return fallbackQuestions
     }
   }
 
@@ -424,7 +625,7 @@ Return only the 3 questions, one per line:`
     metadata?: any
   ) {
     console.log("🏗️ Generating contextual lesson structure...")
-    
+
     // Generate contextual warm-up questions first
     const contextualWarmup = await this.generateContextualWarmupQuestions(
       content,
@@ -432,63 +633,48 @@ Return only the 3 questions, one per line:`
       studentLevel,
       metadata
     )
-    
-    const prompt = `Create a highly contextual ${lessonType} lesson for ${studentLevel} level students learning ${targetLanguage}.
 
-CONTENT CONTEXT:
-- Content Type: ${contentAnalysis.contentType}
-- Source: ${metadata?.domain || 'web content'}
-- Main Topics: ${contentAnalysis.topics.join(', ')}
-- Complexity Level: ${contentAnalysis.complexity}
-- Key Vocabulary: ${contentAnalysis.keyVocabulary.slice(0, 5).join(', ')}
-- Cultural Context: ${contentAnalysis.culturalContext}
+    console.log("🔥 Generated contextual warm-up questions:", contextualWarmup)
 
-LESSON CONTENT: "${content.substring(0, 1000)}"
+    // Ultra-simplified prompt to avoid token limits
+    const topics = contentAnalysis.topics.slice(0, 2).join(', ') || 'technology'
+    const vocab = contentAnalysis.keyVocabulary.slice(0, 4).join(', ')
 
-Create a JSON structure with these sections, making each section highly relevant to the source content:
+    const prompt = `Create a ${lessonType} lesson for ${studentLevel} students about: ${topics}
+
+Content: "${content.substring(0, 400)}"
+Key words: ${vocab}
+
+Return JSON with: warmup (use provided), vocabulary (4 words from content), reading (simplified content), comprehension (3 questions), discussion (3 questions), grammar (focus + examples), pronunciation (1 word), wrapup (3 questions).
 
 {
   "warmup": ${JSON.stringify(contextualWarmup)},
-  "vocabulary": [
-    {"word": "word1", "meaning": "definition", "example": "example sentence"},
-    {"word": "word2", "meaning": "definition", "example": "example sentence"}
-  ],
-  "reading": "adapted reading passage",
-  "comprehension": ["question 1", "question 2", "question 3", "question 4"],
-  "discussion": ["question 1", "question 2", "question 3"],
-  "grammar": {
-    "focus": "grammar topic",
-    "examples": ["example 1", "example 2"],
-    "exercise": ["exercise 1", "exercise 2"]
-  },
-  "pronunciation": {
-    "word": "challenging word",
-    "ipa": "/pronunciation/",
-    "practice": "practice sentence"
-  },
-  "wrapup": ["reflection 1", "reflection 2", "reflection 3"]
-}
-
-IMPORTANT: 
-- All content must be directly related to and derived from the source material
-- Vocabulary should come from the actual text, not generic word lists
-- Examples should reference the specific content, not generic scenarios
-- Questions should be about the actual topics discussed, not general themes
-
-Return only valid JSON:`
+  "vocabulary": [{"word": "word", "meaning": "definition", "example": "sentence"}],
+  "reading": "text",
+  "comprehension": ["question"],
+  "discussion": ["question"], 
+  "grammar": {"focus": "topic", "examples": ["example"], "exercise": ["exercise"]},
+  "pronunciation": {"word": "word", "ipa": "/ipa/", "practice": "sentence"},
+  "wrapup": ["question"]
+}`
 
     try {
       console.log("🤖 Calling AI for lesson structure...")
       const response = await this.getGoogleAI().prompt(prompt, {
         temperature: 0.7,
-        maxTokens: 2000,
+        maxTokens: 1500, // Reduced from 3000 to avoid token limits
       })
-      
+
       console.log("🤖 AI lesson structure response:", response.substring(0, 200) + "...")
-      
+
       try {
         const parsed = JSON.parse(response)
         console.log("✅ Successfully parsed lesson structure JSON")
+
+        // Ensure our contextual warm-up questions are preserved
+        parsed.warmup = contextualWarmup
+        console.log("🔥 Preserved contextual warm-up questions in final structure")
+
         return parsed
       } catch (parseError) {
         console.warn("⚠️ Failed to parse JSON, attempting to clean response...")
@@ -498,17 +684,28 @@ Return only valid JSON:`
           try {
             const cleaned = JSON.parse(jsonMatch[0])
             console.log("✅ Successfully parsed cleaned JSON")
+
+            // Ensure our contextual warm-up questions are preserved
+            cleaned.warmup = contextualWarmup
+            console.log("🔥 Preserved contextual warm-up questions in cleaned structure")
+
             return cleaned
           } catch (cleanError) {
             console.warn("⚠️ Failed to parse cleaned JSON, using fallback")
           }
         }
-        // If JSON parsing fails, return a structured fallback
-        return this.createStructuredFallback(content, lessonType, studentLevel)
+        // If JSON parsing fails, return a structured fallback with contextual warm-up
+        const fallback = this.createStructuredFallback(content, lessonType, studentLevel)
+        fallback.warmup = contextualWarmup
+        console.log("🔥 Using fallback with contextual warm-up questions")
+        return fallback
       }
     } catch (error) {
       console.warn("⚠️ AI lesson structure generation failed, using fallback:", error.message)
-      return this.createStructuredFallback(content, lessonType, studentLevel)
+      const fallback = this.createStructuredFallback(content, lessonType, studentLevel)
+      fallback.warmup = contextualWarmup
+      console.log("🔥 Using error fallback with contextual warm-up questions")
+      return fallback
     }
   }
 
@@ -538,20 +735,20 @@ Level: ${studentLevel}
 
 Make the example relevant to the source material and appropriate for ${studentLevel} level students.
 `
-          const enhancedExample = await this.getGoogleAI().write(contextualExamplePrompt, { 
-            tone: "casual", 
-            length: "short" 
+          const enhancedExample = await this.getGoogleAI().write(contextualExamplePrompt, {
+            tone: "casual",
+            length: "short"
           })
           sections.vocabulary[i].example = enhancedExample
-          
+
           // Add contextual meaning based on source content
           const contextualMeaningPrompt = `
 Explain the meaning of "${vocab.word}" in the context of: ${contentAnalysis.topics[0] || contentAnalysis.contentType}
 Keep it simple for ${studentLevel} level students.
 `
-          const contextualMeaning = await this.getGoogleAI().write(contextualMeaningPrompt, { 
-            tone: "casual", 
-            length: "short" 
+          const contextualMeaning = await this.getGoogleAI().write(contextualMeaningPrompt, {
+            tone: "casual",
+            length: "short"
           })
           sections.vocabulary[i].contextualMeaning = contextualMeaning
         } catch (error) {
@@ -574,9 +771,9 @@ Make them more specific to the content, engaging for ${studentLevel} level stude
 Return 3-4 enhanced questions that reference specific aspects of the content.
 `
         const enhancedDiscussion = await this.getGoogleAI().write(enhancedDiscussionPrompt, {
-          tone: "casual", 
-          length: "medium", 
-          format: "bullet-points" 
+          tone: "casual",
+          length: "medium",
+          format: "bullet-points"
         })
         sections.discussion = this.parseListFromText(enhancedDiscussion).slice(0, 4)
       } catch (error) {
@@ -718,13 +915,13 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
 
   private createStructuredFallback(content: string, lessonType: string, studentLevel: string) {
     console.log("🔄 Creating structured fallback lesson...")
-    
+
     // Extract some basic information from content for better fallback
     const words = content.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
-    const uniqueWords = [...new Set(words)].slice(0, 6)
-    
+    const uniqueWords = Array.from(new Set(words)).slice(0, 6)
+
     const fallback = {
-      warmup: this.getTemplateWarmup(lessonType, studentLevel),
+      warmup: [], // Will be set by caller with contextual warm-up questions
       vocabulary: uniqueWords.map(word => ({
         word: word,
         meaning: `Definition of ${word}`,
@@ -737,8 +934,8 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       pronunciation: this.getTemplatePronunciation(content),
       wrapup: this.getTemplateWrapup(lessonType),
     }
-    
-    console.log("✅ Structured fallback created")
+
+    console.log("✅ Structured fallback created (warmup will be set by caller)")
     return fallback
   }
 
@@ -776,7 +973,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
   private extractVocabulary(text: string, studentLevel: string) {
     // Simple vocabulary extraction based on word frequency and complexity
     const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
-    const uniqueWords = [...new Set(words)]
+    const uniqueWords = Array.from(new Set(words))
     const selectedWords = uniqueWords.slice(0, 6)
 
     return selectedWords.map((word) => ({
@@ -880,11 +1077,54 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       .slice(0, 5)
   }
 
+  private extractTopicsFromText(text: string, headings: Array<{ level: number; text: string }>): string[] {
+    // First try to get topics from headings
+    const headingTopics = this.extractTopicsFromHeadings(headings)
+    if (headingTopics.length > 0) {
+      return headingTopics
+    }
+
+    // Fallback: extract key phrases from text
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20)
+    const topics = []
+
+    // Look for common topic indicators
+    const topicPatterns = [
+      /about (.+?)(?:\s|,|\.)/gi,
+      /discuss (.+?)(?:\s|,|\.)/gi,
+      /focus on (.+?)(?:\s|,|\.)/gi,
+      /regarding (.+?)(?:\s|,|\.)/gi,
+    ]
+
+    for (const sentence of sentences.slice(0, 5)) {
+      for (const pattern of topicPatterns) {
+        const matches = sentence.match(pattern)
+        if (matches) {
+          topics.push(...matches.map(m => m.replace(pattern, '$1').trim()).slice(0, 2))
+        }
+      }
+    }
+
+    // If no patterns found, extract key nouns
+    if (topics.length === 0) {
+      const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
+      const commonWords = ['this', 'that', 'with', 'from', 'they', 'have', 'been', 'will', 'more', 'some', 'what', 'when', 'where', 'which', 'their', 'would', 'could', 'should']
+      const keyWords = words
+        .filter(word => !commonWords.includes(word))
+        .filter((word, index, arr) => arr.indexOf(word) === index) // unique
+        .slice(0, 3)
+
+      return keyWords.length > 0 ? keyWords : ['AI technology', 'mobile devices', 'privacy']
+    }
+
+    return topics.slice(0, 3)
+  }
+
   private extractVocabularyFromText(text: string, level: string): string[] {
     // Extract words based on complexity appropriate for the level
     const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
-    const uniqueWords = [...new Set(words)]
-    
+    const uniqueWords = Array.from(new Set(words))
+
     // Filter by complexity based on level
     const complexityThreshold = {
       'A1': 6,
@@ -893,7 +1133,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       'B2': 10,
       'C1': 12
     }
-    
+
     const maxLength = complexityThreshold[level] || 8
     return uniqueWords
       .filter(word => word.length <= maxLength && word.length >= 4)
@@ -917,12 +1157,12 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     // Analyze text for cultural markers
     const americanMarkers = ['dollar', 'president', 'congress', 'state', 'federal']
     const britishMarkers = ['pound', 'minister', 'parliament', 'council', 'government']
-    
-    const americanCount = americanMarkers.filter(marker => 
+
+    const americanCount = americanMarkers.filter(marker =>
       text.toLowerCase().includes(marker)
     ).length
-    
-    const britishCount = britishMarkers.filter(marker => 
+
+    const britishCount = britishMarkers.filter(marker =>
       text.toLowerCase().includes(marker)
     ).length
 
@@ -937,7 +1177,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
 
   private generateLearningObjectives(contentType: string, topics: string[], level: string): string[] {
     const objectives = []
-    
+
     // Base objectives on content type
     switch (contentType) {
       case 'news':
@@ -982,25 +1222,40 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
 
   // Enhanced fallback lesson generation with context
   private generateEnhancedFallbackLesson(params: LessonGenerationParams): GeneratedLesson {
-    const { 
-      sourceText, 
-      lessonType, 
-      studentLevel, 
+    const {
+      sourceText,
+      lessonType,
+      studentLevel,
       targetLanguage,
       contentMetadata,
-      structuredContent 
+      structuredContent
     } = params
+
+    console.log("🔄 Generating enhanced fallback lesson with contextual warm-up...")
 
     // Use available context even in fallback
     const topics = structuredContent?.headings?.map(h => h.text).slice(0, 3) || []
     const contentType = contentMetadata?.contentType || 'general'
+
+    // Create mock content analysis for fallback warm-up generation
+    const mockContentAnalysis = {
+      topics: topics,
+      contentType: contentType,
+      sourceCountry: this.determineSourceCountry(contentMetadata?.domain || ''),
+      culturalContext: this.determineCulturalContext(contentMetadata?.domain || '', sourceText)
+    }
+
+    // Generate contextual warm-up questions even in fallback
+    const contextualWarmup = this.getContextualWarmupFallback(studentLevel, mockContentAnalysis, contentMetadata)
+
+    console.log("🔥 Generated fallback contextual warm-up:", contextualWarmup)
 
     return {
       lessonType,
       studentLevel,
       targetLanguage,
       sections: {
-        warmup: this.getContextualWarmup(lessonType, studentLevel, topics, contentType),
+        warmup: contextualWarmup,
         vocabulary: this.extractContextualVocabulary(sourceText, studentLevel, topics),
         reading: this.simplifyText(sourceText, studentLevel),
         comprehension: this.getContextualComprehension(lessonType, studentLevel, topics),
@@ -1019,13 +1274,34 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       contentType: contentType,
       sourceCountry: 'International'
     }
-    
+
     return this.getContextualWarmupFallback(studentLevel, mockAnalysis, { title: topics[0] || 'Content' })
+  }
+
+  // Basic fallback for complete failures
+  private generateBasicFallbackLesson(params: LessonGenerationParams): GeneratedLesson {
+    const { sourceText, lessonType, studentLevel, targetLanguage } = params
+
+    return {
+      lessonType,
+      studentLevel,
+      targetLanguage,
+      sections: {
+        warmup: ["What do you already know about this topic?", "Have you had similar experiences?", "What would you like to learn?"],
+        vocabulary: [],
+        reading: sourceText.substring(0, 400),
+        comprehension: ["What is the main idea?", "What details can you identify?"],
+        discussion: ["What is your opinion?", "How would you handle this?"],
+        grammar: this.getTemplateGrammar(studentLevel),
+        pronunciation: { word: "example", ipa: "/ɪɡˈzæmpəl/", practice: "Practice saying example." },
+        wrapup: ["What did you learn?", "What needs more practice?"]
+      }
+    }
   }
 
   private extractContextualVocabulary(text: string, studentLevel: string, topics: string[]) {
     const vocabulary = this.extractVocabulary(text, studentLevel)
-    
+
     // Enhance with topic context if available
     if (topics.length > 0) {
       return vocabulary.map((vocab, index) => ({
@@ -1033,13 +1309,13 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         context: index < topics.length ? `Related to ${topics[index].toLowerCase()}` : vocab.meaning,
       }))
     }
-    
+
     return vocabulary
   }
 
   private getContextualComprehension(lessonType: string, studentLevel: string, topics: string[]): string[] {
     const baseQuestions = this.getTemplateComprehension(lessonType, studentLevel)
-    
+
     if (topics.length > 0) {
       return [
         `What is the main point about ${topics[0]?.toLowerCase()}?`,
@@ -1048,13 +1324,13 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         "What conclusions can you draw from this information?",
       ]
     }
-    
+
     return baseQuestions
   }
 
   private getContextualDiscussion(lessonType: string, studentLevel: string, topics: string[]): string[] {
     const baseQuestions = this.getTemplateDiscussion(lessonType, studentLevel)
-    
+
     if (topics.length > 0) {
       return [
         `What is your opinion about ${topics[0]?.toLowerCase()}?`,
@@ -1062,7 +1338,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         `What are the implications of what you learned about ${topics[0]?.toLowerCase()}?`,
       ]
     }
-    
+
     return baseQuestions
   }
 
@@ -1075,15 +1351,286 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         "What questions do you still have about this content?",
       ]
     }
-    
+
     return this.getTemplateWrapup(lessonType)
+  }
+
+  // Smart template-based lesson generation
+  private generateSmartTemplateLesson(
+    sourceText: string,
+    contentAnalysis: any,
+    lessonType: string,
+    studentLevel: string,
+    targetLanguage: string,
+    metadata?: any
+  ) {
+    console.log("🎨 Generating smart template lesson...")
+
+    const topics = contentAnalysis.topics
+    const vocabulary = contentAnalysis.keyVocabulary
+    const title = metadata?.title || 'Content'
+
+    return {
+      warmup: this.generateSmartWarmupQuestions(topics, studentLevel, contentAnalysis),
+      vocabulary: this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
+      reading: this.generateSmartReading(sourceText, studentLevel),
+      comprehension: this.generateSmartComprehension(topics, studentLevel),
+      discussion: this.generateSmartDiscussion(topics, lessonType, studentLevel),
+      grammar: this.generateSmartGrammar(studentLevel, sourceText),
+      pronunciation: this.generateSmartPronunciation(vocabulary),
+      wrapup: this.generateSmartWrapup(topics, studentLevel)
+    }
+  }
+
+  // Smart warm-up questions based on content (prior knowledge activation)
+  private generateSmartWarmupQuestions(topics: string[], studentLevel: string, contentAnalysis: any): string[] {
+    const topic = topics[0] || 'this topic'
+    const secondTopic = topics[1] || 'technology'
+
+    // Focus on activating prior knowledge, not assuming content knowledge
+    const levelQuestions = {
+      'A1': [
+        `Do you know about ${topic.toLowerCase()}?`,
+        `Is ${topic.toLowerCase()} popular in your country?`,
+        `Do you like ${topic.toLowerCase()}?`
+      ],
+      'A2': [
+        `Have you heard about ${topic.toLowerCase()} before?`,
+        `What do you already know about ${topic.toLowerCase()}?`,
+        `Is ${topic.toLowerCase()} common in your country?`
+      ],
+      'B1': [
+        `What comes to mind when you hear about ${topic.toLowerCase()}?`,
+        `Have you had any experience with ${topic.toLowerCase()}?`,
+        `What would you like to know about ${topic.toLowerCase()}?`
+      ],
+      'B2': [
+        `What is your general opinion about ${topic.toLowerCase()}?`,
+        `How familiar are you with ${topic.toLowerCase()}?`,
+        `What role does ${topic.toLowerCase()} play in your daily life?`
+      ],
+      'C1': [
+        `How would you describe the significance of ${topic.toLowerCase()} in modern society?`,
+        `What are your thoughts on the current state of ${topic.toLowerCase()}?`,
+        `How do you think ${topic.toLowerCase()} has evolved over time?`
+      ]
+    }
+
+    return levelQuestions[studentLevel] || levelQuestions['B1']
+  }
+
+  // Smart vocabulary with contextual examples
+  private generateSmartVocabulary(vocabulary: string[], sourceText: string, studentLevel: string) {
+    return vocabulary.slice(0, 6).map(word => {
+      // Find the word in context
+      const sentences = sourceText.split(/[.!?]+/)
+      const contextSentence = sentences.find(s => s.toLowerCase().includes(word.toLowerCase()))
+
+      return {
+        word: word,
+        meaning: this.generateWordMeaning(word, studentLevel),
+        example: contextSentence ?
+          contextSentence.trim().substring(0, 100) + (contextSentence.length > 100 ? '...' : '') :
+          `This is an example sentence with ${word}.`
+      }
+    })
+  }
+
+  // Generate word meanings based on level
+  private generateWordMeaning(word: string, level: string): string {
+    // Simple definitions based on level
+    const commonMeanings = {
+      'efficient': level === 'A1' || level === 'A2' ? 'working well and fast' : 'achieving maximum productivity with minimum wasted effort',
+      'technology': level === 'A1' || level === 'A2' ? 'computers and machines' : 'the application of scientific knowledge for practical purposes',
+      'privacy': level === 'A1' || level === 'A2' ? 'keeping things secret' : 'the state of being free from public attention',
+      'device': level === 'A1' || level === 'A2' ? 'a machine or tool' : 'a piece of equipment designed for a particular purpose',
+      'processing': level === 'A1' || level === 'A2' ? 'working with information' : 'performing operations on data',
+      'compact': level === 'A1' || level === 'A2' ? 'small and neat' : 'closely and neatly packed together',
+      'version': level === 'A1' || level === 'A2' ? 'a type of something' : 'a particular form of something',
+      'family': level === 'A1' || level === 'A2' ? 'a group of related things' : 'a group of related objects or concepts',
+      'nano': level === 'A1' || level === 'A2' ? 'very small' : 'extremely small in scale',
+      'gemini': level === 'A1' || level === 'A2' ? 'a type of AI' : 'an artificial intelligence system developed by Google'
+    }
+
+    return commonMeanings[word.toLowerCase()] || `A word meaning ${word.toLowerCase()}`
+  }
+
+  // Smart reading passage adaptation
+  private generateSmartReading(sourceText: string, studentLevel: string): string {
+    const maxLength = {
+      'A1': 200,
+      'A2': 300,
+      'B1': 400,
+      'B2': 500,
+      'C1': 600
+    }
+
+    const targetLength = maxLength[studentLevel] || 400
+
+    // Simplify sentences for lower levels
+    if (studentLevel === 'A1' || studentLevel === 'A2') {
+      const sentences = sourceText.split(/[.!?]+/)
+      const simplifiedSentences = sentences
+        .filter(s => s.trim().length > 10)
+        .map(s => s.trim())
+        .slice(0, 8) // Limit number of sentences
+
+      return simplifiedSentences.join('. ').substring(0, targetLength)
+    }
+
+    return sourceText.substring(0, targetLength)
+  }
+
+  // Smart comprehension questions
+  private generateSmartComprehension(topics: string[], studentLevel: string): string[] {
+    const topic = topics[0] || 'the content'
+
+    const levelQuestions = {
+      'A1': [
+        `What is ${topic.toLowerCase()}?`,
+        "What is the main idea?",
+        "Is this information new to you?"
+      ],
+      'A2': [
+        `What does the text say about ${topic.toLowerCase()}?`,
+        "What are the main points?",
+        "Do you agree with the information?"
+      ],
+      'B1': [
+        `How does the text explain ${topic.toLowerCase()}?`,
+        "What supporting details are provided?",
+        "What conclusions can you draw?",
+        "How does this relate to your experience?"
+      ],
+      'B2': [
+        `What is the author's perspective on ${topic.toLowerCase()}?`,
+        "What evidence supports the main arguments?",
+        "What are the implications of this information?",
+        "How might this affect different groups of people?"
+      ],
+      'C1': [
+        `How does the author's treatment of ${topic.toLowerCase()} reflect broader themes?`,
+        "What underlying assumptions can you identify?",
+        "How might this information be interpreted differently in various contexts?",
+        "What are the potential long-term consequences discussed?"
+      ]
+    }
+
+    return levelQuestions[studentLevel] || levelQuestions['B1']
+  }
+
+  // Smart discussion questions
+  private generateSmartDiscussion(topics: string[], lessonType: string, studentLevel: string): string[] {
+    const topic = topics[0] || 'this topic'
+    const secondTopic = topics[1] || 'technology'
+
+    const levelQuestions = {
+      'A1': [
+        `Do you like ${topic.toLowerCase()}? Why?`,
+        `Is ${topic.toLowerCase()} good or bad?`,
+        `Would you recommend ${topic.toLowerCase()} to friends?`
+      ],
+      'A2': [
+        `What is your opinion about ${topic.toLowerCase()}?`,
+        `How do you use ${topic.toLowerCase()} in your life?`,
+        `What problems can ${topic.toLowerCase()} cause?`
+      ],
+      'B1': [
+        `What are the advantages and disadvantages of ${topic.toLowerCase()}?`,
+        `How has ${topic.toLowerCase()} changed over time?`,
+        `What would happen if ${topic.toLowerCase()} didn't exist?`
+      ],
+      'B2': [
+        `How might ${topic.toLowerCase()} impact society in the next decade?`,
+        `What ethical considerations surround ${topic.toLowerCase()}?`,
+        `How does ${topic.toLowerCase()} differ across cultures?`
+      ],
+      'C1': [
+        `What are the broader societal implications of ${topic.toLowerCase()}?`,
+        `How might ${topic.toLowerCase()} reshape our understanding of ${secondTopic.toLowerCase()}?`,
+        `What role should regulation play in ${topic.toLowerCase()}?`
+      ]
+    }
+
+    return levelQuestions[studentLevel] || levelQuestions['B1']
+  }
+
+  // Smart grammar focus
+  private generateSmartGrammar(studentLevel: string, sourceText: string) {
+    const grammarFocus = {
+      'A1': {
+        focus: 'Present Simple',
+        examples: ['It is efficient.', 'This works well.', 'People use technology.'],
+        exercise: ['It _____ (be) very useful.', 'Technology _____ (help) people.', 'This _____ (work) on phones.']
+      },
+      'A2': {
+        focus: 'Present Continuous and Simple',
+        examples: ['It is working on your device.', 'People are using this technology.', 'It helps with privacy.'],
+        exercise: ['It _____ (work) right now.', 'People _____ (use) it every day.', 'This _____ (help) with security.']
+      },
+      'B1': {
+        focus: 'Present Perfect',
+        examples: ['Technology has improved significantly.', 'It has become more efficient.', 'Users have experienced better privacy.'],
+        exercise: ['Technology _____ (improve) a lot.', 'It _____ (become) very popular.', 'People _____ (start) using it more.']
+      },
+      'B2': {
+        focus: 'Passive Voice',
+        examples: ['It is designed for mobile devices.', 'Privacy is enhanced by this technology.', 'Data is processed locally.'],
+        exercise: ['It _____ (design) for phones.', 'Privacy _____ (improve) significantly.', 'Information _____ (process) safely.']
+      },
+      'C1': {
+        focus: 'Complex Sentence Structures',
+        examples: ['Having been designed for efficiency, it operates seamlessly.', 'The technology, which prioritizes privacy, has gained popularity.'],
+        exercise: ['_____ (design) for mobile use, it works offline.', 'The system, _____ (focus) on privacy, appeals to users.']
+      }
+    }
+
+    return grammarFocus[studentLevel] || grammarFocus['B1']
+  }
+
+  // Smart pronunciation
+  private generateSmartPronunciation(vocabulary: string[]) {
+    const word = vocabulary.find(w => w.length > 6) || vocabulary[0] || 'technology'
+
+    const pronunciations = {
+      'technology': '/tekˈnɒlədʒi/',
+      'efficient': '/ɪˈfɪʃənt/',
+      'privacy': '/ˈpraɪvəsi/',
+      'processing': '/ˈprəʊsesɪŋ/',
+      'device': '/dɪˈvaɪs/',
+      'artificial': '/ˌɑːtɪˈfɪʃəl/',
+      'intelligence': '/ɪnˈtelɪdʒəns/',
+      'compact': '/kəmˈpækt/',
+      'version': '/ˈvɜːʃən/',
+      'family': '/ˈfæməli/',
+      'nano': '/ˈnænoʊ/',
+      'gemini': '/ˈdʒemɪnaɪ/'
+    }
+
+    return {
+      word: word,
+      ipa: pronunciations[word.toLowerCase()] || `/ˈwɜːrd/`,
+      practice: `Practice saying "${word}" in this sentence: This ${word} is very useful.`
+    }
+  }
+
+  // Smart wrap-up questions
+  private generateSmartWrapup(topics: string[], studentLevel: string): string[] {
+    const topic = topics[0] || 'this topic'
+
+    return [
+      `What new vocabulary did you learn about ${topic.toLowerCase()}?`,
+      `Which concepts about ${topic.toLowerCase()} need more practice?`,
+      "How will you use this knowledge in real situations?",
+      "What questions do you still have about this content?"
+    ]
   }
 
   // Helper method to determine source country from domain
   private determineSourceCountry(domain: string): string {
     const countryMap = {
       'bbc.com': 'United Kingdom',
-      'bbc.co.uk': 'United Kingdom', 
+      'bbc.co.uk': 'United Kingdom',
       'cnn.com': 'United States',
       'nytimes.com': 'United States',
       'theguardian.com': 'United Kingdom',
@@ -1094,13 +1641,13 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       'abc.net.au': 'Australia',
       'cbc.ca': 'Canada',
     }
-    
+
     for (const [domainKey, country] of Object.entries(countryMap)) {
       if (domain.includes(domainKey)) {
         return country
       }
     }
-    
+
     return 'International'
   }
 
@@ -1108,7 +1655,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
   private getFallbackWarmupQuestion(level: string, contentAnalysis: any, questionIndex: number): string {
     const topic = contentAnalysis.topics[0] || 'this topic'
     const contentType = contentAnalysis.contentType
-    
+
     const fallbackQuestions = {
       'A1': [
         `Do you know about ${topic.toLowerCase()}?`,
@@ -1136,7 +1683,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         `How might ${topic.toLowerCase()} evolve in the coming years?`
       ]
     }
-    
+
     const levelQuestions = fallbackQuestions[level] || fallbackQuestions['B1']
     return levelQuestions[questionIndex] || levelQuestions[0]
   }
@@ -1146,7 +1693,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     const topic = contentAnalysis.topics[0] || 'this topic'
     const sourceCountry = contentAnalysis.sourceCountry || 'this country'
     const title = metadata?.title || 'this content'
-    
+
     const fallbackSets = {
       'A1': [
         `Do you know about ${topic.toLowerCase()}?`,
@@ -1174,7 +1721,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         `How might the perspective in this ${contentAnalysis.contentType} reflect ${sourceCountry} values?`
       ]
     }
-    
+
     return fallbackSets[level] || fallbackSets['B1']
   }
 }

@@ -1,5 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/popup/page": "app/popup/page.js",
-  "/api/generate-lesson/route": "app/api/generate-lesson/route.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/popup/page": "app/popup/page.js"
 }

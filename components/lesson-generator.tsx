@@ -282,24 +282,76 @@ export default function LessonGenerator({
             </Button>
             
             {process.env.NODE_ENV === 'development' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const response = await fetch("/api/test-ai", { method: "POST" })
-                    const result = await response.json()
-                    console.log("AI Test Result:", result)
-                    alert(result.success ? `AI Working: ${result.response}` : `AI Error: ${result.error}`)
-                  } catch (error) {
-                    console.error("Test failed:", error)
-                    alert("Test failed: " + error.message)
-                  }
-                }}
-                className="w-full text-xs"
-              >
-                Test AI Connection
-              </Button>
+              <div className="space-y-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch("/api/test-ai", { method: "POST" })
+                      const result = await response.json()
+                      console.log("AI Test Result:", result)
+                      alert(result.success ? `AI Working: ${result.response}` : `AI Error: ${result.error}`)
+                    } catch (error) {
+                      console.error("Test failed:", error)
+                      alert("Test failed: " + error.message)
+                    }
+                  }}
+                  className="w-full text-xs"
+                >
+                  Test AI Connection
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch("/api/test-warmup", { method: "POST" })
+                      const result = await response.json()
+                      console.log("Warm-up Test Result:", result)
+                      if (result.success) {
+                        const questions = result.warmupQuestions || []
+                        if (questions.length > 0) {
+                          alert(`Warm-up Questions Generated:\n${questions.join('\n')}`)
+                        } else {
+                          alert("No warm-up questions generated. Check console for details.")
+                        }
+                      } else {
+                        alert(`Warm-up Error: ${result.error}`)
+                      }
+                    } catch (error) {
+                      console.error("Warm-up test failed:", error)
+                      alert("Warm-up test failed: " + error.message)
+                    }
+                  }}
+                  className="w-full text-xs"
+                >
+                  Test Warm-up Questions
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch("/api/test-warmup-direct", { method: "POST" })
+                      const result = await response.json()
+                      console.log("Direct Warm-up Test Result:", result)
+                      if (result.success) {
+                        const questions = result.parsedQuestions || []
+                        alert(`Direct AI Questions:\n${questions.join('\n')}\n\nRaw Response: ${result.rawResponse}`)
+                      } else {
+                        alert(`Direct Test Error: ${result.error}`)
+                      }
+                    } catch (error) {
+                      console.error("Direct warm-up test failed:", error)
+                      alert("Direct test failed: " + error.message)
+                    }
+                  }}
+                  className="w-full text-xs"
+                >
+                  Test Direct AI
+                </Button>
+              </div>
             )}
           </div>
 

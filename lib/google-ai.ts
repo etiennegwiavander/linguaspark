@@ -49,19 +49,9 @@ class GoogleAIService {
   }
 
   private async makeGeminiRequest(prompt: string, options: any = {}) {
-    // Try different model names based on actual available models from API
+    // Use only the working model
     const modelsToTry = [
-      'models/gemini-2.5-flash',
-      'models/gemini-2.5-pro', 
-      'models/gemini-2.0-flash',
-      'models/gemini-flash-latest',
-      'models/gemini-pro-latest',
-      'models/gemini-2.0-flash-001',
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-2.0-flash',
-      'gemini-flash-latest',
-      'gemini-pro-latest'
+      'models/gemini-2.5-flash'
     ]
     
     const possibleUrls = []
@@ -80,56 +70,72 @@ class GoogleAIService {
       }],
       generationConfig: {
         temperature: options.temperature || 0.7,
-        maxOutputTokens: options.maxTokens || 1000,
+        maxOutputTokens: options.maxTokens || 2000, // Increased from 1000 to 2000
         topP: options.topP || 0.9,
       }
     }
 
-    console.log("🔗 Trying Gemini API endpoints...")
+    console.log("🔗 Using working Gemini API endpoint...")
 
-    // Try each URL until one works
-    for (let i = 0; i < possibleUrls.length; i++) {
-      const url = possibleUrls[i]
-      console.log(`🌐 Attempt ${i + 1}: ${url.replace(this.config.apiKey, 'API_KEY_HIDDEN')}`)
-      
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        })
+    // Use only the working endpoint
+    const url = `${this.config.baseUrl}/v1beta/models/gemini-2.5-flash:generateContent?key=${this.config.apiKey}`
+    console.log(`🌐 API URL: ${url.replace(this.config.apiKey, 'API_KEY_HIDDEN')}`)
+    
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      })
 
-        console.log(`📡 Response status: ${response.status} ${response.statusText}`)
+      console.log(`📡 Response status: ${response.status} ${response.statusText}`)
 
-        if (response.ok) {
-          const result = await response.json()
-          console.log("✅ Successful API response received")
+      if (response.ok) {
+        const result = await response.json()
+        console.log("✅ Successful API response received")
+        console.log("🔍 Full API response structure:", JSON.stringify(result, null, 2))
+        
+        // More robust response parsing with MAX_TOKENS handling
+        if (result.candidates && result.candidates.length > 0) {
+          const candidate = result.candidates[0]
           
-          if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-            return result.candidates[0].content.parts[0].text
+          // Check if we hit MAX_TOKENS limit
+          if (candidate.finishReason === "MAX_TOKENS") {
+            console.warn("⚠️ Hit MAX_TOKENS limit, response may be incomplete")
+            // Still try to extract partial content if available
+            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+              const text = candidate.content.parts[0].text
+              console.log("⚠️ Extracted partial text due to MAX_TOKENS:", text.substring(0, 100) + "...")
+              return text
+            } else {
+              console.warn("❌ MAX_TOKENS hit and no content available")
+              throw new Error("API response hit token limit with no usable content")
+            }
+          }
+          
+          // Normal response processing
+          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+            const text = candidate.content.parts[0].text
+            console.log("✅ Extracted text:", text)
+            return text
           } else {
-            console.warn("⚠️ Invalid response structure:", result)
-            throw new Error("Invalid response structure from Gemini API")
+            console.warn("⚠️ Invalid content structure in candidate:", candidate)
+            throw new Error("Invalid content structure in API response")
           }
         } else {
-          const errorText = await response.text()
-          console.warn(`❌ Attempt ${i + 1} failed:`, response.status, errorText)
-          
-          // If this is the last attempt, throw the error
-          if (i === possibleUrls.length - 1) {
-            throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`)
-          }
+          console.warn("⚠️ No candidates in response:", result)
+          throw new Error("No candidates in API response")
         }
-      } catch (error) {
-        console.warn(`❌ Attempt ${i + 1} exception:`, error.message)
-        
-        // If this is the last attempt, throw the error
-        if (i === possibleUrls.length - 1) {
-          throw error
-        }
+      } else {
+        const errorText = await response.text()
+        console.error(`❌ API call failed:`, response.status, errorText)
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`)
       }
+    } catch (error) {
+      console.error(`❌ API call exception:`, error.message)
+      throw error
     }
   }
 

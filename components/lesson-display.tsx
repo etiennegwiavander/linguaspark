@@ -165,13 +165,26 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: MessageCircle,
       enabled: sectionStates.warmup,
       content: (
-        <div className="space-y-2">
-          {safeLesson.sections.warmup.map((question, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <span className="text-primary font-medium text-sm">{index + 1}.</span>
-              <p className="text-sm">{question}</p>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {safeLesson.sections.warmup.map((question, index) => {
+            // First item is the instruction
+            if (index === 0) {
+              return (
+                <div key={index} className="mb-3">
+                  <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                    {question}
+                  </p>
+                </div>
+              )
+            }
+            // Rest are actual questions
+            return (
+              <div key={index} className="flex items-start gap-2">
+                <span className="text-primary font-medium text-sm">{index}.</span>
+                <p className="text-sm">{question}</p>
+              </div>
+            )
+          })}
         </div>
       ),
     },
@@ -216,13 +229,26 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: CheckCircle,
       enabled: sectionStates.comprehension,
       content: (
-        <div className="space-y-2">
-          {safeLesson.sections.comprehension.map((question, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <span className="text-primary font-medium text-sm">{index + 1}.</span>
-              <p className="text-sm">{question}</p>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {safeLesson.sections.comprehension.map((question, index) => {
+            // First item is the instruction
+            if (index === 0) {
+              return (
+                <div key={index} className="mb-3">
+                  <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                    {question}
+                  </p>
+                </div>
+              )
+            }
+            // Rest are actual questions
+            return (
+              <div key={index} className="flex items-start gap-2">
+                <span className="text-primary font-medium text-sm">{index}.</span>
+                <p className="text-sm">{question}</p>
+              </div>
+            )
+          })}
         </div>
       ),
     },
@@ -232,13 +258,26 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Users,
       enabled: sectionStates.discussion,
       content: (
-        <div className="space-y-2">
-          {safeLesson.sections.discussion.map((question, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <span className="text-primary font-medium text-sm">{index + 1}.</span>
-              <p className="text-sm">{question}</p>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {safeLesson.sections.discussion.map((question, index) => {
+            // First item is the instruction
+            if (index === 0) {
+              return (
+                <div key={index} className="mb-3">
+                  <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                    {question}
+                  </p>
+                </div>
+              )
+            }
+            // Rest are actual questions
+            return (
+              <div key={index} className="flex items-start gap-2">
+                <span className="text-primary font-medium text-sm">{index}.</span>
+                <p className="text-sm">{question}</p>
+              </div>
+            )
+          })}
         </div>
       ),
     },
@@ -299,13 +338,26 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: CheckCircle,
       enabled: sectionStates.wrapup,
       content: (
-        <div className="space-y-2">
-          {safeLesson.sections.wrapup.map((question, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <span className="text-primary font-medium text-sm">{index + 1}.</span>
-              <p className="text-sm">{question}</p>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {safeLesson.sections.wrapup.map((question, index) => {
+            // First item is the instruction
+            if (index === 0) {
+              return (
+                <div key={index} className="mb-3">
+                  <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                    {question}
+                  </p>
+                </div>
+              )
+            }
+            // Rest are actual questions
+            return (
+              <div key={index} className="flex items-start gap-2">
+                <span className="text-primary font-medium text-sm">{index}.</span>
+                <p className="text-sm">{question}</p>
+              </div>
+            )
+          })}
         </div>
       ),
     },
