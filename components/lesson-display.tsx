@@ -196,6 +196,17 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       content: (
         <div className="space-y-3">
           {safeLesson.sections.vocabulary.map((item, index) => {
+            // First item is the instruction
+            if (index === 0 && item.word === "INSTRUCTION") {
+              return (
+                <div key={index} className="mb-3">
+                  <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                    {item.meaning}
+                  </p>
+                </div>
+              )
+            }
+            
             // Split multiple examples if they exist
             const examples = item.example.split(' | ').filter(ex => ex.trim().length > 0)
             
@@ -214,7 +225,12 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                     {examples.map((example, exIndex) => (
                       <li key={exIndex} className="flex items-start gap-2">
                         <span className="text-primary mt-1">•</span>
-                        <span className="text-sm text-slate-700">"{example.trim()}"</span>
+                        <span 
+                          className="text-sm text-slate-700"
+                          dangerouslySetInnerHTML={{
+                            __html: example.trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          }}
+                        />
                       </li>
                     ))}
                   </ul>

@@ -141,7 +141,7 @@ export class LessonAIServerGenerator {
     // Step 2: Use hybrid approach - AI for key parts, templates for the rest
     return {
       warmup: this.addWarmupInstructions(warmupQuestions, studentLevel),
-      vocabulary: vocabulary,
+      vocabulary: this.addVocabularyInstructions(vocabulary, studentLevel),
       reading: this.generateSmartReading(sourceText, studentLevel),
       comprehension: this.addComprehensionInstructions(comprehensionQuestions, studentLevel),
       discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(this.extractBetterTopics(sourceText), lessonType, studentLevel), studentLevel),
@@ -219,6 +219,15 @@ export class LessonAIServerGenerator {
   private addWrapupInstructions(questions: string[], studentLevel: string): string[] {
     const instruction = "Reflect on your learning by discussing these wrap-up questions:"
     return [instruction, ...questions]
+  }
+
+  private addVocabularyInstructions(vocabulary: Array<{ word: string, meaning: string, example: string }>, studentLevel: string): Array<{ word: string, meaning: string, example: string }> {
+    const instruction = {
+      word: "INSTRUCTION",
+      meaning: "Study the following words with your tutor before reading the text:",
+      example: ""
+    }
+    return [instruction, ...vocabulary]
   }
 
   // Better topic extraction that recognizes compound terms
@@ -338,7 +347,7 @@ export class LessonAIServerGenerator {
       targetLanguage,
       sections: {
         warmup: this.addWarmupInstructions(this.generateSmartWarmupQuestions(topics, studentLevel, {}), studentLevel),
-        vocabulary: await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
+        vocabulary: this.addVocabularyInstructions(await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel), studentLevel),
         reading: this.generateSmartReading(sourceText, studentLevel),
         comprehension: this.addComprehensionInstructions(this.generateSmartComprehension(topics, studentLevel), studentLevel),
         discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(topics, lessonType, studentLevel), studentLevel),
@@ -1519,12 +1528,12 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
   // Generate AI-powered contextual example sentences
   private async generateAIExampleSentences(word: string, level: string, sourceText: string): Promise<string> {
     const exampleCount = this.getExampleCount(level)
-    const context = sourceText.substring(0, 100) // Shorter context for cleaner prompts
+    const context = sourceText.substring(0, 120) // More context for relevance
 
     try {
       const levelGuidance = this.getLevelGuidance(level)
-      const prompt = `Write ${exampleCount} simple ${level} level sentences using "${word}". Context: ${context}. ${levelGuidance} One sentence per line:`
-      console.log("📝 Example sentences prompt:", prompt.length, "chars")
+      const prompt = `Create ${exampleCount} contextual ${level} level sentences using "${word}" related to: ${context}. Make sentences meaningful and relevant to the topic. ${levelGuidance} Format: one sentence per line, no quotes:`
+      console.log("📝 Contextual example sentences prompt:", prompt.length, "chars")
 
       const response = await this.getGoogleAI().prompt(prompt)
 
@@ -1533,24 +1542,25 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         .map(line => line.trim())
         .filter(line => line.length > 5 && line.toLowerCase().includes(word.toLowerCase()))
         .map(line => this.cleanSentence(line))
+        .map(line => this.boldifyTargetWord(line, word))
         .filter(line => line.length > 0)
         .slice(0, exampleCount)
 
-      // If AI generated enough sentences, use them
+      // If AI generated enough contextual sentences, use them
       if (sentences.length >= exampleCount) {
         return sentences.join(' | ')
       }
 
-      // Otherwise, supplement with level-appropriate template sentences
+      // Otherwise, supplement with contextual template sentences
       const additionalNeeded = exampleCount - sentences.length
-      const templateSentences = this.generateLevelAppropriateExamples(word, level, additionalNeeded)
+      const templateSentences = this.generateContextualExamples(word, level, sourceText, additionalNeeded)
 
       return [...sentences, ...templateSentences].slice(0, exampleCount).join(' | ')
 
     } catch (error) {
-      console.log(`⚠️ AI example generation failed for ${word}, using templates`)
-      // Fallback to level-appropriate template examples
-      return this.generateLevelAppropriateExamples(word, level, exampleCount).join(' | ')
+      console.log(`⚠️ AI example generation failed for ${word}, using contextual templates`)
+      // Fallback to contextual template examples
+      return this.generateContextualExamples(word, level, sourceText, exampleCount).join(' | ')
     }
   }
 
@@ -1585,6 +1595,84 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       .replace(/^\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
       .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
       .trim()
+  }
+
+  // Make target word bold in sentence
+  private boldifyTargetWord(sentence: string, targetWord: string): string {
+    const regex = new RegExp(`\\b${targetWord}\\b`, 'gi')
+    return sentence.replace(regex, `**${targetWord}**`)
+  }
+
+  // Generate contextual examples based on source material
+  private generateContextualExamples(word: string, level: string, sourceText: string, count: number): string[] {
+    const lowerWord = word.toLowerCase()
+    const capitalizedWord = this.capitalizeWord(word)
+
+    // Extract themes from source text for context
+    const themes = this.extractThemesFromText(sourceText)
+    const mainTheme = themes[0] || 'this topic'
+
+    const contextualExamples = {
+      'A1': [
+        `**${capitalizedWord}** is in the news today.`,
+        `I read about **${lowerWord}** online.`,
+        `**${capitalizedWord}** is important for ${mainTheme}.`,
+        `People talk about **${lowerWord}**.`,
+        `**${capitalizedWord}** helps with ${mainTheme}.`
+      ],
+      'A2': [
+        `**${capitalizedWord}** plays a big role in ${mainTheme}.`,
+        `Many people are interested in **${lowerWord}**.`,
+        `**${capitalizedWord}** affects how we think about ${mainTheme}.`,
+        `The news often mentions **${lowerWord}**.`,
+        `**${capitalizedWord}** is becoming more important in ${mainTheme}.`
+      ],
+      'B1': [
+        `**${capitalizedWord}** has changed the way we approach ${mainTheme}.`,
+        `Understanding **${lowerWord}** is crucial for ${mainTheme}.`,
+        `**${capitalizedWord}** continues to influence ${mainTheme}.`,
+        `The role of **${lowerWord}** in ${mainTheme} is growing.`
+      ],
+      'B2': [
+        `**${capitalizedWord}** represents a significant development in ${mainTheme}.`,
+        `The implications of **${lowerWord}** for ${mainTheme} are far-reaching.`,
+        `**${capitalizedWord}** has transformed our understanding of ${mainTheme}.`
+      ],
+      'C1': [
+        `**${capitalizedWord}** exemplifies the complex dynamics within ${mainTheme}.`,
+        `The multifaceted nature of **${lowerWord}** requires nuanced analysis in ${mainTheme}.`,
+        `**${capitalizedWord}** represents a paradigmatic shift in contemporary ${mainTheme}.`
+      ]
+    }
+
+    const levelExamples = contextualExamples[level] || contextualExamples['B1']
+    return levelExamples.slice(0, count)
+  }
+
+  // Extract themes from source text for contextual examples
+  private extractThemesFromText(text: string): string[] {
+    const themes = []
+
+    // Common themes based on keywords
+    const themeKeywords = {
+      'sports': ['team', 'game', 'win', 'play', 'match', 'competition', 'tournament', 'cup'],
+      'technology': ['AI', 'computer', 'digital', 'software', 'system', 'device', 'artificial', 'intelligence'],
+      'environment': ['climate', 'nature', 'earth', 'green', 'pollution', 'energy', 'change'],
+      'health': ['medical', 'doctor', 'treatment', 'patient', 'medicine', 'care', 'healthcare'],
+      'business': ['company', 'market', 'economy', 'finance', 'industry', 'trade'],
+      'education': ['student', 'learn', 'school', 'knowledge', 'study', 'teach']
+    }
+
+    const lowerText = text.toLowerCase()
+
+    for (const [theme, keywords] of Object.entries(themeKeywords)) {
+      const matchCount = keywords.filter(keyword => lowerText.includes(keyword)).length
+      if (matchCount >= 2) {
+        themes.push(theme)
+      }
+    }
+
+    return themes.length > 0 ? themes : ['this topic']
   }
 
   // Generate truly level-appropriate example sentences

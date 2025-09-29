@@ -1,1 +1,3 @@
-{}
+{
+  "/popup/page": "app/popup/page.js"
+}
