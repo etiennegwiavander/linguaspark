@@ -119,7 +119,7 @@ export class LessonAIServerGenerator {
       console.error("❌ Error in AI lesson generation:", error)
       console.log("🔄 Falling back to smart template generation...")
       // Fallback to smart templates if AI fails
-      return this.generateSmartTemplateFallback(params)
+      return await this.generateSmartTemplateFallback(params)
     }
   }
 
@@ -250,39 +250,44 @@ export class LessonAIServerGenerator {
     return topics.length > 0 ? topics : ['sports']
   }
 
-  // Ultra-minimal vocabulary generation
+  // Enhanced vocabulary generation with AI-generated contextual examples
   private async generateMinimalVocabulary(sourceText: string, studentLevel: string): Promise<Array<{ word: string, meaning: string, example: string }>> {
     const words = sourceText.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
-    const uniqueWords = Array.from(new Set(words)).slice(0, 4) // Only 4 words
+    const uniqueWords = Array.from(new Set(words)).slice(0, 8) // 6-10 words, start with 8
 
     const vocabulary = []
 
     for (const word of uniqueWords) {
       try {
-        const prompt = `Define "${word}" for ${studentLevel} student:`
-        console.log("📚 Minimal vocab prompt:", prompt.length, "chars")
-        const meaning = await this.getGoogleAI().prompt(prompt)
+        const capitalizedWord = this.capitalizeWord(word)
 
-        // Find example sentence from source
-        const sentences = sourceText.split(/[.!?]+/)
-        const example = sentences.find(s => s.toLowerCase().includes(word.toLowerCase())) || `Example with ${word}.`
+        // Generate AI definition
+        const definitionPrompt = `Define "${word}" simply for ${studentLevel} level. Context: ${sourceText.substring(0, 80)}. Give only the definition, no extra text:`
+        console.log("📚 Vocab definition prompt:", definitionPrompt.length, "chars")
+        const rawMeaning = await this.getGoogleAI().prompt(definitionPrompt)
+        const meaning = this.cleanDefinition(rawMeaning, studentLevel)
+
+        // Generate AI contextual examples
+        const examples = await this.generateAIExampleSentences(word, studentLevel, sourceText)
 
         vocabulary.push({
-          word: word,
-          meaning: meaning.trim().substring(0, 100), // Limit meaning length
-          example: example.trim().substring(0, 100)
+          word: capitalizedWord,
+          meaning: meaning.trim().substring(0, 200),
+          example: examples
         })
       } catch (error) {
-        console.log(`⚠️ Vocab failed for ${word}, using template`)
+        console.log(`⚠️ Vocab failed for ${word}, using enhanced template`)
+        const capitalizedWord = this.capitalizeWord(word)
         vocabulary.push({
-          word: word,
-          meaning: this.generateWordMeaning(word, studentLevel),
-          example: `Example sentence with ${word}.`
+          word: capitalizedWord,
+          meaning: this.generateContextualWordMeaning(word, studentLevel, sourceText),
+          example: await this.generateAIExampleSentences(word, studentLevel, sourceText)
         })
       }
     }
 
-    return vocabulary
+    // Ensure we have 6-10 words
+    return vocabulary.slice(0, 10).length >= 6 ? vocabulary.slice(0, 10) : vocabulary.slice(0, 6)
   }
 
   // Ultra-minimal comprehension generation
@@ -319,12 +324,12 @@ export class LessonAIServerGenerator {
     }
   }
 
-  // Smart template fallback
-  private generateSmartTemplateFallback(params: LessonGenerationParams): GeneratedLesson {
+  // Smart template fallback with AI-generated examples
+  private async generateSmartTemplateFallback(params: LessonGenerationParams): Promise<GeneratedLesson> {
     const { sourceText, lessonType, studentLevel, targetLanguage } = params
 
     console.log("🎨 Using smart template fallback...")
-    const topics = this.extractTopicsFromText(sourceText, [])
+    const topics = this.extractBetterTopics(sourceText)
     const vocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
 
     return {
@@ -333,7 +338,7 @@ export class LessonAIServerGenerator {
       targetLanguage,
       sections: {
         warmup: this.addWarmupInstructions(this.generateSmartWarmupQuestions(topics, studentLevel, {}), studentLevel),
-        vocabulary: this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
+        vocabulary: await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
         reading: this.generateSmartReading(sourceText, studentLevel),
         comprehension: this.addComprehensionInstructions(this.generateSmartComprehension(topics, studentLevel), studentLevel),
         discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(topics, lessonType, studentLevel), studentLevel),
@@ -1419,40 +1424,290 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     return levelQuestions[studentLevel] || levelQuestions['B1']
   }
 
-  // Smart vocabulary with contextual examples
-  private generateSmartVocabulary(vocabulary: string[], sourceText: string, studentLevel: string) {
-    return vocabulary.slice(0, 6).map(word => {
-      // Find the word in context
-      const sentences = sourceText.split(/[.!?]+/)
-      const contextSentence = sentences.find(s => s.toLowerCase().includes(word.toLowerCase()))
+  // Enhanced smart vocabulary with AI-generated contextual examples
+  private async generateSmartVocabulary(vocabulary: string[], sourceText: string, studentLevel: string) {
+    const selectedWords = vocabulary.slice(0, 8) // Start with 8 words
+    const vocabPromises = selectedWords.map(async (word) => {
+      const capitalizedWord = this.capitalizeWord(word)
 
       return {
-        word: word,
-        meaning: this.generateWordMeaning(word, studentLevel),
-        example: contextSentence ?
-          contextSentence.trim().substring(0, 100) + (contextSentence.length > 100 ? '...' : '') :
-          `This is an example sentence with ${word}.`
+        word: capitalizedWord,
+        meaning: this.generateContextualWordMeaning(word, studentLevel, sourceText),
+        example: await this.generateAIExampleSentences(word, studentLevel, sourceText)
       }
     })
+
+    const results = await Promise.all(vocabPromises)
+    // Ensure we have 6-10 words
+    return results.slice(0, 10).length >= 6 ? results.slice(0, 10) : results.slice(0, 6)
   }
 
-  // Generate word meanings based on level
-  private generateWordMeaning(word: string, level: string): string {
-    // Simple definitions based on level
-    const commonMeanings = {
-      'efficient': level === 'A1' || level === 'A2' ? 'working well and fast' : 'achieving maximum productivity with minimum wasted effort',
-      'technology': level === 'A1' || level === 'A2' ? 'computers and machines' : 'the application of scientific knowledge for practical purposes',
-      'privacy': level === 'A1' || level === 'A2' ? 'keeping things secret' : 'the state of being free from public attention',
-      'device': level === 'A1' || level === 'A2' ? 'a machine or tool' : 'a piece of equipment designed for a particular purpose',
-      'processing': level === 'A1' || level === 'A2' ? 'working with information' : 'performing operations on data',
-      'compact': level === 'A1' || level === 'A2' ? 'small and neat' : 'closely and neatly packed together',
-      'version': level === 'A1' || level === 'A2' ? 'a type of something' : 'a particular form of something',
-      'family': level === 'A1' || level === 'A2' ? 'a group of related things' : 'a group of related objects or concepts',
-      'nano': level === 'A1' || level === 'A2' ? 'very small' : 'extremely small in scale',
-      'gemini': level === 'A1' || level === 'A2' ? 'a type of AI' : 'an artificial intelligence system developed by Google'
+  // Capitalize word properly
+  private capitalizeWord(word: string): string {
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  }
+
+  // Generate contextual word meanings based on level and source text
+  private generateContextualWordMeaning(word: string, level: string, sourceText: string): string {
+    const lowerWord = word.toLowerCase()
+
+    // Enhanced contextual definitions based on level
+    const contextualMeanings = {
+      'efficient': {
+        'A1': 'working well without wasting time',
+        'A2': 'doing something well and quickly without wasting time or energy',
+        'B1': 'working in a way that achieves the best results with the least waste of time and effort',
+        'B2': 'achieving maximum productivity with minimum wasted effort or expense',
+        'C1': 'achieving maximum productivity with minimum wasted effort, expense, or unnecessary activity'
+      },
+      'technology': {
+        'A1': 'computers and machines that help us',
+        'A2': 'machines and computer systems that make life easier',
+        'B1': 'the use of scientific knowledge to create useful tools and machines',
+        'B2': 'the application of scientific knowledge for practical purposes in industry and daily life',
+        'C1': 'the systematic application of scientific knowledge to develop practical solutions and innovations'
+      },
+      'europe': {
+        'A1': 'a big area with many countries',
+        'A2': 'a continent with many different countries like France, Germany, and Italy',
+        'B1': 'a continent consisting of many countries, known for its history and culture',
+        'B2': 'a continent comprising numerous nations with diverse cultures, languages, and political systems',
+        'C1': 'a geopolitical and cultural continent characterized by diverse nation-states, shared historical heritage, and economic integration'
+      },
+      'sensational': {
+        'A1': 'very exciting and good',
+        'A2': 'extremely exciting or impressive, causing strong feelings',
+        'B1': 'causing great excitement, interest, or shock; extremely impressive',
+        'B2': 'causing intense excitement, interest, or shock; extraordinarily impressive or remarkable',
+        'C1': 'causing or designed to cause intense excitement, interest, or shock through dramatic or extraordinary qualities'
+      },
+      'stages': {
+        'A1': 'does or makes something happen',
+        'A2': 'organizes and presents an event or performance',
+        'B1': 'organizes and presents an event, or refers to different parts of a process',
+        'B2': 'organizes and presents an event or performance, or represents distinct phases in a process',
+        'C1': 'orchestrates and presents an event or performance, or denotes sequential phases in a complex process'
+      },
+      'comeback': {
+        'A1': 'winning after losing',
+        'A2': 'returning to win after being behind in a game or competition',
+        'B1': 'a return to a winning position after being behind, or a return to success',
+        'B2': 'a recovery from a disadvantageous position to achieve success or victory',
+        'C1': 'a strategic recovery from a disadvantageous position to achieve success, often against expectations'
+      },
+      'dramatic': {
+        'A1': 'very exciting and surprising',
+        'A2': 'very exciting, with sudden changes that surprise people',
+        'B1': 'involving sudden changes or strong emotions; very noticeable or impressive',
+        'B2': 'characterized by sudden, striking changes or intense emotions; highly impressive or theatrical',
+        'C1': 'marked by sudden, striking developments or intense emotional impact; theatrically impressive or emotionally powerful'
+      }
     }
 
-    return commonMeanings[word.toLowerCase()] || `A word meaning ${word.toLowerCase()}`
+    const levelMeanings = contextualMeanings[lowerWord]
+    if (levelMeanings && levelMeanings[level]) {
+      return levelMeanings[level]
+    }
+
+    // Fallback to basic level-appropriate definition
+    const isSimpleLevel = level === 'A1' || level === 'A2'
+    return isSimpleLevel ?
+      `a word that means ${lowerWord}` :
+      `a term referring to ${lowerWord} in this context`
+  }
+
+  // Generate AI-powered contextual example sentences
+  private async generateAIExampleSentences(word: string, level: string, sourceText: string): Promise<string> {
+    const exampleCount = this.getExampleCount(level)
+    const context = sourceText.substring(0, 100) // Shorter context for cleaner prompts
+
+    try {
+      const levelGuidance = this.getLevelGuidance(level)
+      const prompt = `Write ${exampleCount} simple ${level} level sentences using "${word}". Context: ${context}. ${levelGuidance} One sentence per line:`
+      console.log("📝 Example sentences prompt:", prompt.length, "chars")
+
+      const response = await this.getGoogleAI().prompt(prompt)
+
+      // Parse and clean AI response
+      const sentences = response.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 5 && line.toLowerCase().includes(word.toLowerCase()))
+        .map(line => this.cleanSentence(line))
+        .filter(line => line.length > 0)
+        .slice(0, exampleCount)
+
+      // If AI generated enough sentences, use them
+      if (sentences.length >= exampleCount) {
+        return sentences.join(' | ')
+      }
+
+      // Otherwise, supplement with level-appropriate template sentences
+      const additionalNeeded = exampleCount - sentences.length
+      const templateSentences = this.generateLevelAppropriateExamples(word, level, additionalNeeded)
+
+      return [...sentences, ...templateSentences].slice(0, exampleCount).join(' | ')
+
+    } catch (error) {
+      console.log(`⚠️ AI example generation failed for ${word}, using templates`)
+      // Fallback to level-appropriate template examples
+      return this.generateLevelAppropriateExamples(word, level, exampleCount).join(' | ')
+    }
+  }
+
+  // Get level-specific guidance for AI prompts
+  private getLevelGuidance(level: string): string {
+    const guidance = {
+      'A1': 'Use very simple words, short sentences (5-8 words), present tense.',
+      'A2': 'Use simple words, short sentences (6-10 words), basic grammar.',
+      'B1': 'Use common words, medium sentences (8-12 words), clear meaning.',
+      'B2': 'Use varied vocabulary, longer sentences (10-15 words), complex ideas.',
+      'C1': 'Use sophisticated vocabulary, complex sentences (12+ words), nuanced meaning.'
+    }
+    return guidance[level] || guidance['B1']
+  }
+
+  // Clean sentence formatting
+  private cleanSentence(sentence: string): string {
+    return sentence
+      .replace(/^\d+\.?\s*/, '') // Remove numbering
+      .replace(/^-\s*/, '') // Remove dashes
+      .replace(/^\*\s*/, '') // Remove asterisks
+      .replace(/^•\s*/, '') // Remove bullet points
+      .trim()
+  }
+
+  // Clean definition formatting
+  private cleanDefinition(definition: string, level: string): string {
+    return definition
+      .replace(/^For an? [A-Z]\d+ student,?\s*/i, '') // Remove level prefixes
+      .replace(/^In this context,?\s*/i, '') // Remove context prefixes
+      .replace(/^Here's? (a )?definition.*?:\s*/i, '') // Remove definition intros
+      .replace(/^\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
+      .trim()
+  }
+
+  // Generate truly level-appropriate example sentences
+  private generateLevelAppropriateExamples(word: string, level: string, count: number): string[] {
+    const lowerWord = word.toLowerCase()
+    const capitalizedWord = this.capitalizeWord(word)
+
+    const examples = {
+      'A1': [
+        `${capitalizedWord} is good.`,
+        `I like ${lowerWord}.`,
+        `This is ${lowerWord}.`,
+        `${capitalizedWord} helps us.`,
+        `We see ${lowerWord}.`
+      ],
+      'A2': [
+        `${capitalizedWord} is very important.`,
+        `I think ${lowerWord} is interesting.`,
+        `Many people know about ${lowerWord}.`,
+        `${capitalizedWord} is useful for us.`,
+        `We can learn about ${lowerWord}.`
+      ],
+      'B1': [
+        `${capitalizedWord} plays an important role today.`,
+        `People are interested in ${lowerWord}.`,
+        `${capitalizedWord} affects our daily lives.`,
+        `We should understand ${lowerWord} better.`
+      ],
+      'B2': [
+        `${capitalizedWord} has significant implications for society.`,
+        `The impact of ${lowerWord} continues to grow.`,
+        `Understanding ${lowerWord} requires careful consideration.`
+      ],
+      'C1': [
+        `${capitalizedWord} exemplifies contemporary challenges.`,
+        `The complexity of ${lowerWord} demands sophisticated analysis.`,
+        `${capitalizedWord} represents a paradigm shift in thinking.`
+      ]
+    }
+
+    const levelExamples = examples[level] || examples['B1']
+    return levelExamples.slice(0, count)
+  }
+
+  // Fallback template-based example generation
+  private generateTemplateExamples(word: string, level: string, sourceText: string): string {
+    const exampleCount = this.getExampleCount(level)
+
+    // Try to find the word in the source text first
+    const sentences = sourceText.split(/[.!?]+/).filter(s => s.trim().length > 10)
+    const contextSentence = sentences.find(s => s.toLowerCase().includes(word.toLowerCase()))
+
+    const examples = []
+
+    // Add context sentence if found
+    if (contextSentence) {
+      examples.push(contextSentence.trim())
+    }
+
+    // Generate additional level-appropriate examples
+    const additionalExamples = this.generateAdditionalExamples(word, level, exampleCount - examples.length)
+    examples.push(...additionalExamples)
+
+    // Ensure we have the right number of examples
+    return examples.slice(0, exampleCount).join(' | ')
+  }
+
+  // Get number of examples based on CEFR level
+  private getExampleCount(level: string): number {
+    switch (level) {
+      case 'A1':
+      case 'A2':
+        return 5
+      case 'B1':
+        return 4
+      case 'B2':
+      case 'C1':
+        return 3
+      default:
+        return 4
+    }
+  }
+
+  // Generate additional level-appropriate example sentences
+  private generateAdditionalExamples(word: string, level: string, count: number): string[] {
+    const lowerWord = word.toLowerCase()
+    const capitalizedWord = this.capitalizeWord(word)
+
+    const exampleTemplates = {
+      'A1': [
+        `${capitalizedWord} is important.`,
+        `I like ${lowerWord}.`,
+        `This is ${lowerWord}.`,
+        `${capitalizedWord} is good.`,
+        `We use ${lowerWord}.`
+      ],
+      'A2': [
+        `${capitalizedWord} is very important in our daily life.`,
+        `I think ${lowerWord} is interesting.`,
+        `Many people use ${lowerWord} today.`,
+        `${capitalizedWord} helps us a lot.`,
+        `We can learn about ${lowerWord}.`
+      ],
+      'B1': [
+        `${capitalizedWord} plays an important role in modern society.`,
+        `The concept of ${lowerWord} has evolved significantly.`,
+        `Understanding ${lowerWord} is essential for students.`,
+        `${capitalizedWord} continues to influence our daily lives.`
+      ],
+      'B2': [
+        `${capitalizedWord} represents a significant development in this field.`,
+        `The implications of ${lowerWord} extend beyond immediate applications.`,
+        `Experts consider ${lowerWord} to be a crucial factor in future progress.`
+      ],
+      'C1': [
+        `${capitalizedWord} exemplifies the complex interplay between innovation and practical application.`,
+        `The multifaceted nature of ${lowerWord} requires comprehensive analysis.`,
+        `Contemporary discourse surrounding ${lowerWord} reflects broader societal transformations.`
+      ]
+    }
+
+    const templates = exampleTemplates[level] || exampleTemplates['B1']
+    return templates.slice(0, count)
   }
 
   // Smart reading passage adaptation

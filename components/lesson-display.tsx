@@ -195,18 +195,33 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.vocabulary,
       content: (
         <div className="space-y-3">
-          {safeLesson.sections.vocabulary.map((item, index) => (
-            <div key={index} className="border rounded-lg p-3 bg-muted/30">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-primary">{item.word}</span>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                  <Volume2 className="h-3 w-3" />
-                </Button>
+          {safeLesson.sections.vocabulary.map((item, index) => {
+            // Split multiple examples if they exist
+            const examples = item.example.split(' | ').filter(ex => ex.trim().length > 0)
+            
+            return (
+              <div key={index} className="border rounded-lg p-3 bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-semibold text-primary text-base">{item.word}</span>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Volume2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3 leading-relaxed">{item.meaning}</p>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Examples:</p>
+                  <ul className="space-y-1">
+                    {examples.map((example, exIndex) => (
+                      <li key={exIndex} className="flex items-start gap-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span className="text-sm text-slate-700">"{example.trim()}"</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mb-1">{item.meaning}</p>
-              <p className="text-sm italic">"{item.example}"</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ),
     },
