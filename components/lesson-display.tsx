@@ -71,6 +71,16 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       vocabulary: lesson.sections?.vocabulary || [],
       reading: lesson.sections?.reading || "",
       comprehension: lesson.sections?.comprehension || [],
+      dialoguePractice: lesson.sections?.dialoguePractice || {
+        instruction: "",
+        dialogue: [],
+        followUpQuestions: []
+      },
+      dialogueFillGap: lesson.sections?.dialogueFillGap || {
+        instruction: "",
+        dialogue: [],
+        answers: []
+      },
       discussion: lesson.sections?.discussion || [],
       grammar: lesson.sections?.grammar || {
         focus: "Grammar Focus",
@@ -91,6 +101,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     vocabulary: true,
     reading: true,
     comprehension: true,
+    dialoguePractice: true,
+    dialogueFillGap: true,
     discussion: true,
     grammar: true,
     pronunciation: true,
@@ -314,6 +326,87 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               </div>
             )
           })}
+        </div>
+      ),
+    },
+    {
+      id: "dialoguePractice",
+      title: "Dialogue Practice",
+      icon: Users,
+      enabled: sectionStates.dialoguePractice,
+      content: (
+        <div className="space-y-4">
+          <div className="mb-3">
+            <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+              {safeLesson.sections.dialoguePractice.instruction}
+            </p>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-4 border">
+            <div className="space-y-3">
+              {safeLesson.sections.dialoguePractice.dialogue.map((line, index) => (
+                <div key={index} className="flex gap-3">
+                  <span className="font-semibold text-primary min-w-[80px]">{line.character}:</span>
+                  <span className="text-sm">{line.line}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {safeLesson.sections.dialoguePractice.followUpQuestions.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium text-sm mb-2">Follow-up Questions:</h4>
+              <div className="space-y-2">
+                {safeLesson.sections.dialoguePractice.followUpQuestions.map((question, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <span className="text-primary font-medium text-sm">{index + 1}.</span>
+                    <p className="text-sm">{question}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "dialogueFillGap",
+      title: "Dialogue Fill-in-the-Gap",
+      icon: MessageCircle,
+      enabled: sectionStates.dialogueFillGap,
+      content: (
+        <div className="space-y-4">
+          <div className="mb-3">
+            <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+              {safeLesson.sections.dialogueFillGap.instruction}
+            </p>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-4 border">
+            <div className="space-y-3">
+              {safeLesson.sections.dialogueFillGap.dialogue.map((line, index) => (
+                <div key={index} className="flex gap-3">
+                  <span className="font-semibold text-primary min-w-[80px]">{line.character}:</span>
+                  <span className="text-sm">
+                    {line.isGap ? (
+                      <span 
+                        dangerouslySetInnerHTML={{
+                          __html: line.line.replace(/_____/g, '<span class="inline-block w-20 h-6 border-b-2 border-primary/50 mx-1"></span>')
+                        }}
+                      />
+                    ) : (
+                      line.line
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {safeLesson.sections.dialogueFillGap.answers.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium text-sm mb-2">Answer Key:</h4>
+              <div className="text-xs text-muted-foreground">
+                {safeLesson.sections.dialogueFillGap.answers.join(', ')}
+              </div>
+            </div>
+          )}
         </div>
       ),
     },

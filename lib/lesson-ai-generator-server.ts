@@ -38,6 +38,16 @@ interface GeneratedLesson {
     reading: string
     comprehension: string[]
     discussion: string[]
+    dialoguePractice: {
+      instruction: string
+      dialogue: Array<{ character: string; line: string }>
+      followUpQuestions: string[]
+    }
+    dialogueFillGap: {
+      instruction: string
+      dialogue: Array<{ character: string; line: string; isGap?: boolean }>
+      answers: string[]
+    }
     grammar: {
       focus: string
       examples: string[]
@@ -148,6 +158,8 @@ export class LessonAIServerGenerator {
       reading: this.addReadingInstructions(readingPassage, studentLevel),
       comprehension: this.addComprehensionInstructions(comprehensionQuestions, studentLevel),
       discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(this.extractBetterTopics(sourceText), lessonType, studentLevel), studentLevel),
+      dialoguePractice: await this.generateDialoguePractice(sourceText, studentLevel, vocabularyWords),
+      dialogueFillGap: await this.generateDialogueFillGap(sourceText, studentLevel, vocabularyWords),
       grammar: this.generateSmartGrammar(studentLevel, sourceText),
       pronunciation: this.generateSmartPronunciation(vocabulary.map(v => v.word)),
       wrapup: this.addWrapupInstructions(this.generateSmartWrapup(this.extractBetterTopics(sourceText), studentLevel), studentLevel)
@@ -359,6 +371,8 @@ export class LessonAIServerGenerator {
         reading: this.addReadingInstructions(await this.generateSmartReading(sourceText, studentLevel, vocabulary), studentLevel),
         comprehension: this.addComprehensionInstructions(this.generateSmartComprehension(topics, studentLevel), studentLevel),
         discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(topics, lessonType, studentLevel), studentLevel),
+        dialoguePractice: await this.generateDialoguePractice(sourceText, studentLevel, vocabulary),
+        dialogueFillGap: await this.generateDialogueFillGap(sourceText, studentLevel, vocabulary),
         grammar: this.generateSmartGrammar(studentLevel, sourceText),
         pronunciation: this.generateSmartPronunciation(vocabulary),
         wrapup: this.addWrapupInstructions(this.generateSmartWrapup(topics, studentLevel), studentLevel)
@@ -2075,6 +2089,182 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       `Which concepts about ${topic.toLowerCase()} need more practice?`,
       "How will you use this knowledge in real situations?",
       "What questions do you still have about this content?"
+    ]
+  }
+
+  // Generate dialogue practice section (Engoo-style)
+  private async generateDialoguePractice(sourceText: string, studentLevel: string, vocabularyWords: string[]): Promise<{instruction: string, dialogue: Array<{character: string, line: string}>, followUpQuestions: string[]}> {
+    const topics = this.extractBetterTopics(sourceText)
+    const mainTopic = topics[0] || 'this topic'
+    
+    try {
+      const context = sourceText.substring(0, 150)
+      const prompt = `Create a ${studentLevel} level dialogue between 2-3 characters about: ${context}. Include vocabulary: ${vocabularyWords.slice(0, 3).join(', ')}. Format: Character Name: dialogue line. Make it natural and conversational.`
+      
+      console.log("🎭 Dialogue practice prompt:", prompt.length, "chars")
+      const response = await this.getGoogleAI().prompt(prompt)
+      
+      const dialogue = this.parseDialogue(response)
+      const followUpQuestions = this.generateDialogueFollowUpQuestions(mainTopic, studentLevel)
+      
+      return {
+        instruction: "Practice this dialogue with your tutor. Take turns reading different characters:",
+        dialogue: dialogue,
+        followUpQuestions: followUpQuestions
+      }
+    } catch (error) {
+      console.log("⚠️ Dialogue practice generation failed, using template")
+      return this.generateTemplateDialoguePractice(mainTopic, studentLevel, vocabularyWords)
+    }
+  }
+
+  // Generate dialogue fill-in-the-gap section
+  private async generateDialogueFillGap(sourceText: string, studentLevel: string, vocabularyWords: string[]): Promise<{instruction: string, dialogue: Array<{character: string, line: string, isGap?: boolean}>, answers: string[]}> {
+    const topics = this.extractBetterTopics(sourceText)
+    const mainTopic = topics[0] || 'this topic'
+    
+    try {
+      const context = sourceText.substring(0, 150)
+      const prompt = `Create a short ${studentLevel} level dialogue between 2 characters about: ${context}. Leave 3-4 blanks for students to fill. Format: Character: dialogue with _____ for blanks.`
+      
+      console.log("📝 Fill-gap dialogue prompt:", prompt.length, "chars")
+      const response = await this.getGoogleAI().prompt(prompt)
+      
+      const { dialogue, answers } = this.parseDialogueWithGaps(response)
+      
+      return {
+        instruction: "Complete the dialogue by filling in the missing words or phrases:",
+        dialogue: dialogue,
+        answers: answers
+      }
+    } catch (error) {
+      console.log("⚠️ Fill-gap dialogue generation failed, using template")
+      return this.generateTemplateDialogueFillGap(mainTopic, studentLevel, vocabularyWords)
+    }
+  }
+
+  // Parse dialogue from AI response
+  private parseDialogue(response: string): Array<{character: string, line: string}> {
+    const lines = response.split('\n').filter(line => line.trim().length > 0)
+    const dialogue = []
+    
+    for (const line of lines) {
+      const match = line.match(/^([A-Za-z\s]+):\s*(.+)$/)
+      if (match) {
+        dialogue.push({
+          character: match[1].trim(),
+          line: match[2].trim()
+        })
+      }
+    }
+    
+    return dialogue.length > 0 ? dialogue : this.getDefaultDialogue()
+  }
+
+  // Parse dialogue with gaps
+  private parseDialogueWithGaps(response: string): {dialogue: Array<{character: string, line: string, isGap?: boolean}>, answers: string[]} {
+    const lines = response.split('\n').filter(line => line.trim().length > 0)
+    const dialogue = []
+    const answers = []
+    
+    for (const line of lines) {
+      const match = line.match(/^([A-Za-z\s]+):\s*(.+)$/)
+      if (match) {
+        const character = match[1].trim()
+        const text = match[2].trim()
+        
+        if (text.includes('_____')) {
+          dialogue.push({
+            character: character,
+            line: text,
+            isGap: true
+          })
+          answers.push("answer")
+        } else {
+          dialogue.push({
+            character: character,
+            line: text
+          })
+        }
+      }
+    }
+    
+    return { dialogue, answers }
+  }
+
+  // Generate follow-up questions for dialogue practice
+  private generateDialogueFollowUpQuestions(topic: string, studentLevel: string): string[] {
+    const levelQuestions = {
+      'A1': [
+        "What did the characters talk about?",
+        "Which character do you like more?",
+        "Is this conversation easy or difficult?"
+      ],
+      'A2': [
+        "What is the main problem in the dialogue?",
+        "How do the characters feel?",
+        "What would you say in this situation?"
+      ],
+      'B1': [
+        "What is the relationship between the characters?",
+        "How would you handle this situation differently?",
+        "What cultural differences do you notice?"
+      ],
+      'B2': [
+        "What are the underlying motivations of each character?",
+        "How effective is their communication?",
+        "What assumptions are being made in this conversation?"
+      ],
+      'C1': [
+        "How do the characters' communication styles reflect their backgrounds?",
+        "What implicit meanings can you identify in their exchanges?",
+        "How might this conversation unfold in different cultural contexts?"
+      ]
+    }
+    
+    return levelQuestions[studentLevel] || levelQuestions['B1']
+  }
+
+  // Template dialogue practice fallback
+  private generateTemplateDialoguePractice(topic: string, studentLevel: string, vocabularyWords: string[]): {instruction: string, dialogue: Array<{character: string, line: string}>, followUpQuestions: string[]} {
+    const dialogue = [
+      { character: "Alex", line: `Have you heard about ${topic}?` },
+      { character: "Sam", line: `Yes, I think it's very interesting.` },
+      { character: "Alex", line: `What do you think about it?` },
+      { character: "Sam", line: `I believe it will change many things.` },
+      { character: "Alex", line: `I agree. It's important to understand it better.` }
+    ]
+    
+    return {
+      instruction: "Practice this dialogue with your tutor. Take turns reading different characters:",
+      dialogue: dialogue,
+      followUpQuestions: this.generateDialogueFollowUpQuestions(topic, studentLevel)
+    }
+  }
+
+  // Template fill-gap dialogue fallback
+  private generateTemplateDialogueFillGap(topic: string, studentLevel: string, vocabularyWords: string[]): {instruction: string, dialogue: Array<{character: string, line: string, isGap?: boolean}>, answers: string[]} {
+    const dialogue = [
+      { character: "Person A", line: `What do you think about _____?`, isGap: true },
+      { character: "Person B", line: `I think it's very _____.`, isGap: true },
+      { character: "Person A", line: `Why do you feel that way?` },
+      { character: "Person B", line: `Because it _____ our daily lives.`, isGap: true }
+    ]
+    
+    return {
+      instruction: "Complete the dialogue by filling in the missing words or phrases:",
+      dialogue: dialogue,
+      answers: [topic, "interesting", "affects"]
+    }
+  }
+
+  // Default dialogue fallback
+  private getDefaultDialogue(): Array<{character: string, line: string}> {
+    return [
+      { character: "Alex", line: "What do you think about this topic?" },
+      { character: "Sam", line: "I find it very interesting." },
+      { character: "Alex", line: "Can you tell me more?" },
+      { character: "Sam", line: "Sure, I'd be happy to explain." }
     ]
   }
 
