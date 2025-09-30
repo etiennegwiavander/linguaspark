@@ -248,9 +248,43 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       enabled: sectionStates.reading,
       content: (
         <div className="prose prose-sm max-w-none">
-          <div className="bg-muted/30 rounded-lg p-4 border">
-            <p className="text-sm leading-relaxed">{safeLesson.sections.reading}</p>
-          </div>
+          {(() => {
+            const readingContent = safeLesson.sections.reading
+            const parts = readingContent.split('\n\n')
+            
+            // Check if first part is an instruction
+            if (parts.length > 1 && parts[0].includes('Read the following text carefully')) {
+              return (
+                <div className="space-y-3">
+                  <div className="mb-3">
+                    <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                      {parts[0]}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 border">
+                    <p 
+                      className="text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{
+                        __html: parts.slice(1).join('\n\n').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            } else {
+              // No instruction, display as before
+              return (
+                <div className="bg-muted/30 rounded-lg p-4 border">
+                  <p 
+                    className="text-sm leading-relaxed"
+                    dangerouslySetInnerHTML={{
+                      __html: readingContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    }}
+                  />
+                </div>
+              )
+            }
+          })()}
         </div>
       ),
     },

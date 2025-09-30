@@ -139,10 +139,13 @@ export class LessonAIServerGenerator {
     const comprehensionQuestions = await this.generateMinimalComprehension(sourceText, studentLevel)
 
     // Step 2: Use hybrid approach - AI for key parts, templates for the rest
+    const vocabularyWords = vocabulary.map(v => v.word)
+    const readingPassage = await this.generateSmartReading(sourceText, studentLevel, vocabularyWords)
+    
     return {
       warmup: this.addWarmupInstructions(warmupQuestions, studentLevel),
       vocabulary: this.addVocabularyInstructions(vocabulary, studentLevel),
-      reading: this.generateSmartReading(sourceText, studentLevel),
+      reading: this.addReadingInstructions(readingPassage, studentLevel),
       comprehension: this.addComprehensionInstructions(comprehensionQuestions, studentLevel),
       discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(this.extractBetterTopics(sourceText), lessonType, studentLevel), studentLevel),
       grammar: this.generateSmartGrammar(studentLevel, sourceText),
@@ -228,6 +231,11 @@ export class LessonAIServerGenerator {
       example: ""
     }
     return [instruction, ...vocabulary]
+  }
+
+  private addReadingInstructions(readingText: string, studentLevel: string): string {
+    const instruction = "Read the following text carefully. Your tutor will help you with any difficult words or concepts:"
+    return `${instruction}\n\n${readingText}`
   }
 
   // Better topic extraction that recognizes compound terms
@@ -348,7 +356,7 @@ export class LessonAIServerGenerator {
       sections: {
         warmup: this.addWarmupInstructions(this.generateSmartWarmupQuestions(topics, studentLevel, {}), studentLevel),
         vocabulary: this.addVocabularyInstructions(await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel), studentLevel),
-        reading: this.generateSmartReading(sourceText, studentLevel),
+        reading: this.addReadingInstructions(await this.generateSmartReading(sourceText, studentLevel, vocabulary), studentLevel),
         comprehension: this.addComprehensionInstructions(this.generateSmartComprehension(topics, studentLevel), studentLevel),
         discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(topics, lessonType, studentLevel), studentLevel),
         grammar: this.generateSmartGrammar(studentLevel, sourceText),
@@ -1370,7 +1378,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
   }
 
   // Smart template-based lesson generation
-  private generateSmartTemplateLesson(
+  private async generateSmartTemplateLesson(
     sourceText: string,
     contentAnalysis: any,
     lessonType: string,
@@ -1386,8 +1394,8 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
 
     return {
       warmup: this.generateSmartWarmupQuestions(topics, studentLevel, contentAnalysis),
-      vocabulary: this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
-      reading: this.generateSmartReading(sourceText, studentLevel),
+      vocabulary: await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
+      reading: await this.generateSmartReading(sourceText, studentLevel, vocabulary),
       comprehension: this.generateSmartComprehension(topics, studentLevel),
       discussion: this.generateSmartDiscussion(topics, lessonType, studentLevel),
       grammar: this.generateSmartGrammar(studentLevel, sourceText),
@@ -1798,30 +1806,124 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     return templates.slice(0, count)
   }
 
-  // Smart reading passage adaptation
-  private generateSmartReading(sourceText: string, studentLevel: string): string {
+  // Enhanced reading passage adaptation with AI rewriting and vocabulary bolding
+  private async generateSmartReading(sourceText: string, studentLevel: string, vocabularyWords: string[] = []): Promise<string> {
     const maxLength = {
-      'A1': 200,
-      'A2': 300,
-      'B1': 400,
-      'B2': 500,
-      'C1': 600
+      'A1': 150,
+      'A2': 250,
+      'B1': 350,
+      'B2': 450,
+      'C1': 550
     }
 
-    const targetLength = maxLength[studentLevel] || 400
+    const targetLength = maxLength[studentLevel] || 350
 
-    // Simplify sentences for lower levels
+    try {
+      // Use AI to rewrite text for appropriate level
+      const rewrittenText = await this.rewriteForLevel(sourceText, studentLevel, targetLength)
+      // Bold vocabulary words in the reading passage
+      return this.boldVocabularyInText(rewrittenText, vocabularyWords)
+    } catch (error) {
+      console.log(`⚠️ AI rewriting failed for reading passage, using template adaptation`)
+      // Fallback to template-based adaptation
+      const adaptedText = this.adaptReadingTemplate(sourceText, studentLevel, targetLength)
+      return this.boldVocabularyInText(adaptedText, vocabularyWords)
+    }
+  }
+
+  // AI-powered text rewriting for CEFR levels
+  private async rewriteForLevel(sourceText: string, studentLevel: string, targetLength: number): Promise<string> {
+    const levelGuidance = this.getReadingLevelGuidance(studentLevel)
+    const shortText = sourceText.substring(0, targetLength + 100) // Give AI more context to work with
+    
+    const prompt = `Rewrite this text for ${studentLevel} level students. ${levelGuidance} Keep the main ideas but adapt the language. Target length: ${targetLength} characters. Text: ${shortText}`
+    
+    console.log("📖 Reading rewrite prompt:", prompt.length, "chars")
+    
+    const rewrittenText = await this.getGoogleAI().prompt(prompt)
+    
+    // Clean and limit the rewritten text
+    return rewrittenText.trim().substring(0, targetLength)
+  }
+
+  // Get level-specific guidance for reading adaptation
+  private getReadingLevelGuidance(level: string): string {
+    const guidance = {
+      'A1': 'Use very simple words, short sentences (5-8 words), present tense only, basic vocabulary.',
+      'A2': 'Use simple words, short sentences (6-10 words), simple past and present, common vocabulary.',
+      'B1': 'Use clear language, medium sentences (8-12 words), various tenses, intermediate vocabulary.',
+      'B2': 'Use varied vocabulary, longer sentences (10-15 words), complex grammar, advanced concepts.',
+      'C1': 'Use sophisticated language, complex sentences (12+ words), advanced grammar, nuanced ideas.'
+    }
+    return guidance[level] || guidance['B1']
+  }
+
+  // Template-based reading adaptation (fallback)
+  private adaptReadingTemplate(sourceText: string, studentLevel: string, targetLength: number): string {
+    const sentences = sourceText.split(/[.!?]+/).filter(s => s.trim().length > 10)
+    
     if (studentLevel === 'A1' || studentLevel === 'A2') {
-      const sentences = sourceText.split(/[.!?]+/)
+      // Simplify for lower levels
       const simplifiedSentences = sentences
-        .filter(s => s.trim().length > 10)
-        .map(s => s.trim())
-        .slice(0, 8) // Limit number of sentences
-
+        .map(s => this.simplifysentence(s.trim(), studentLevel))
+        .filter(s => s.length > 0)
+        .slice(0, 6) // Limit number of sentences for A1/A2
+      
       return simplifiedSentences.join('. ').substring(0, targetLength)
+    } else {
+      // For B1+ levels, use original text with length control
+      return sentences.join('. ').substring(0, targetLength)
+    }
+  }
+
+  // Simplify individual sentences for lower levels
+  private simplifysentence(sentence: string, level: string): string {
+    if (level === 'A1') {
+      // Very basic simplification for A1
+      return sentence
+        .replace(/\b(however|nevertheless|furthermore|moreover)\b/gi, 'but')
+        .replace(/\b(approximately|approximately)\b/gi, 'about')
+        .replace(/\b(significant|substantial)\b/gi, 'big')
+        .replace(/\b(demonstrate|illustrate)\b/gi, 'show')
+    } else if (level === 'A2') {
+      // Moderate simplification for A2
+      return sentence
+        .replace(/\b(nevertheless|furthermore)\b/gi, 'however')
+        .replace(/\b(approximately)\b/gi, 'about')
+        .replace(/\b(substantial)\b/gi, 'significant')
+    }
+    
+    return sentence
+  }
+
+  // Bold vocabulary words in reading passage for visual landmarks
+  private boldVocabularyInText(text: string, vocabularyWords: string[]): string {
+    if (!vocabularyWords || vocabularyWords.length === 0) {
+      return text
     }
 
-    return sourceText.substring(0, targetLength)
+    let boldedText = text
+    
+    // Sort vocabulary words by length (longest first) to avoid partial matches
+    const sortedWords = vocabularyWords
+      .filter(word => word && word !== 'INSTRUCTION') // Filter out instruction marker
+      .sort((a, b) => b.length - a.length)
+    
+    for (const word of sortedWords) {
+      // Create regex to match whole words only (case insensitive)
+      const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
+      
+      // Replace with bold markdown, but avoid double-bolding
+      boldedText = boldedText.replace(regex, (match) => {
+        // Check if already bolded
+        if (boldedText.includes(`**${match}**`)) {
+          return match
+        }
+        return `**${match}**`
+      })
+    }
+    
+    return boldedText
   }
 
   // Smart comprehension questions
