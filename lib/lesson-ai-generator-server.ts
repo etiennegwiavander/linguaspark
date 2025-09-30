@@ -309,8 +309,8 @@ export class LessonAIServerGenerator {
 
   // Ultra-minimal comprehension generation
   private async generateMinimalComprehension(sourceText: string, studentLevel: string): Promise<string[]> {
-    const shortText = sourceText.substring(0, 150) // Use only first 150 chars
-    const prompt = `Write 3 ${studentLevel} reading comprehension questions about this text. Only return questions, no instructions: ${shortText}`
+    const shortText = sourceText.substring(0, 200) // Increase context for more questions
+    const prompt = `Write 5 ${studentLevel} reading comprehension questions about this text. Only return questions, no instructions: ${shortText}`
 
     try {
       console.log("❓ Minimal comprehension prompt:", prompt.length, "chars")
@@ -326,9 +326,9 @@ export class LessonAIServerGenerator {
             !line.toLowerCase().includes('based on')
         })
         .map(line => line.replace(/^\d+\.?\s*/, '').replace(/^\*\*/, '').replace(/\*\*$/, '').trim())
-        .slice(0, 3)
+        .slice(0, 5)
 
-      return questions.length >= 3 ? questions : this.generateSmartComprehension(
+      return questions.length >= 5 ? questions : this.generateSmartComprehension(
         this.extractBetterTopics(sourceText),
         studentLevel
       )
@@ -1926,7 +1926,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     return boldedText
   }
 
-  // Smart comprehension questions
+  // Smart comprehension questions (5 questions per level)
   private generateSmartComprehension(topics: string[], studentLevel: string): string[] {
     const topic = topics[0] || 'the content'
 
@@ -1934,30 +1934,37 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
       'A1': [
         `What is ${topic.toLowerCase()}?`,
         "What is the main idea?",
-        "Is this information new to you?"
+        "Is this information new to you?",
+        "Do you understand the text?",
+        "What did you learn?"
       ],
       'A2': [
         `What does the text say about ${topic.toLowerCase()}?`,
         "What are the main points?",
-        "Do you agree with the information?"
+        "Do you agree with the information?",
+        "Which part is most interesting?",
+        "What questions do you have?"
       ],
       'B1': [
         `How does the text explain ${topic.toLowerCase()}?`,
         "What supporting details are provided?",
         "What conclusions can you draw?",
-        "How does this relate to your experience?"
+        "How does this relate to your experience?",
+        "What additional information would be helpful?"
       ],
       'B2': [
         `What is the author's perspective on ${topic.toLowerCase()}?`,
         "What evidence supports the main arguments?",
         "What are the implications of this information?",
-        "How might this affect different groups of people?"
+        "How might this affect different groups of people?",
+        "What counterarguments could be made?"
       ],
       'C1': [
         `How does the author's treatment of ${topic.toLowerCase()} reflect broader themes?`,
         "What underlying assumptions can you identify?",
         "How might this information be interpreted differently in various contexts?",
-        "What are the potential long-term consequences discussed?"
+        "What are the potential long-term consequences discussed?",
+        "How does this contribute to the ongoing discourse in this field?"
       ]
     }
 
