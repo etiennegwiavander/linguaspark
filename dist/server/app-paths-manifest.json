@@ -1,3 +1,4 @@
 {
+  "/api/generate-lesson/route": "app/api/generate-lesson/route.js",
   "/popup/page": "app/popup/page.js"
 }

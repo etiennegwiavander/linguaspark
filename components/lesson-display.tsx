@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -548,6 +546,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               <div>Sections: {Object.keys(safeLesson.sections).join(', ')}</div>
               <div>Warmup Items: {safeLesson.sections.warmup.length}</div>
               <div>Vocabulary Items: {safeLesson.sections.vocabulary.length}</div>
+              <div>Dialogue Practice: {safeLesson.sections.dialoguePractice?.dialogue?.length || 0} lines</div>
+              <div>Dialogue Fill Gap: {safeLesson.sections.dialogueFillGap?.dialogue?.length || 0} lines</div>
+              <div>Available Sections: {sections.map(s => s.id).join(', ')}</div>
+              <div>Enabled Sections: {sections.filter(s => s.enabled).map(s => s.id).join(', ')}</div>
             </div>
           </CardContent>
         </Card>
