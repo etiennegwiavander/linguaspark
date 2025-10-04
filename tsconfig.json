@@ -5,6 +5,7 @@
       "dom.iterable",
       "esnext"
     ],
+    "types": ["vitest/globals"],
     "allowJs": true,
     "target": "ES6",
     "skipLibCheck": true,
@@ -33,7 +34,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "dist/types/**/*.ts"
+    "dist/types/**/*.ts",
+    "test/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -38,6 +38,14 @@ const TARGET_LANGUAGES = [
   { value: "chinese", label: "Chinese", flag: "🇨🇳" },
 ]
 
+interface ErrorState {
+  type?: string
+  message?: string
+  actionableSteps?: string[]
+  errorId?: string
+  supportContact?: string
+}
+
 interface LessonGeneratorProps {
   initialText?: string
   sourceUrl?: string
@@ -58,21 +66,45 @@ export default function LessonGenerator({
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generationStep, setGenerationStep] = useState("")
-  const [error, setError] = useState("")
+  const [error, setError] = useState<ErrorState | null>(null)
   const { user } = useAuth()
+
+  // Clear error when user makes changes
+  const clearError = () => {
+    if (error) {
+      setError(null)
+    }
+  }
 
   const handleGenerateLesson = async () => {
     if (!lessonType || !studentLevel || !targetLanguage || !selectedText.trim()) {
-      setError("Please fill in all fields and provide source content.")
+      setError({
+        type: "Validation Error",
+        message: "Please fill in all fields and provide source content.",
+        actionableSteps: [
+          "Select a lesson type from the dropdown",
+          "Choose a student level (A1-C1)",
+          "Select a target language",
+          "Provide source content by extracting from page or pasting text"
+        ]
+      })
       return
     }
 
     if (selectedText.length < 50) {
-      setError("Please provide more content (at least 50 characters) for better lesson generation.")
+      setError({
+        type: "Content Too Short",
+        message: "Please provide more content (at least 50 characters) for better lesson generation.",
+        actionableSteps: [
+          "Select more text from the webpage",
+          "Paste additional content into the text area",
+          "Ensure the content has meaningful information for lesson creation"
+        ]
+      })
       return
     }
 
-    setError("")
+    setError(null)
     setIsGenerating(true)
     setGenerationProgress(0)
 
@@ -127,16 +159,49 @@ export default function LessonGenerator({
         body: JSON.stringify(requestBody),
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to generate lesson")
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        // Handle structured error response from API
+        if (result.error) {
+          setError({
+            type: result.error.type,
+            message: result.error.message,
+            actionableSteps: result.error.actionableSteps || [],
+            errorId: result.error.errorId,
+            supportContact: result.error.supportContact
+          })
+        } else {
+          // Fallback for unexpected error format
+          setError({
+            type: "Generation Failed",
+            message: "Failed to generate lesson. Please try again.",
+            actionableSteps: [
+              "Check your internet connection",
+              "Try again in a few moments",
+              "Contact support if the issue persists"
+            ],
+            errorId: `ERR_${Date.now()}`
+          })
+        }
+        setIsGenerating(false)
+        return
       }
 
-      const { lesson } = await response.json()
-      onLessonGenerated(lesson)
+      onLessonGenerated(result.lesson)
       setIsGenerating(false)
     } catch (error) {
       console.error("Error generating lesson:", error)
-      setError("Failed to generate lesson. Please try again.")
+      setError({
+        type: "Network Error",
+        message: "Connection error occurred while generating lesson.",
+        actionableSteps: [
+          "Check your internet connection",
+          "Refresh the page and try again",
+          "Contact support if the problem continues"
+        ],
+        errorId: `ERR_${Date.now()}`
+      })
       setIsGenerating(false)
     }
   }
@@ -161,13 +226,36 @@ export default function LessonGenerator({
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs">{error}</AlertDescription>
+              <AlertDescription className="text-xs space-y-2">
+                <div>
+                  <div className="font-medium">{error.type}</div>
+                  <div>{error.message}</div>
+                </div>
+                {error.actionableSteps && error.actionableSteps.length > 0 && (
+                  <div>
+                    <div className="font-medium mb-1">What you can do:</div>
+                    <ul className="list-disc list-inside space-y-1">
+                      {error.actionableSteps.map((step, index) => (
+                        <li key={index}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {error.errorId && (
+                  <div className="text-xs text-muted-foreground border-t pt-2">
+                    <div>Error ID: <code className="bg-muted px-1 rounded">{error.errorId}</code></div>
+                    {error.supportContact && (
+                      <div>Support: {error.supportContact}</div>
+                    )}
+                  </div>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Lesson Type</label>
-            <Select value={lessonType} onValueChange={setLessonType}>
+            <Select value={lessonType} onValueChange={(value) => { setLessonType(value); clearError(); }}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Choose lesson type" />
               </SelectTrigger>
@@ -190,7 +278,7 @@ export default function LessonGenerator({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Student Level</label>
-            <Select value={studentLevel} onValueChange={setStudentLevel}>
+            <Select value={studentLevel} onValueChange={(value) => { setStudentLevel(value); clearError(); }}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Choose CEFR level" />
               </SelectTrigger>
@@ -210,7 +298,7 @@ export default function LessonGenerator({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Target Language</label>
-            <Select value={targetLanguage} onValueChange={setTargetLanguage}>
+            <Select value={targetLanguage} onValueChange={(value) => { setTargetLanguage(value); clearError(); }}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Choose language" />
               </SelectTrigger>
@@ -236,7 +324,7 @@ export default function LessonGenerator({
             </div>
             <Textarea
               value={selectedText}
-              onChange={(e) => setSelectedText(e.target.value)}
+              onChange={(e) => { setSelectedText(e.target.value); clearError(); }}
               placeholder="Select text on the page or paste content here..."
               className="min-h-[100px] text-xs"
             />
@@ -280,79 +368,6 @@ export default function LessonGenerator({
                 </>
               )}
             </Button>
-            
-            {process.env.NODE_ENV === 'development' && (
-              <div className="space-y-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch("/api/test-ai", { method: "POST" })
-                      const result = await response.json()
-                      console.log("AI Test Result:", result)
-                      alert(result.success ? `AI Working: ${result.response}` : `AI Error: ${result.error}`)
-                    } catch (error) {
-                      console.error("Test failed:", error)
-                      alert("Test failed: " + error.message)
-                    }
-                  }}
-                  className="w-full text-xs"
-                >
-                  Test AI Connection
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch("/api/test-warmup", { method: "POST" })
-                      const result = await response.json()
-                      console.log("Warm-up Test Result:", result)
-                      if (result.success) {
-                        const questions = result.warmupQuestions || []
-                        if (questions.length > 0) {
-                          alert(`Warm-up Questions Generated:\n${questions.join('\n')}`)
-                        } else {
-                          alert("No warm-up questions generated. Check console for details.")
-                        }
-                      } else {
-                        alert(`Warm-up Error: ${result.error}`)
-                      }
-                    } catch (error) {
-                      console.error("Warm-up test failed:", error)
-                      alert("Warm-up test failed: " + error.message)
-                    }
-                  }}
-                  className="w-full text-xs"
-                >
-                  Test Warm-up Questions
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch("/api/test-warmup-direct", { method: "POST" })
-                      const result = await response.json()
-                      console.log("Direct Warm-up Test Result:", result)
-                      if (result.success) {
-                        const questions = result.parsedQuestions || []
-                        alert(`Direct AI Questions:\n${questions.join('\n')}\n\nRaw Response: ${result.rawResponse}`)
-                      } else {
-                        alert(`Direct Test Error: ${result.error}`)
-                      }
-                    } catch (error) {
-                      console.error("Direct warm-up test failed:", error)
-                      alert("Direct test failed: " + error.message)
-                    }
-                  }}
-                  className="w-full text-xs"
-                >
-                  Test Direct AI
-                </Button>
-              </div>
-            )}
           </div>
 
           {user && (

@@ -272,10 +272,14 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                     </p>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-4 border">
-                    <p 
-                      className="text-sm leading-relaxed"
+                    <div 
+                      className="text-sm leading-relaxed space-y-4"
                       dangerouslySetInnerHTML={{
-                        __html: parts.slice(1).join('\n\n').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        __html: parts.slice(1).join('\n\n')
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\n\n/g, '</p><p class="mb-4">')
+                          .replace(/^/, '<p class="mb-4">')
+                          .replace(/$/, '</p>')
                       }}
                     />
                   </div>
@@ -285,10 +289,14 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               // No instruction, display as before
               return (
                 <div className="bg-muted/30 rounded-lg p-4 border">
-                  <p 
-                    className="text-sm leading-relaxed"
+                  <div 
+                    className="text-sm leading-relaxed space-y-4"
                     dangerouslySetInnerHTML={{
-                      __html: readingContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      __html: readingContent
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n\n/g, '</p><p class="mb-4">')
+                        .replace(/^/, '<p class="mb-4">')
+                        .replace(/$/, '</p>')
                     }}
                   />
                 </div>

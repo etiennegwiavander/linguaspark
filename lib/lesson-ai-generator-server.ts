@@ -1,4 +1,6 @@
 import { createGoogleAIServerService } from "./google-ai-server"
+import { ProgressiveGeneratorImpl, type CEFRLevel, type LessonSection } from "./progressive-generator"
+import { usageMonitor, type GenerationContext } from "./usage-monitor"
 
 interface LessonGenerationParams {
   sourceText: string
@@ -64,12 +66,58 @@ interface GeneratedLesson {
 
 export class LessonAIServerGenerator {
   private googleAI: ReturnType<typeof createGoogleAIServerService> | null = null
+  private progressiveGenerator: ProgressiveGeneratorImpl | null = null
 
   private getGoogleAI() {
     if (!this.googleAI) {
       this.googleAI = createGoogleAIServerService()
     }
     return this.googleAI
+  }
+
+  private getProgressiveGenerator() {
+    if (!this.progressiveGenerator) {
+      this.progressiveGenerator = new ProgressiveGeneratorImpl()
+    }
+    return this.progressiveGenerator
+  }
+
+  // Summarize and adapt content to student level
+  private async summarizeAndAdaptContent(sourceText: string, studentLevel: string, targetLanguage: string): Promise<string> {
+    try {
+      const levelGuidance = {
+        'A1': 'Use very simple vocabulary, present tense, short sentences (5-8 words). Explain basic concepts clearly.',
+        'A2': 'Use simple vocabulary, basic past/present tense, medium sentences (8-12 words). Include familiar topics.',
+        'B1': 'Use intermediate vocabulary, various tenses, longer sentences (12-15 words). Include opinions and explanations.',
+        'B2': 'Use advanced vocabulary, complex sentences, abstract concepts. Include detailed explanations and analysis.',
+        'C1': 'Use sophisticated vocabulary, complex structures, nuanced ideas. Include cultural and contextual depth.'
+      }
+
+      const guidance = levelGuidance[studentLevel] || levelGuidance['B1']
+      
+      const prompt = `Summarize and rewrite this content for ${studentLevel} level ${targetLanguage} students:
+
+${sourceText.substring(0, 1000)}
+
+REQUIREMENTS:
+- ${guidance}
+- Keep all important information and key concepts
+- Make it 200-400 words (appropriate length for reading)
+- Use vocabulary appropriate for ${studentLevel} level
+- Maintain the main ideas but simplify complex language
+- Include specific details and examples
+- Make it engaging and educational
+
+Rewrite the content clearly and completely:`
+
+      console.log("📝 Content adaptation prompt:", prompt.length, "chars")
+      const response = await this.getGoogleAI().prompt(prompt)
+      
+      return response.trim() || sourceText.substring(0, 400)
+    } catch (error) {
+      console.log("⚠️ Content adaptation failed, using original text")
+      return sourceText.substring(0, 400)
+    }
   }
 
   async generateLesson(params: LessonGenerationParams): Promise<GeneratedLesson> {
@@ -85,7 +133,21 @@ export class LessonAIServerGenerator {
       readingTime
     } = params
 
-    console.log("🚀 Starting optimized AI lesson generation with params:", {
+    // Create usage monitoring context
+    const generationContext: GenerationContext = {
+      lessonId: `lesson_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      lessonType,
+      difficultyLevel: studentLevel,
+      contentLength: sourceText.length,
+      timestamp: new Date()
+    };
+
+    // Validate sourceText
+    if (!sourceText || typeof sourceText !== 'string') {
+      throw new Error("Invalid sourceText: must be a non-empty string")
+    }
+
+    console.log("🚀 Starting lesson generation with params:", {
       textLength: sourceText.length,
       lessonType,
       studentLevel,
@@ -94,16 +156,45 @@ export class LessonAIServerGenerator {
       hasStructuredContent: !!structuredContent
     })
 
+
+
     try {
-      // Use ultra-minimal AI approach to avoid MAX_TOKENS
-      console.log("🤖 Step 1: Generating lesson with ultra-minimal AI prompts...")
+      // Step 1: Summarize and adapt content to student level
+      console.log("📝 Step 1: Summarizing and adapting content to student level...")
+      const adaptationStartTime = Date.now();
+      const adaptedContent = await this.summarizeAndAdaptContent(sourceText, studentLevel, targetLanguage)
+      const adaptationEndTime = Date.now();
+      
+      // Log content adaptation usage
+      usageMonitor.logTokenUsage(
+        'content-adaptation',
+        Math.ceil(sourceText.length / 4), // Rough token estimate
+        'content-summarization',
+        generationContext
+      );
+      
+      console.log("✅ Content adapted:", adaptedContent.length, "chars")
+
+      // Step 2: Generate lesson with adapted content
+      console.log("🤖 Step 2: Generating lesson with adapted content...")
+      const lessonGenerationStartTime = Date.now();
       const lessonStructure = await this.generateMinimalAILesson(
-        sourceText,
+        adaptedContent,
         lessonType,
         studentLevel,
         targetLanguage,
         contentMetadata
       )
+      const lessonGenerationEndTime = Date.now();
+      
+      // Log lesson generation usage
+      usageMonitor.logTokenUsage(
+        'lesson-structure-generation',
+        Math.ceil(adaptedContent.length / 3), // Rough token estimate for lesson generation
+        'structured-generation',
+        generationContext
+      );
+      
       console.log("✅ Minimal AI lesson generated:", Object.keys(lessonStructure))
 
       // Return properly structured GeneratedLesson object
@@ -126,14 +217,15 @@ export class LessonAIServerGenerator {
       console.log("🎉 Optimized AI lesson generation complete!")
       return finalLesson
     } catch (error) {
+      // Log error to usage monitor
+      usageMonitor.logError(error as Error, 'LESSON_GENERATION_FAILED', generationContext);
+      
       console.error("❌ Error in AI lesson generation:", error)
-      console.log("🔄 Falling back to smart template generation...")
-      // Fallback to smart templates if AI fails
-      return await this.generateSmartTemplateFallback(params)
+      throw error
     }
   }
 
-  // Ultra-minimal AI lesson generation to avoid MAX_TOKENS
+  // Progressive AI lesson generation with shared context
   private async generateMinimalAILesson(
     sourceText: string,
     lessonType: string,
@@ -141,29 +233,72 @@ export class LessonAIServerGenerator {
     targetLanguage: string,
     metadata?: any
   ) {
-    console.log("🎯 Using ultra-minimal AI prompts to avoid token limits...")
+    console.log("🎯 Using progressive generation with shared context...")
 
-    // Step 1: Generate just the essential parts with minimal prompts
-    const warmupQuestions = await this.generateMinimalWarmup(sourceText, studentLevel)
-    const vocabulary = await this.generateMinimalVocabulary(sourceText, studentLevel)
-    const comprehensionQuestions = await this.generateMinimalComprehension(sourceText, studentLevel)
+    const progressiveGen = this.getProgressiveGenerator()
 
-    // Step 2: Use hybrid approach - AI for key parts, templates for the rest
-    const vocabularyWords = vocabulary.map(v => v.word)
-    const readingPassage = await this.generateSmartReading(sourceText, studentLevel, vocabularyWords)
-    
-    return {
-      warmup: this.addWarmupInstructions(warmupQuestions, studentLevel),
-      vocabulary: this.addVocabularyInstructions(vocabulary, studentLevel),
-      reading: this.addReadingInstructions(readingPassage, studentLevel),
-      comprehension: this.addComprehensionInstructions(comprehensionQuestions, studentLevel),
-      discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(this.extractBetterTopics(sourceText), lessonType, studentLevel), studentLevel),
-      dialoguePractice: await this.generateDialoguePractice(sourceText, studentLevel, vocabularyWords),
-      dialogueFillGap: await this.generateDialogueFillGap(sourceText, studentLevel, vocabularyWords),
-      grammar: this.generateSmartGrammar(studentLevel, sourceText),
-      pronunciation: this.generateSmartPronunciation(vocabulary.map(v => v.word)),
-      wrapup: this.addWrapupInstructions(this.generateSmartWrapup(this.extractBetterTopics(sourceText), studentLevel), studentLevel)
+    // Step 1: Build shared context for all sections
+    console.log("🏗️ Building shared context...")
+    const sharedContext = await progressiveGen.buildSharedContext(
+      sourceText,
+      lessonType,
+      studentLevel as CEFRLevel,
+      targetLanguage
+    )
+
+    // Step 2: Define lesson sections with dependencies
+    const lessonSections: LessonSection[] = [
+      { name: 'warmup', priority: 1, dependencies: [] },
+      { name: 'vocabulary', priority: 2, dependencies: [] },
+      { name: 'reading', priority: 3, dependencies: ['vocabulary'] },
+      { name: 'comprehension', priority: 4, dependencies: ['reading'] },
+      { name: 'discussion', priority: 5, dependencies: ['reading', 'comprehension'] },
+      { name: 'grammar', priority: 6, dependencies: ['reading'] },
+      { name: 'pronunciation', priority: 7, dependencies: ['vocabulary'] },
+      { name: 'wrapup', priority: 8, dependencies: ['discussion'] }
+    ]
+
+    // Step 3: Generate sections progressively
+    const generatedSections = []
+    let currentContext = sharedContext
+
+    for (const section of lessonSections) {
+      console.log(`🔄 Generating section: ${section.name}`)
+      
+      const generatedSection = await progressiveGen.generateSection(
+        section,
+        currentContext,
+        generatedSections
+      )
+      
+      generatedSections.push(generatedSection)
+      
+      // Update context with new section information
+      currentContext = progressiveGen.updateContext(currentContext, generatedSection)
     }
+
+    // Step 4: Generate dialogue sections using template methods
+    const vocabularyWords = generatedSections
+      .find(s => s.sectionName === 'vocabulary')?.content
+      ?.filter((item: any) => item.word !== 'INSTRUCTION')
+      ?.map((item: any) => item.word) || []
+
+    const mainTopic = sharedContext.mainThemes[0] || 'this topic'
+    const dialoguePractice = this.generateTemplateDialoguePractice(mainTopic, studentLevel, vocabularyWords)
+    const dialogueFillGap = this.generateTemplateDialogueFillGap(mainTopic, studentLevel, vocabularyWords)
+
+    // Step 5: Assemble final lesson structure
+    const lessonStructure: any = {}
+    
+    for (const section of generatedSections) {
+      lessonStructure[section.sectionName] = section.content
+    }
+
+    lessonStructure.dialoguePractice = dialoguePractice
+    lessonStructure.dialogueFillGap = dialogueFillGap
+
+    console.log("✅ Progressive lesson generation complete!")
+    return lessonStructure
   }
 
   // Ultra-minimal warmup generation
@@ -200,18 +335,13 @@ export class LessonAIServerGenerator {
 
       console.log("🎯 Extracted warmup questions:", questions)
 
-      return questions.length >= 3 ? questions : this.generateSmartWarmupQuestions(
-        topics,
-        studentLevel,
-        {}
-      )
+      if (questions.length < 3) {
+        throw new Error("Failed to generate sufficient warmup questions")
+      }
+      return questions
     } catch (error) {
-      console.log("⚠️ Minimal warmup failed, using template")
-      return this.generateSmartWarmupQuestions(
-        this.extractBetterTopics(sourceText),
-        studentLevel,
-        {}
-      )
+      console.log("⚠️ Minimal warmup failed")
+      throw new Error("Failed to generate warmup questions: " + error.message)
     }
   }
 
@@ -281,12 +411,13 @@ export class LessonAIServerGenerator {
 
   // Enhanced vocabulary generation with AI-generated contextual examples
   private async generateMinimalVocabulary(sourceText: string, studentLevel: string): Promise<Array<{ word: string, meaning: string, example: string }>> {
-    const words = sourceText.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
-    const uniqueWords = Array.from(new Set(words)).slice(0, 8) // 6-10 words, start with 8
+    // Use smart vocabulary extraction instead of basic word matching
+    const meaningfulWords = this.extractMeaningfulVocabulary(sourceText, studentLevel)
+    console.log("📚 Meaningful vocabulary extracted:", meaningfulWords)
 
     const vocabulary = []
 
-    for (const word of uniqueWords) {
+    for (const word of meaningfulWords) {
       try {
         const capitalizedWord = this.capitalizeWord(word)
 
@@ -340,45 +471,96 @@ export class LessonAIServerGenerator {
         .map(line => line.replace(/^\d+\.?\s*/, '').replace(/^\*\*/, '').replace(/\*\*$/, '').trim())
         .slice(0, 5)
 
-      return questions.length >= 5 ? questions : this.generateSmartComprehension(
-        this.extractBetterTopics(sourceText),
-        studentLevel
-      )
-    } catch (error) {
-      console.log("⚠️ Minimal comprehension failed, using template")
-      return this.generateSmartComprehension(
-        this.extractBetterTopics(sourceText),
-        studentLevel
-      )
-    }
-  }
-
-  // Smart template fallback with AI-generated examples
-  private async generateSmartTemplateFallback(params: LessonGenerationParams): Promise<GeneratedLesson> {
-    const { sourceText, lessonType, studentLevel, targetLanguage } = params
-
-    console.log("🎨 Using smart template fallback...")
-    const topics = this.extractBetterTopics(sourceText)
-    const vocabulary = this.extractVocabularyFromText(sourceText, studentLevel)
-
-    return {
-      lessonType,
-      studentLevel,
-      targetLanguage,
-      sections: {
-        warmup: this.addWarmupInstructions(this.generateSmartWarmupQuestions(topics, studentLevel, {}), studentLevel),
-        vocabulary: this.addVocabularyInstructions(await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel), studentLevel),
-        reading: this.addReadingInstructions(await this.generateSmartReading(sourceText, studentLevel, vocabulary), studentLevel),
-        comprehension: this.addComprehensionInstructions(this.generateSmartComprehension(topics, studentLevel), studentLevel),
-        discussion: this.addDiscussionInstructions(this.generateSmartDiscussion(topics, lessonType, studentLevel), studentLevel),
-        dialoguePractice: await this.generateDialoguePractice(sourceText, studentLevel, vocabulary),
-        dialogueFillGap: await this.generateDialogueFillGap(sourceText, studentLevel, vocabulary),
-        grammar: this.generateSmartGrammar(studentLevel, sourceText),
-        pronunciation: this.generateSmartPronunciation(vocabulary),
-        wrapup: this.addWrapupInstructions(this.generateSmartWrapup(topics, studentLevel), studentLevel)
+      if (questions.length < 5) {
+        throw new Error("Failed to generate sufficient comprehension questions")
       }
+      return questions
+    } catch (error) {
+      console.log("⚠️ Minimal comprehension failed")
+      throw new Error("Failed to generate comprehension questions: " + error.message)
     }
   }
+
+  // Minimal AI-only reading passage generation
+  private async generateMinimalReading(sourceText: string, studentLevel: string): Promise<string> {
+    const prompt = `Rewrite this text for ${studentLevel} level students. Keep it 200-400 words: ${sourceText.substring(0, 500)}`
+    
+    try {
+      const response = await this.getGoogleAI().prompt(prompt)
+      return response.trim()
+    } catch (error) {
+      throw new Error("Failed to generate reading passage: " + error.message)
+    }
+  }
+
+  // Minimal AI-only discussion questions generation
+  private async generateMinimalDiscussion(sourceText: string, studentLevel: string): Promise<string[]> {
+    const prompt = `Write 3 ${studentLevel} discussion questions about this text. Only return questions: ${sourceText.substring(0, 200)}`
+    
+    try {
+      const response = await this.getGoogleAI().prompt(prompt)
+      const questions = response.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.endsWith('?') && line.length > 10)
+        .map(line => line.replace(/^\d+\.?\s*/, '').trim())
+        .slice(0, 3)
+
+      if (questions.length < 3) {
+        throw new Error("Failed to generate sufficient discussion questions")
+      }
+      return questions
+    } catch (error) {
+      throw new Error("Failed to generate discussion questions: " + error.message)
+    }
+  }
+
+  // Minimal AI-only grammar section generation
+  private async generateMinimalGrammar(sourceText: string, studentLevel: string): Promise<any> {
+    const prompt = `Create a grammar lesson for ${studentLevel} level based on this text. Return JSON with focus, examples, exercise: ${sourceText.substring(0, 200)}`
+    
+    try {
+      const response = await this.getGoogleAI().prompt(prompt)
+      return JSON.parse(response)
+    } catch (error) {
+      throw new Error("Failed to generate grammar section: " + error.message)
+    }
+  }
+
+  // Minimal AI-only pronunciation section generation
+  private async generateMinimalPronunciation(vocabularyWords: string[], studentLevel: string): Promise<any> {
+    const word = vocabularyWords[0] || 'communication'
+    const prompt = `Create pronunciation practice for "${word}". Return JSON with word, ipa, practice:`
+    
+    try {
+      const response = await this.getGoogleAI().prompt(prompt)
+      return JSON.parse(response)
+    } catch (error) {
+      throw new Error("Failed to generate pronunciation section: " + error.message)
+    }
+  }
+
+  // Minimal AI-only wrapup questions generation
+  private async generateMinimalWrapup(sourceText: string, studentLevel: string): Promise<string[]> {
+    const prompt = `Write 3 ${studentLevel} wrap-up questions about this lesson. Only return questions: ${sourceText.substring(0, 200)}`
+    
+    try {
+      const response = await this.getGoogleAI().prompt(prompt)
+      const questions = response.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.endsWith('?') && line.length > 10)
+        .map(line => line.replace(/^\d+\.?\s*/, '').trim())
+        .slice(0, 3)
+
+      if (questions.length < 3) {
+        throw new Error("Failed to generate sufficient wrapup questions")
+      }
+      return questions
+    } catch (error) {
+      throw new Error("Failed to generate wrapup questions: " + error.message)
+    }
+  }
+
+
 
   // Content analysis without AI calls
   private analyzeContentContextNoAI(
@@ -1158,24 +1340,152 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     return topics.slice(0, 3)
   }
 
-  private extractVocabularyFromText(text: string, level: string): string[] {
-    // Extract words based on complexity appropriate for the level
+  // Extract meaningful vocabulary for lesson content (improved algorithm)
+  private extractMeaningfulVocabulary(text: string, level: string): string[] {
     const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []
     const uniqueWords = Array.from(new Set(words))
 
-    // Filter by complexity based on level
-    const complexityThreshold = {
-      'A1': 6,
-      'A2': 7,
-      'B1': 8,
-      'B2': 10,
-      'C1': 12
-    }
+    // Enhanced exclusion list focusing on truly basic words and proper names
+    const excludeWords = new Set([
+      // Basic function words
+      'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'she', 'use', 'way', 'what', 'when', 'where', 'will', 'with', 'have', 'this', 'that', 'they', 'been', 'said', 'each', 'which', 'their', 'time', 'would', 'there', 'could', 'other', 'after', 'first', 'well', 'water', 'very', 'what', 'know', 'just', 'people', 'into', 'over', 'think', 'also', 'back', 'work', 'life', 'only', 'year', 'years', 'come', 'came', 'right', 'good', 'each', 'those', 'feel', 'seem', 'these', 'give', 'most', 'hand', 'high', 'keep', 'last', 'left', 'life', 'live', 'look', 'made', 'make', 'many', 'much', 'must', 'name', 'need', 'next', 'open', 'part', 'play', 'said', 'same', 'seem', 'show', 'side', 'take', 'tell', 'turn', 'want', 'ways', 'well', 'went', 'were', 'here', 'home', 'long', 'look', 'move', 'place', 'right', 'small', 'sound', 'still', 'such', 'thing', 'think', 'three', 'under', 'water', 'where', 'while', 'world', 'write', 'young',
+      // Very basic words that B1+ students should know
+      'student', 'english', 'september', 'october', 'november', 'december', 'january', 'february', 'march', 'april', 'june', 'july', 'august', 'south', 'africa', 'images', 'image', 'photo', 'picture', 'black', 'white', 'coloured', 'colored',
+      // Problematic or sensitive terms to avoid in vocabulary
+      'slur', 'slurs', 'racial', 'racist', 'racism', 'mckenzie', 'apartheid',
+      'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+      'today', 'yesterday', 'tomorrow', 'morning', 'afternoon', 'evening', 'night',
+      // Common proper names to avoid (people's names and specific places)
+      'john', 'mary', 'david', 'sarah', 'michael', 'jennifer', 'robert', 'lisa', 'william', 'karen', 'james', 'susan', 'christopher', 'jessica', 'daniel', 'nancy', 'matthew', 'betty', 'anthony', 'helen', 'mark', 'sandra', 'donald', 'donna', 'steven', 'carol', 'paul', 'ruth', 'andrew', 'sharon', 'joshua', 'michelle', 'kenneth', 'laura', 'kevin', 'sarah', 'brian', 'kimberly', 'george', 'deborah', 'edward', 'dorothy', 'ronald', 'lisa', 'timothy', 'nancy', 'jason', 'karen', 'jeffrey', 'betty', 'ryan', 'helen', 'jacob', 'sandra', 'gary', 'donna', 'nicholas', 'carol', 'eric', 'ruth', 'jonathan', 'sharon', 'stephen', 'michelle', 'larry', 'laura', 'justin', 'sarah', 'scott', 'kimberly', 'brandon', 'deborah', 'benjamin', 'dorothy', 'samuel', 'lisa', 'gregory', 'nancy', 'alexander', 'karen', 'patrick', 'betty', 'frank', 'helen', 'raymond', 'sandra', 'jack', 'donna', 'dennis', 'carol', 'jerry', 'ruth', 'tyler', 'sharon', 'aaron', 'michelle', 'jose', 'laura', 'henry', 'sarah', 'adam', 'kimberly', 'douglas', 'deborah', 'nathan', 'dorothy', 'peter', 'lisa', 'zachary', 'nancy', 'kyle', 'karen', 'julius', 'malema'
+    ])
 
-    const maxLength = complexityThreshold[level] || 8
-    return uniqueWords
-      .filter(word => word.length <= maxLength && word.length >= 4)
-      .slice(0, 8)
+    // Filter and score words for educational value
+    const meaningfulWords = uniqueWords.filter(word => {
+      if (excludeWords.has(word)) return false
+      if (/^\d+$/.test(word)) return false // Skip pure numbers
+      if (word.length < 4) return false // Skip very short words
+      if (word.length > 15) return false // Skip very long words
+      if (this.isProperName(word)) return false // Skip proper names
+      return true
+    })
+
+    // Score words based on educational and contextual value
+    const scoredWords = meaningfulWords.map(word => {
+      let score = 0
+      
+      // High-value content-specific vocabulary (political, business, academic terms)
+      if (/^(announcement|opposition|recognition|leadership|management|government|political|parliament|democracy|election|policy|legislation|constitution|rights|freedom|justice|equality|development|economic|social|cultural|environmental|international|national|regional|community|organization|institution|administration|authority|responsibility|accountability|transparency|governance|regulation|compliance|strategy|implementation|evaluation|assessment|analysis|research|investigation|examination|consideration|discussion|negotiation|agreement|cooperation|collaboration|partnership|relationship|communication|information|education|training|knowledge|understanding|awareness|consciousness|perspective|opinion|belief|attitude|approach|method|technique|process|system|structure|framework|principle|concept|theory|practice|experience|skill|expertise|professional|academic|scientific|technical|technological|digital|innovation|creativity|development|improvement|enhancement|transformation|change|progress|advancement|achievement|success|performance|quality|efficiency|effectiveness|productivity|sustainability|responsibility|commitment|dedication|motivation|inspiration|leadership|management|coordination|supervision|direction|guidance|support|assistance|service|provision|delivery|implementation|execution|operation|function|activity|action|behavior|conduct|practice|procedure|protocol|standard|guideline|requirement|condition|situation|circumstance|context|environment|setting|background|history|tradition|culture|society|community|population|group|team|organization|institution|establishment|authority|government|administration|policy|regulation|law|rule|standard|guideline|procedure|protocol|framework|model|pattern|template|example|instance|case|scenario)/.test(word)) {
+        score += 6 // Highest priority for meaningful content vocabulary
+      }
+      
+      // Business and professional terms
+      if (/^(manage|leader|team|company|business|strategy|develop|create|innovat|technolog|digital|global|professional|experience|skill|expert|analysis|research|project|solution|challenge|opportunity|growth|success|achievement|performance|quality|efficiency|productivity|collaboration|communication|decision|responsibility|objective|goal|target|result|outcome|impact|benefit|advantage|value|profit|revenue|investment|market|customer|client|service|product|brand|reputation|competitive|industry|sector|economy|economic|financial|budget|cost|price|sales|marketing|advertising|promotion|campaign|strategy|planning|implementation|execution|evaluation|assessment|improvement|optimization|transformation|change|adaptation|flexibility|agility|resilience|sustainability|environmental|social|ethical|governance|compliance|regulation|policy|procedure|standard|guideline|framework|methodology|approach|technique|method|process|system|structure|organization|hierarchy|department|division|function|role|position|title|career|development|training|education|learning|knowledge|information|data|insight|intelligence)/.test(word)) {
+        score += 4
+      }
+      
+      // Academic and formal vocabulary
+      if (/^(research|study|analysis|theory|concept|principle|method|approach|technique|process|system|structure|function|relationship|connection|interaction|influence|effect|impact|cause|result|consequence|factor|element|component|aspect|feature|characteristic|property|quality|attribute|dimension|level|degree|extent|scope|range|scale|measure|measurement|evaluation|assessment|comparison|contrast|similarity|difference|variation|change|development|evolution|progress|advancement|improvement|enhancement|modification|adjustment|adaptation|transformation|revolution|innovation|discovery|invention|creation|production|construction|design|planning|organization|management|administration|operation|implementation|execution|performance|achievement|accomplishment)/.test(word)) {
+        score += 3
+      }
+      
+      // Action words and processes (often good for learning)
+      if (/^(announce|reorganize|manage|develop|implement|achieve|improve|transform|communicate|collaborate|investigate|explore|examine|evaluate|assess|consider|discuss|negotiate|present|demonstrate|explain|describe|illustrate|interpret|translate|adapt|modify|optimize|organize|coordinate|administer|supervise|operate|execute|perform|accomplish|establish|maintain|preserve|conserve|protect|prevent|promote|advance|enhance|enrich|empower|engage|involve|participate|contribute|dedicate|commit|invest|allocate|distribute|circulate|transmit|transport|deliver|provide|supply|support|assist|guide|direct|instruct|educate|train|prepare|plan|schedule|arrange|coordinate|synchronize|integrate|combine|connect|associate|relate|partner|collaborate|cooperate|compete|compare|contrast|differentiate|distinguish|identify|recognize|acknowledge|appreciate|understand|comprehend|realize|aware|conscious|perceive|observe|monitor|track|measure|calculate|estimate|predict|forecast|project|anticipate|expect|assume|hypothesize|speculate|investigate|explore|research|analyze|synthesize|evaluate|assess|judge|decide|choose|select|prefer|recommend|suggest|propose|offer|request|demand|require|specify|instruct|direct|guide|advise|consult|discuss|negotiate|agree|contract|deal|transaction|exchange|trade|purchase|sale|investment|funding|financing|sponsorship|support|assistance|service|provision|delivery|distribution|allocation|assignment|delegation|authorization|approval|permission|consent|acceptance|rejection|refusal|denial|prohibition|restriction|limitation|constraint|regulation|control|management|administration|governance|leadership|supervision|oversight|monitoring|evaluation|assessment|review|audit|inspection|examination|investigation|inquiry)/.test(word)) {
+        score += 3
+      }
+      
+      // Frequency bonus (words that appear multiple times are likely important)
+      const frequency = (text.toLowerCase().match(new RegExp(`\\b${word}\\b`, 'g')) || []).length
+      if (frequency > 1) score += frequency * 2
+      
+      // Length bonus for substantial words
+      if (word.length >= 6 && word.length <= 12) score += 1
+      
+      return { word, score }
+    })
+
+    // Sort by score and return top words
+    const topWords = scoredWords
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8) // Take top 8 words
+      .map(item => item.word)
+
+    console.log("📚 Meaningful vocabulary extraction results:", topWords.map(w => `${w} (score: ${scoredWords.find(s => s.word === w)?.score})`))
+    return topWords
+  }
+
+  private extractVocabularyFromText(text: string, level: string): string[] {
+    // Smart vocabulary extraction focusing on meaningful, educational words
+    const words = text.toLowerCase().match(/\b[a-z]{3,}\b/g) || []
+    const uniqueWords = Array.from(new Set(words))
+
+    // Words to exclude (common, non-educational words)
+    const excludeWords = new Set([
+      // Common words
+      'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'she', 'use', 'way', 'what', 'when', 'where', 'will', 'with', 'have', 'this', 'that', 'they', 'been', 'said', 'each', 'which', 'their', 'time', 'would', 'there', 'could', 'other', 'after', 'first', 'well', 'water', 'very', 'what', 'know', 'just', 'people', 'into', 'over', 'think', 'also', 'back', 'work', 'life', 'only', 'year', 'years', 'come', 'came', 'right', 'good', 'each', 'those', 'feel', 'seem', 'these', 'give', 'most', 'hand', 'high', 'keep', 'last', 'left', 'life', 'live', 'look', 'made', 'make', 'many', 'much', 'must', 'name', 'need', 'next', 'open', 'part', 'play', 'said', 'same', 'seem', 'show', 'side', 'take', 'tell', 'turn', 'want', 'ways', 'well', 'went', 'were', 'here', 'home', 'long', 'look', 'move', 'place', 'right', 'small', 'sound', 'still', 'such', 'thing', 'think', 'three', 'under', 'water', 'where', 'while', 'world', 'write', 'young',
+      // Dates, numbers, names (often not useful for vocabulary)
+      'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
+      'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+      'today', 'yesterday', 'tomorrow', 'morning', 'afternoon', 'evening', 'night',
+      // Common proper nouns that are often not educational
+      'francisco', 'california', 'america', 'american', 'united', 'states', 'york', 'london', 'paris', 'tokyo'
+    ])
+
+    // Prioritize meaningful vocabulary categories
+    const meaningfulWords = uniqueWords.filter(word => {
+      // Skip excluded words
+      if (excludeWords.has(word)) return false
+      
+      // Skip pure numbers or dates
+      if (/^\d+$/.test(word) || /^\d{4}$/.test(word)) return false
+      
+      // Skip very short words (less than 4 letters) unless they're important
+      if (word.length < 4) return false
+      
+      // Skip very long words that might be too complex
+      if (word.length > 15) return false
+      
+      return true
+    })
+
+    // Score words based on educational value
+    const scoredWords = meaningfulWords.map(word => {
+      let score = 0
+      
+      // Business/professional vocabulary
+      if (/^(manage|leader|team|company|business|strategy|develop|create|innovat|technolog|digital|global|international|professional|experience|skill|expert|analysis|research|project|solution|challenge|opportunity|growth|success|achievement|performance|quality|efficiency|productivity|collaboration|communication|decision|responsibility|objective|goal|target|result|outcome|impact|benefit|advantage|value|profit|revenue|investment|market|customer|client|service|product|brand|reputation|competitive|industry|sector|economy|economic|financial|budget|cost|price|sales|marketing|advertising|promotion|campaign|strategy|planning|implementation|execution|evaluation|assessment|improvement|optimization|transformation|change|adaptation|flexibility|agility|resilience|sustainability|environmental|social|ethical|governance|compliance|regulation|policy|procedure|standard|guideline|framework|methodology|approach|technique|method|process|system|structure|organization|hierarchy|department|division|function|role|position|title|career|development|training|education|learning|knowledge|information|data|insight|intelligence|wisdom|understanding|comprehension|awareness|consciousness|perception|perspective|viewpoint|opinion|belief|attitude|mindset|culture|values|principles|ethics|integrity|honesty|transparency|accountability|responsibility|commitment|dedication|passion|motivation|inspiration|creativity|innovation|imagination|vision|mission|purpose|meaning|significance|importance|relevance|priority|urgency|critical|essential|fundamental|basic|advanced|complex|sophisticated|comprehensive|detailed|specific|particular|general|overall|total|complete|full|entire|whole|partial|limited|restricted|exclusive|inclusive|diverse|varied|different|similar|comparable|equivalent|equal|fair|just|reasonable|logical|rational|practical|realistic|achievable|feasible|possible|probable|likely|unlikely|impossible|certain|uncertain|confident|doubtful|optimistic|pessimistic|positive|negative|neutral|objective|subjective|personal|individual|collective|social|public|private|internal|external|local|regional|national|international|global|worldwide|universal)/.test(word)) {
+        score += 3
+      }
+      
+      // Academic/educational vocabulary
+      if (/^(research|study|analysis|theory|concept|principle|method|approach|technique|process|system|structure|function|relationship|connection|interaction|influence|effect|impact|cause|result|consequence|factor|element|component|aspect|feature|characteristic|property|quality|attribute|dimension|level|degree|extent|scope|range|scale|measure|measurement|evaluation|assessment|comparison|contrast|similarity|difference|variation|change|development|evolution|progress|advancement|improvement|enhancement|modification|adjustment|adaptation|transformation|revolution|innovation|discovery|invention|creation|production|construction|design|planning|organization|management|administration|operation|implementation|execution|performance|achievement|accomplishment|success|failure|challenge|problem|issue|difficulty|obstacle|barrier|limitation|constraint|restriction|requirement|condition|situation|circumstance|context|environment|setting|background|history|tradition|culture|society|community|population|group|team|organization|institution|establishment|authority|government|administration|policy|regulation|law|rule|standard|guideline|procedure|protocol|framework|model|pattern|template|example|instance|case|scenario|situation|condition|state|status|position|location|place|area|region|zone|territory|domain|field|sector|industry|market|economy|business|commerce|trade|exchange|transaction|deal|agreement|contract|partnership|collaboration|cooperation|coordination|communication|interaction|relationship|connection|network|system|structure|organization|hierarchy|level|rank|grade|class|category|type|kind|sort|variety|diversity|range|spectrum)/.test(word)) {
+        score += 2
+      }
+      
+      // Technical/specialized vocabulary
+      if (/^(technolog|digital|computer|software|hardware|internet|online|website|platform|application|program|code|data|information|network|system|security|privacy|encryption|algorithm|artificial|intelligence|machine|learning|automation|robot|innovation|development|engineering|science|scientific|medical|health|treatment|diagnosis|research|experiment|laboratory|equipment|instrument|device|tool|machine|mechanism|process|procedure|technique|method|approach|strategy|solution|problem|challenge|opportunity|advantage|benefit|risk|threat|danger|safety|protection|prevention|control|management|monitoring|supervision|oversight|governance|regulation|compliance|standard|quality|performance|efficiency|effectiveness|productivity|optimization|improvement|enhancement|upgrade|update|modification|customization|personalization|adaptation|flexibility|scalability|sustainability|reliability|durability|stability|consistency|accuracy|precision|validity|credibility|authenticity|transparency|accountability|responsibility|integrity|ethics|morality|values|principles|beliefs|attitudes|perspectives|opinions|views|thoughts|ideas|concepts|theories|models|frameworks|paradigms|approaches|methodologies|strategies|tactics|techniques|procedures|protocols)/.test(word)) {
+        score += 2
+      }
+      
+      // Action/process words (verbs in noun form or gerunds)
+      if (/^(announcement|leadership|management|development|implementation|achievement|improvement|transformation|communication|collaboration|investigation|exploration|examination|evaluation|assessment|consideration|discussion|negotiation|presentation|demonstration|explanation|description|illustration|interpretation|translation|adaptation|modification|optimization|organization|coordination|administration|supervision|operation|execution|performance|accomplishment|establishment|maintenance|preservation|conservation|protection|prevention|promotion|advancement|enhancement|enrichment|empowerment|engagement|involvement|participation|contribution|dedication|commitment|investment|allocation|distribution|circulation|transmission|transportation|delivery|provision|supply|support|assistance|guidance|direction|instruction|education|training|preparation|planning|scheduling|arrangement|coordination|synchronization|integration|combination|connection|association|relationship|partnership|collaboration|cooperation|competition|comparison|contrast|differentiation|distinction|identification|recognition|acknowledgment|appreciation|understanding|comprehension|realization|awareness|consciousness|perception|observation|monitoring|tracking|measurement|calculation|estimation|prediction|forecasting|projection|anticipation|expectation|assumption|hypothesis|speculation|investigation|exploration|research|analysis|synthesis|evaluation|assessment|judgment|decision|choice|selection|preference|recommendation|suggestion|proposal|offer|request|demand|requirement|specification|instruction|direction|guidance|advice|consultation|discussion|negotiation|agreement|contract|deal|transaction|exchange|trade|purchase|sale|investment|funding|financing|sponsorship|support|assistance|service|provision|delivery|distribution|allocation|assignment|delegation|authorization|approval|permission|consent|acceptance|rejection|refusal|denial|prohibition|restriction|limitation|constraint|regulation|control|management|administration|governance|leadership|supervision|oversight|monitoring|evaluation|assessment|review|audit|inspection|examination|investigation|inquiry|research|study|analysis|interpretation|explanation|clarification|specification|definition|description|illustration|demonstration|presentation|exhibition|display|show|performance|execution|implementation|application|utilization|employment|usage|operation|function|activity|action|behavior|conduct|practice|procedure|process|method|technique|approach|strategy|plan|scheme|program|project|initiative|campaign|movement|effort|attempt|trial|experiment|test|examination|evaluation|assessment|measurement|calculation|estimation|determination|identification|recognition|discovery|invention|creation|production|construction|building|development|growth|expansion|extension|enlargement|increase|improvement|enhancement|upgrade|advancement|progress|evolution|transformation|change|modification|adjustment|adaptation|customization|personalization|optimization|refinement|perfection|completion|achievement|accomplishment|success|victory|triumph|conquest|defeat|failure|loss|mistake|error|problem|issue|difficulty|challenge|obstacle|barrier|limitation|constraint|restriction|requirement|condition|situation|circumstance|context|environment|setting|atmosphere|climate|culture|tradition|custom|habit|routine|pattern|trend|tendency|inclination|preference|choice|option|alternative|possibility|opportunity|chance|probability|likelihood|certainty|uncertainty|doubt|confidence|trust|faith|belief|conviction|opinion|view|perspective|standpoint|position|stance|attitude|approach|mindset|mentality|psychology|philosophy|ideology|theory|concept|idea|notion|thought|consideration|reflection|contemplation|meditation|concentration|focus|attention|interest|curiosity|wonder|amazement|surprise|shock|astonishment|bewilderment|confusion|uncertainty|clarity|understanding|comprehension|knowledge|information|data|facts|details|specifics|particulars|characteristics|features|attributes|properties|qualities|aspects|elements|components|parts|sections|segments|divisions|categories|types|kinds|varieties|forms|shapes|sizes|dimensions|measurements|quantities|amounts|numbers|figures|statistics|percentages|proportions|ratios|rates|speeds|frequencies|intervals|periods|durations|times|moments|instances|occasions|events|incidents|occurrences|happenings|developments|changes|modifications|alterations|adjustments|improvements|enhancements|upgrades|updates|revisions|corrections|fixes|repairs|maintenance|preservation|conservation|protection|security|safety|defense|prevention|precaution|preparation|readiness|availability|accessibility|convenience|comfort|ease|simplicity|complexity|difficulty|challenge|complication|sophistication|advancement|progress|development|growth|expansion|extension|increase|rise|improvement|enhancement|betterment|amelioration|optimization|perfection|excellence|quality|standard|level|grade|rank|status|position|location|place|site|spot|point|area|region|zone|territory|domain|field|sector|industry|market|economy|business|enterprise|organization|institution|establishment|company|corporation|firm|agency|department|division|section|unit|team|group|committee|board|council|assembly|association|society|community|population|public|audience|customers|clients|users|consumers|buyers|purchasers|investors|stakeholders|shareholders|partners|collaborators|colleagues|associates|members|participants|contributors|supporters|advocates|representatives|delegates|ambassadors|spokespersons|leaders|managers|directors|executives|administrators|supervisors|coordinators|organizers|planners|designers|developers|creators|producers|manufacturers|suppliers|providers|distributors|retailers|sellers|vendors|contractors|consultants|advisors|experts|specialists|professionals|practitioners|technicians|operators|workers|employees|staff|personnel|workforce|labor|human|resources|capital|assets|investments|funds|finances|budget|costs|expenses|revenues|income|profits|earnings|returns|benefits|advantages|gains|losses|risks|threats|dangers|hazards|challenges|problems|issues|difficulties|obstacles|barriers|limitations|constraints|restrictions|requirements|conditions|terms|specifications|standards|criteria|guidelines|rules|regulations|policies|procedures|protocols|processes|methods|techniques|approaches|strategies|plans|programs|projects|initiatives|campaigns|efforts|activities|actions|operations|functions|services|products|goods|items|articles|objects|things|materials|substances|elements|components|ingredients|contents)$/.test(word)) {
+        score += 3
+      }
+      
+      // Bonus for words that appear multiple times (indicating importance)
+      const frequency = (text.toLowerCase().match(new RegExp(`\\b${word}\\b`, 'g')) || []).length
+      if (frequency > 1) score += frequency
+      
+      return { word, score }
+    })
+
+    // Sort by score and return top words
+    const topWords = scoredWords
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(item => item.word)
+
+    console.log("📚 Smart vocabulary extraction results:", topWords)
+    return topWords
   }
 
   private determineCulturalContext(domain: string, text: string): string {
@@ -1397,982 +1707,139 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     return this.getTemplateWrapup(lessonType)
   }
 
-  // Smart template-based lesson generation
-  private async generateSmartTemplateLesson(
-    sourceText: string,
-    contentAnalysis: any,
-    lessonType: string,
-    studentLevel: string,
-    targetLanguage: string,
-    metadata?: any
-  ) {
-    console.log("🎨 Generating smart template lesson...")
-
-    const topics = contentAnalysis.topics
-    const vocabulary = contentAnalysis.keyVocabulary
-    const title = metadata?.title || 'Content'
-
-    return {
-      warmup: this.generateSmartWarmupQuestions(topics, studentLevel, contentAnalysis),
-      vocabulary: await this.generateSmartVocabulary(vocabulary, sourceText, studentLevel),
-      reading: await this.generateSmartReading(sourceText, studentLevel, vocabulary),
-      comprehension: this.generateSmartComprehension(topics, studentLevel),
-      dialoguePractice: await this.generateDialoguePractice(sourceText, studentLevel, vocabulary),
-      dialogueFillGap: await this.generateDialogueFillGap(sourceText, studentLevel, vocabulary),
-      discussion: this.generateSmartDiscussion(topics, lessonType, studentLevel),
-      grammar: this.generateSmartGrammar(studentLevel, sourceText),
-      pronunciation: this.generateSmartPronunciation(vocabulary),
-      wrapup: this.generateSmartWrapup(topics, studentLevel)
-    }
-  }
-
-  // Smart warm-up questions based on content (prior knowledge activation)
-  private generateSmartWarmupQuestions(topics: string[], studentLevel: string, contentAnalysis: any): string[] {
-    const topic = topics[0] || 'this topic'
-    const secondTopic = topics[1] || 'technology'
-
-    // Focus on activating prior knowledge, not assuming content knowledge
-    const levelQuestions = {
-      'A1': [
-        `Do you know about ${topic.toLowerCase()}?`,
-        `Is ${topic.toLowerCase()} popular in your country?`,
-        `Do you like ${topic.toLowerCase()}?`
-      ],
-      'A2': [
-        `Have you heard about ${topic.toLowerCase()} before?`,
-        `What do you already know about ${topic.toLowerCase()}?`,
-        `Is ${topic.toLowerCase()} common in your country?`
-      ],
-      'B1': [
-        `What comes to mind when you hear about ${topic.toLowerCase()}?`,
-        `Have you had any experience with ${topic.toLowerCase()}?`,
-        `What would you like to know about ${topic.toLowerCase()}?`
-      ],
-      'B2': [
-        `What is your general opinion about ${topic.toLowerCase()}?`,
-        `How familiar are you with ${topic.toLowerCase()}?`,
-        `What role does ${topic.toLowerCase()} play in your daily life?`
-      ],
-      'C1': [
-        `How would you describe the significance of ${topic.toLowerCase()} in modern society?`,
-        `What are your thoughts on the current state of ${topic.toLowerCase()}?`,
-        `How do you think ${topic.toLowerCase()} has evolved over time?`
-      ]
-    }
-
-    return levelQuestions[studentLevel] || levelQuestions['B1']
-  }
-
-  // Enhanced smart vocabulary with AI-generated contextual examples
-  private async generateSmartVocabulary(vocabulary: string[], sourceText: string, studentLevel: string) {
-    const selectedWords = vocabulary.slice(0, 8) // Start with 8 words
-    const vocabPromises = selectedWords.map(async (word) => {
-      const capitalizedWord = this.capitalizeWord(word)
-
-      return {
-        word: capitalizedWord,
-        meaning: this.generateContextualWordMeaning(word, studentLevel, sourceText),
-        example: await this.generateAIExampleSentences(word, studentLevel, sourceText)
-      }
-    })
-
-    const results = await Promise.all(vocabPromises)
-    // Ensure we have 6-10 words
-    return results.slice(0, 10).length >= 6 ? results.slice(0, 10) : results.slice(0, 6)
-  }
-
-  // Capitalize word properly
-  private capitalizeWord(word: string): string {
-    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  }
-
-  // Generate contextual word meanings based on level and source text
-  private generateContextualWordMeaning(word: string, level: string, sourceText: string): string {
-    const lowerWord = word.toLowerCase()
-
-    // Enhanced contextual definitions based on level
-    const contextualMeanings = {
-      'efficient': {
-        'A1': 'working well without wasting time',
-        'A2': 'doing something well and quickly without wasting time or energy',
-        'B1': 'working in a way that achieves the best results with the least waste of time and effort',
-        'B2': 'achieving maximum productivity with minimum wasted effort or expense',
-        'C1': 'achieving maximum productivity with minimum wasted effort, expense, or unnecessary activity'
-      },
-      'technology': {
-        'A1': 'computers and machines that help us',
-        'A2': 'machines and computer systems that make life easier',
-        'B1': 'the use of scientific knowledge to create useful tools and machines',
-        'B2': 'the application of scientific knowledge for practical purposes in industry and daily life',
-        'C1': 'the systematic application of scientific knowledge to develop practical solutions and innovations'
-      },
-      'europe': {
-        'A1': 'a big area with many countries',
-        'A2': 'a continent with many different countries like France, Germany, and Italy',
-        'B1': 'a continent consisting of many countries, known for its history and culture',
-        'B2': 'a continent comprising numerous nations with diverse cultures, languages, and political systems',
-        'C1': 'a geopolitical and cultural continent characterized by diverse nation-states, shared historical heritage, and economic integration'
-      },
-      'sensational': {
-        'A1': 'very exciting and good',
-        'A2': 'extremely exciting or impressive, causing strong feelings',
-        'B1': 'causing great excitement, interest, or shock; extremely impressive',
-        'B2': 'causing intense excitement, interest, or shock; extraordinarily impressive or remarkable',
-        'C1': 'causing or designed to cause intense excitement, interest, or shock through dramatic or extraordinary qualities'
-      },
-      'stages': {
-        'A1': 'does or makes something happen',
-        'A2': 'organizes and presents an event or performance',
-        'B1': 'organizes and presents an event, or refers to different parts of a process',
-        'B2': 'organizes and presents an event or performance, or represents distinct phases in a process',
-        'C1': 'orchestrates and presents an event or performance, or denotes sequential phases in a complex process'
-      },
-      'comeback': {
-        'A1': 'winning after losing',
-        'A2': 'returning to win after being behind in a game or competition',
-        'B1': 'a return to a winning position after being behind, or a return to success',
-        'B2': 'a recovery from a disadvantageous position to achieve success or victory',
-        'C1': 'a strategic recovery from a disadvantageous position to achieve success, often against expectations'
-      },
-      'dramatic': {
-        'A1': 'very exciting and surprising',
-        'A2': 'very exciting, with sudden changes that surprise people',
-        'B1': 'involving sudden changes or strong emotions; very noticeable or impressive',
-        'B2': 'characterized by sudden, striking changes or intense emotions; highly impressive or theatrical',
-        'C1': 'marked by sudden, striking developments or intense emotional impact; theatrically impressive or emotionally powerful'
-      }
-    }
-
-    const levelMeanings = contextualMeanings[lowerWord]
-    if (levelMeanings && levelMeanings[level]) {
-      return levelMeanings[level]
-    }
-
-    // Fallback to basic level-appropriate definition
-    const isSimpleLevel = level === 'A1' || level === 'A2'
-    return isSimpleLevel ?
-      `a word that means ${lowerWord}` :
-      `a term referring to ${lowerWord} in this context`
-  }
-
-  // Generate AI-powered contextual example sentences
-  private async generateAIExampleSentences(word: string, level: string, sourceText: string): Promise<string> {
-    const exampleCount = this.getExampleCount(level)
-    const context = sourceText.substring(0, 120) // More context for relevance
-
-    try {
-      const levelGuidance = this.getLevelGuidance(level)
-      const prompt = `Create ${exampleCount} contextual ${level} level sentences using "${word}" related to: ${context}. Make sentences meaningful and relevant to the topic. ${levelGuidance} Format: one sentence per line, no quotes:`
-      console.log("📝 Contextual example sentences prompt:", prompt.length, "chars")
-
-      const response = await this.getGoogleAI().prompt(prompt)
-
-      // Parse and clean AI response
-      const sentences = response.split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 5 && line.toLowerCase().includes(word.toLowerCase()))
-        .map(line => this.cleanSentence(line))
-        .map(line => this.boldifyTargetWord(line, word))
-        .filter(line => line.length > 0)
-        .slice(0, exampleCount)
-
-      // If AI generated enough contextual sentences, use them
-      if (sentences.length >= exampleCount) {
-        return sentences.join(' | ')
-      }
-
-      // Otherwise, supplement with contextual template sentences
-      const additionalNeeded = exampleCount - sentences.length
-      const templateSentences = this.generateContextualExamples(word, level, sourceText, additionalNeeded)
-
-      return [...sentences, ...templateSentences].slice(0, exampleCount).join(' | ')
-
-    } catch (error) {
-      console.log(`⚠️ AI example generation failed for ${word}, using contextual templates`)
-      // Fallback to contextual template examples
-      return this.generateContextualExamples(word, level, sourceText, exampleCount).join(' | ')
-    }
-  }
-
-  // Get level-specific guidance for AI prompts
-  private getLevelGuidance(level: string): string {
-    const guidance = {
-      'A1': 'Use very simple words, short sentences (5-8 words), present tense.',
-      'A2': 'Use simple words, short sentences (6-10 words), basic grammar.',
-      'B1': 'Use common words, medium sentences (8-12 words), clear meaning.',
-      'B2': 'Use varied vocabulary, longer sentences (10-15 words), complex ideas.',
-      'C1': 'Use sophisticated vocabulary, complex sentences (12+ words), nuanced meaning.'
-    }
-    return guidance[level] || guidance['B1']
-  }
-
-  // Clean sentence formatting
-  private cleanSentence(sentence: string): string {
-    return sentence
-      .replace(/^\d+\.?\s*/, '') // Remove numbering
-      .replace(/^-\s*/, '') // Remove dashes
-      .replace(/^\*\s*/, '') // Remove asterisks
-      .replace(/^•\s*/, '') // Remove bullet points
-      .trim()
-  }
-
-  // Clean definition formatting
-  private cleanDefinition(definition: string, level: string): string {
-    return definition
-      .replace(/^For an? [A-Z]\d+ student,?\s*/i, '') // Remove level prefixes
-      .replace(/^In this context,?\s*/i, '') // Remove context prefixes
-      .replace(/^Here's? (a )?definition.*?:\s*/i, '') // Remove definition intros
-      .replace(/^\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
-      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
-      .trim()
-  }
-
-  // Make target word bold in sentence
-  private boldifyTargetWord(sentence: string, targetWord: string): string {
-    const regex = new RegExp(`\\b${targetWord}\\b`, 'gi')
-    return sentence.replace(regex, `**${targetWord}**`)
-  }
-
-  // Generate contextual examples based on source material
-  private generateContextualExamples(word: string, level: string, sourceText: string, count: number): string[] {
-    const lowerWord = word.toLowerCase()
-    const capitalizedWord = this.capitalizeWord(word)
-
-    // Extract themes from source text for context
-    const themes = this.extractThemesFromText(sourceText)
-    const mainTheme = themes[0] || 'this topic'
-
-    const contextualExamples = {
-      'A1': [
-        `**${capitalizedWord}** is in the news today.`,
-        `I read about **${lowerWord}** online.`,
-        `**${capitalizedWord}** is important for ${mainTheme}.`,
-        `People talk about **${lowerWord}**.`,
-        `**${capitalizedWord}** helps with ${mainTheme}.`
-      ],
-      'A2': [
-        `**${capitalizedWord}** plays a big role in ${mainTheme}.`,
-        `Many people are interested in **${lowerWord}**.`,
-        `**${capitalizedWord}** affects how we think about ${mainTheme}.`,
-        `The news often mentions **${lowerWord}**.`,
-        `**${capitalizedWord}** is becoming more important in ${mainTheme}.`
-      ],
-      'B1': [
-        `**${capitalizedWord}** has changed the way we approach ${mainTheme}.`,
-        `Understanding **${lowerWord}** is crucial for ${mainTheme}.`,
-        `**${capitalizedWord}** continues to influence ${mainTheme}.`,
-        `The role of **${lowerWord}** in ${mainTheme} is growing.`
-      ],
-      'B2': [
-        `**${capitalizedWord}** represents a significant development in ${mainTheme}.`,
-        `The implications of **${lowerWord}** for ${mainTheme} are far-reaching.`,
-        `**${capitalizedWord}** has transformed our understanding of ${mainTheme}.`
-      ],
-      'C1': [
-        `**${capitalizedWord}** exemplifies the complex dynamics within ${mainTheme}.`,
-        `The multifaceted nature of **${lowerWord}** requires nuanced analysis in ${mainTheme}.`,
-        `**${capitalizedWord}** represents a paradigmatic shift in contemporary ${mainTheme}.`
-      ]
-    }
-
-    const levelExamples = contextualExamples[level] || contextualExamples['B1']
-    return levelExamples.slice(0, count)
-  }
-
-  // Extract themes from source text for contextual examples
-  private extractThemesFromText(text: string): string[] {
-    const themes = []
-
-    // Common themes based on keywords
-    const themeKeywords = {
-      'sports': ['team', 'game', 'win', 'play', 'match', 'competition', 'tournament', 'cup'],
-      'technology': ['AI', 'computer', 'digital', 'software', 'system', 'device', 'artificial', 'intelligence'],
-      'environment': ['climate', 'nature', 'earth', 'green', 'pollution', 'energy', 'change'],
-      'health': ['medical', 'doctor', 'treatment', 'patient', 'medicine', 'care', 'healthcare'],
-      'business': ['company', 'market', 'economy', 'finance', 'industry', 'trade'],
-      'education': ['student', 'learn', 'school', 'knowledge', 'study', 'teach']
-    }
-
-    const lowerText = text.toLowerCase()
-
-    for (const [theme, keywords] of Object.entries(themeKeywords)) {
-      const matchCount = keywords.filter(keyword => lowerText.includes(keyword)).length
-      if (matchCount >= 2) {
-        themes.push(theme)
-      }
-    }
-
-    return themes.length > 0 ? themes : ['this topic']
-  }
-
-  // Generate truly level-appropriate example sentences
-  private generateLevelAppropriateExamples(word: string, level: string, count: number): string[] {
-    const lowerWord = word.toLowerCase()
-    const capitalizedWord = this.capitalizeWord(word)
-
-    const examples = {
-      'A1': [
-        `${capitalizedWord} is good.`,
-        `I like ${lowerWord}.`,
-        `This is ${lowerWord}.`,
-        `${capitalizedWord} helps us.`,
-        `We see ${lowerWord}.`
-      ],
-      'A2': [
-        `${capitalizedWord} is very important.`,
-        `I think ${lowerWord} is interesting.`,
-        `Many people know about ${lowerWord}.`,
-        `${capitalizedWord} is useful for us.`,
-        `We can learn about ${lowerWord}.`
-      ],
-      'B1': [
-        `${capitalizedWord} plays an important role today.`,
-        `People are interested in ${lowerWord}.`,
-        `${capitalizedWord} affects our daily lives.`,
-        `We should understand ${lowerWord} better.`
-      ],
-      'B2': [
-        `${capitalizedWord} has significant implications for society.`,
-        `The impact of ${lowerWord} continues to grow.`,
-        `Understanding ${lowerWord} requires careful consideration.`
-      ],
-      'C1': [
-        `${capitalizedWord} exemplifies contemporary challenges.`,
-        `The complexity of ${lowerWord} demands sophisticated analysis.`,
-        `${capitalizedWord} represents a paradigm shift in thinking.`
-      ]
-    }
-
-    const levelExamples = examples[level] || examples['B1']
-    return levelExamples.slice(0, count)
-  }
-
-  // Fallback template-based example generation
-  private generateTemplateExamples(word: string, level: string, sourceText: string): string {
-    const exampleCount = this.getExampleCount(level)
-
-    // Try to find the word in the source text first
-    const sentences = sourceText.split(/[.!?]+/).filter(s => s.trim().length > 10)
-    const contextSentence = sentences.find(s => s.toLowerCase().includes(word.toLowerCase()))
-
-    const examples = []
-
-    // Add context sentence if found
-    if (contextSentence) {
-      examples.push(contextSentence.trim())
-    }
-
-    // Generate additional level-appropriate examples
-    const additionalExamples = this.generateAdditionalExamples(word, level, exampleCount - examples.length)
-    examples.push(...additionalExamples)
-
-    // Ensure we have the right number of examples
-    return examples.slice(0, exampleCount).join(' | ')
-  }
-
-  // Get number of examples based on CEFR level
-  private getExampleCount(level: string): number {
-    switch (level) {
-      case 'A1':
-      case 'A2':
-        return 5
-      case 'B1':
-        return 4
-      case 'B2':
-      case 'C1':
-        return 3
-      default:
-        return 4
-    }
-  }
-
-  // Generate additional level-appropriate example sentences
-  private generateAdditionalExamples(word: string, level: string, count: number): string[] {
-    const lowerWord = word.toLowerCase()
-    const capitalizedWord = this.capitalizeWord(word)
-
-    const exampleTemplates = {
-      'A1': [
-        `${capitalizedWord} is important.`,
-        `I like ${lowerWord}.`,
-        `This is ${lowerWord}.`,
-        `${capitalizedWord} is good.`,
-        `We use ${lowerWord}.`
-      ],
-      'A2': [
-        `${capitalizedWord} is very important in our daily life.`,
-        `I think ${lowerWord} is interesting.`,
-        `Many people use ${lowerWord} today.`,
-        `${capitalizedWord} helps us a lot.`,
-        `We can learn about ${lowerWord}.`
-      ],
-      'B1': [
-        `${capitalizedWord} plays an important role in modern society.`,
-        `The concept of ${lowerWord} has evolved significantly.`,
-        `Understanding ${lowerWord} is essential for students.`,
-        `${capitalizedWord} continues to influence our daily lives.`
-      ],
-      'B2': [
-        `${capitalizedWord} represents a significant development in this field.`,
-        `The implications of ${lowerWord} extend beyond immediate applications.`,
-        `Experts consider ${lowerWord} to be a crucial factor in future progress.`
-      ],
-      'C1': [
-        `${capitalizedWord} exemplifies the complex interplay between innovation and practical application.`,
-        `The multifaceted nature of ${lowerWord} requires comprehensive analysis.`,
-        `Contemporary discourse surrounding ${lowerWord} reflects broader societal transformations.`
-      ]
-    }
-
-    const templates = exampleTemplates[level] || exampleTemplates['B1']
-    return templates.slice(0, count)
-  }
-
-  // Enhanced reading passage adaptation with AI rewriting and vocabulary bolding
-  private async generateSmartReading(sourceText: string, studentLevel: string, vocabularyWords: string[] = []): Promise<string> {
-    const maxLength = {
-      'A1': 150,
-      'A2': 250,
-      'B1': 350,
-      'B2': 450,
-      'C1': 550
-    }
-
-    const targetLength = maxLength[studentLevel] || 350
-
-    try {
-      // Use AI to rewrite text for appropriate level
-      const rewrittenText = await this.rewriteForLevel(sourceText, studentLevel, targetLength)
-      // Bold vocabulary words in the reading passage
-      return this.boldVocabularyInText(rewrittenText, vocabularyWords)
-    } catch (error) {
-      console.log(`⚠️ AI rewriting failed for reading passage, using template adaptation`)
-      // Fallback to template-based adaptation
-      const adaptedText = this.adaptReadingTemplate(sourceText, studentLevel, targetLength)
-      return this.boldVocabularyInText(adaptedText, vocabularyWords)
-    }
-  }
-
-  // AI-powered text rewriting for CEFR levels
-  private async rewriteForLevel(sourceText: string, studentLevel: string, targetLength: number): Promise<string> {
-    const levelGuidance = this.getReadingLevelGuidance(studentLevel)
-    const shortText = sourceText.substring(0, targetLength + 100) // Give AI more context to work with
-    
-    const prompt = `Rewrite this text for ${studentLevel} level students. ${levelGuidance} Keep the main ideas but adapt the language. Target length: ${targetLength} characters. Text: ${shortText}`
-    
-    console.log("📖 Reading rewrite prompt:", prompt.length, "chars")
-    
-    const rewrittenText = await this.getGoogleAI().prompt(prompt)
-    
-    // Clean and limit the rewritten text
-    return rewrittenText.trim().substring(0, targetLength)
-  }
-
-  // Get level-specific guidance for reading adaptation
-  private getReadingLevelGuidance(level: string): string {
-    const guidance = {
-      'A1': 'Use very simple words, short sentences (5-8 words), present tense only, basic vocabulary.',
-      'A2': 'Use simple words, short sentences (6-10 words), simple past and present, common vocabulary.',
-      'B1': 'Use clear language, medium sentences (8-12 words), various tenses, intermediate vocabulary.',
-      'B2': 'Use varied vocabulary, longer sentences (10-15 words), complex grammar, advanced concepts.',
-      'C1': 'Use sophisticated language, complex sentences (12+ words), advanced grammar, nuanced ideas.'
-    }
-    return guidance[level] || guidance['B1']
-  }
-
-  // Template-based reading adaptation (fallback)
-  private adaptReadingTemplate(sourceText: string, studentLevel: string, targetLength: number): string {
-    const sentences = sourceText.split(/[.!?]+/).filter(s => s.trim().length > 10)
-    
-    if (studentLevel === 'A1' || studentLevel === 'A2') {
-      // Simplify for lower levels
-      const simplifiedSentences = sentences
-        .map(s => this.simplifysentence(s.trim(), studentLevel))
-        .filter(s => s.length > 0)
-        .slice(0, 6) // Limit number of sentences for A1/A2
-      
-      return simplifiedSentences.join('. ').substring(0, targetLength)
-    } else {
-      // For B1+ levels, use original text with length control
-      return sentences.join('. ').substring(0, targetLength)
-    }
-  }
-
-  // Simplify individual sentences for lower levels
-  private simplifysentence(sentence: string, level: string): string {
-    if (level === 'A1') {
-      // Very basic simplification for A1
-      return sentence
-        .replace(/\b(however|nevertheless|furthermore|moreover)\b/gi, 'but')
-        .replace(/\b(approximately|approximately)\b/gi, 'about')
-        .replace(/\b(significant|substantial)\b/gi, 'big')
-        .replace(/\b(demonstrate|illustrate)\b/gi, 'show')
-    } else if (level === 'A2') {
-      // Moderate simplification for A2
-      return sentence
-        .replace(/\b(nevertheless|furthermore)\b/gi, 'however')
-        .replace(/\b(approximately)\b/gi, 'about')
-        .replace(/\b(substantial)\b/gi, 'significant')
-    }
-    
-    return sentence
-  }
-
-  // Bold vocabulary words in reading passage for visual landmarks
-  private boldVocabularyInText(text: string, vocabularyWords: string[]): string {
-    if (!vocabularyWords || vocabularyWords.length === 0) {
-      return text
-    }
-
-    let boldedText = text
-    
-    // Sort vocabulary words by length (longest first) to avoid partial matches
-    const sortedWords = vocabularyWords
-      .filter(word => word && word !== 'INSTRUCTION') // Filter out instruction marker
-      .sort((a, b) => b.length - a.length)
-    
-    for (const word of sortedWords) {
-      // Create regex to match whole words only (case insensitive)
-      const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
-      
-      // Replace with bold markdown, but avoid double-bolding
-      boldedText = boldedText.replace(regex, (match) => {
-        // Check if already bolded
-        if (boldedText.includes(`**${match}**`)) {
-          return match
-        }
-        return `**${match}**`
-      })
-    }
-    
-    return boldedText
-  }
-
-  // Smart comprehension questions (5 questions per level)
-  private generateSmartComprehension(topics: string[], studentLevel: string): string[] {
-    const topic = topics[0] || 'the content'
-
-    const levelQuestions = {
-      'A1': [
-        `What is ${topic.toLowerCase()}?`,
-        "What is the main idea?",
-        "Is this information new to you?",
-        "Do you understand the text?",
-        "What did you learn?"
-      ],
-      'A2': [
-        `What does the text say about ${topic.toLowerCase()}?`,
-        "What are the main points?",
-        "Do you agree with the information?",
-        "Which part is most interesting?",
-        "What questions do you have?"
-      ],
-      'B1': [
-        `How does the text explain ${topic.toLowerCase()}?`,
-        "What supporting details are provided?",
-        "What conclusions can you draw?",
-        "How does this relate to your experience?",
-        "What additional information would be helpful?"
-      ],
-      'B2': [
-        `What is the author's perspective on ${topic.toLowerCase()}?`,
-        "What evidence supports the main arguments?",
-        "What are the implications of this information?",
-        "How might this affect different groups of people?",
-        "What counterarguments could be made?"
-      ],
-      'C1': [
-        `How does the author's treatment of ${topic.toLowerCase()} reflect broader themes?`,
-        "What underlying assumptions can you identify?",
-        "How might this information be interpreted differently in various contexts?",
-        "What are the potential long-term consequences discussed?",
-        "How does this contribute to the ongoing discourse in this field?"
-      ]
-    }
-
-    return levelQuestions[studentLevel] || levelQuestions['B1']
-  }
-
-  // Smart discussion questions
-  private generateSmartDiscussion(topics: string[], lessonType: string, studentLevel: string): string[] {
-    const topic = topics[0] || 'this topic'
-    const secondTopic = topics[1] || 'technology'
-
-    const levelQuestions = {
-      'A1': [
-        `Do you like ${topic.toLowerCase()}? Why?`,
-        `Is ${topic.toLowerCase()} good or bad?`,
-        `Would you recommend ${topic.toLowerCase()} to friends?`
-      ],
-      'A2': [
-        `What is your opinion about ${topic.toLowerCase()}?`,
-        `How do you use ${topic.toLowerCase()} in your life?`,
-        `What problems can ${topic.toLowerCase()} cause?`
-      ],
-      'B1': [
-        `What are the advantages and disadvantages of ${topic.toLowerCase()}?`,
-        `How has ${topic.toLowerCase()} changed over time?`,
-        `What would happen if ${topic.toLowerCase()} didn't exist?`
-      ],
-      'B2': [
-        `How might ${topic.toLowerCase()} impact society in the next decade?`,
-        `What ethical considerations surround ${topic.toLowerCase()}?`,
-        `How does ${topic.toLowerCase()} differ across cultures?`
-      ],
-      'C1': [
-        `What are the broader societal implications of ${topic.toLowerCase()}?`,
-        `How might ${topic.toLowerCase()} reshape our understanding of ${secondTopic.toLowerCase()}?`,
-        `What role should regulation play in ${topic.toLowerCase()}?`
-      ]
-    }
-
-    return levelQuestions[studentLevel] || levelQuestions['B1']
-  }
-
-  // Smart grammar focus
-  private generateSmartGrammar(studentLevel: string, sourceText: string) {
-    const grammarFocus = {
+  // Template dialogue generation methods
+  private generateTemplateDialoguePractice(topic: string, studentLevel: string, vocabularyWords: string[]): any {
+    const levelDialogues = {
       'A1': {
-        focus: 'Present Simple',
-        examples: ['It is efficient.', 'This works well.', 'People use technology.'],
-        exercise: ['It _____ (be) very useful.', 'Technology _____ (help) people.', 'This _____ (work) on phones.']
+        instruction: "Practice this simple conversation with your tutor:",
+        dialogue: [
+          { character: "Student", line: `I want to learn about ${topic}.` },
+          { character: "Tutor", line: `That's great! What do you already know about ${topic}?` },
+          { character: "Student", line: "I know a little bit." },
+          { character: "Tutor", line: `Let's explore ${topic} together.` }
+        ],
+        followUpQuestions: [
+          `What interests you most about ${topic}?`,
+          "What would you like to know more about?",
+          "How can this help you in daily life?"
+        ]
       },
       'A2': {
-        focus: 'Present Continuous and Simple',
-        examples: ['It is working on your device.', 'People are using this technology.', 'It helps with privacy.'],
-        exercise: ['It _____ (work) right now.', 'People _____ (use) it every day.', 'This _____ (help) with security.']
+        instruction: "Practice this conversation with your tutor:",
+        dialogue: [
+          { character: "Student", line: `I've been reading about ${topic}. It's quite interesting.` },
+          { character: "Tutor", line: `What did you find most interesting about ${topic}?` },
+          { character: "Student", line: "I learned some new things I didn't know before." },
+          { character: "Tutor", line: `Can you share what you learned about ${topic}?` }
+        ],
+        followUpQuestions: [
+          `How does ${topic} relate to your experience?`,
+          "What surprised you the most?",
+          "Would you recommend this topic to others?"
+        ]
       },
       'B1': {
-        focus: 'Present Perfect',
-        examples: ['Technology has improved significantly.', 'It has become more efficient.', 'Users have experienced better privacy.'],
-        exercise: ['Technology _____ (improve) a lot.', 'It _____ (become) very popular.', 'People _____ (start) using it more.']
+        instruction: "Practice this discussion with your tutor:",
+        dialogue: [
+          { character: "Student", line: `I've been thinking about ${topic} and its implications.` },
+          { character: "Tutor", line: `That's a complex topic. What aspects of ${topic} interest you most?` },
+          { character: "Student", line: "There are several factors to consider when discussing this." },
+          { character: "Tutor", line: `Let's explore those factors. What do you think is most important about ${topic}?` }
+        ],
+        followUpQuestions: [
+          `What are the advantages and disadvantages of ${topic}?`,
+          "How might this impact different groups of people?",
+          "What solutions would you propose?"
+        ]
       },
       'B2': {
-        focus: 'Passive Voice',
-        examples: ['It is designed for mobile devices.', 'Privacy is enhanced by this technology.', 'Data is processed locally.'],
-        exercise: ['It _____ (design) for phones.', 'Privacy _____ (improve) significantly.', 'Information _____ (process) safely.']
+        instruction: "Engage in this analytical discussion with your tutor:",
+        dialogue: [
+          { character: "Student", line: `The complexity of ${topic} requires careful analysis of multiple perspectives.` },
+          { character: "Tutor", line: `Excellent point. How do you think different stakeholders view ${topic}?` },
+          { character: "Student", line: "Each perspective brings unique insights and challenges to consider." },
+          { character: "Tutor", line: `What evidence supports your analysis of ${topic}?` }
+        ],
+        followUpQuestions: [
+          `How do cultural differences influence perspectives on ${topic}?`,
+          "What long-term consequences should we consider?",
+          "How would you evaluate the effectiveness of current approaches?"
+        ]
       },
       'C1': {
-        focus: 'Complex Sentence Structures',
-        examples: ['Having been designed for efficiency, it operates seamlessly.', 'The technology, which prioritizes privacy, has gained popularity.'],
-        exercise: ['_____ (design) for mobile use, it works offline.', 'The system, _____ (focus) on privacy, appeals to users.']
+        instruction: "Participate in this sophisticated discourse with your tutor:",
+        dialogue: [
+          { character: "Student", line: `The nuanced nature of ${topic} demands a multifaceted approach to understanding.` },
+          { character: "Tutor", line: `Indeed. How do you reconcile the apparent contradictions within ${topic}?` },
+          { character: "Student", line: "The paradoxes inherent in this subject reflect broader societal complexities." },
+          { character: "Tutor", line: `What theoretical frameworks best illuminate the intricacies of ${topic}?` }
+        ],
+        followUpQuestions: [
+          `How do philosophical underpinnings shape our understanding of ${topic}?`,
+          "What paradigm shifts might be necessary for progress?",
+          "How do you envision the evolution of thought regarding this matter?"
+        ]
       }
     }
 
-    return grammarFocus[studentLevel] || grammarFocus['B1']
+    return levelDialogues[studentLevel as keyof typeof levelDialogues] || levelDialogues['B1']
   }
 
-  // Smart pronunciation
-  private generateSmartPronunciation(vocabulary: string[]) {
-    const word = vocabulary.find(w => w.length > 6) || vocabulary[0] || 'technology'
-
-    const pronunciations = {
-      'technology': '/tekˈnɒlədʒi/',
-      'efficient': '/ɪˈfɪʃənt/',
-      'privacy': '/ˈpraɪvəsi/',
-      'processing': '/ˈprəʊsesɪŋ/',
-      'device': '/dɪˈvaɪs/',
-      'artificial': '/ˌɑːtɪˈfɪʃəl/',
-      'intelligence': '/ɪnˈtelɪdʒəns/',
-      'compact': '/kəmˈpækt/',
-      'version': '/ˈvɜːʃən/',
-      'family': '/ˈfæməli/',
-      'nano': '/ˈnænoʊ/',
-      'gemini': '/ˈdʒemɪnaɪ/'
-    }
-
-    return {
-      word: word,
-      ipa: pronunciations[word.toLowerCase()] || `/ˈwɜːrd/`,
-      practice: `Practice saying "${word}" in this sentence: This ${word} is very useful.`
-    }
-  }
-
-  // Smart wrap-up questions
-  private generateSmartWrapup(topics: string[], studentLevel: string): string[] {
-    const topic = topics[0] || 'this topic'
-
-    return [
-      `What new vocabulary did you learn about ${topic.toLowerCase()}?`,
-      `Which concepts about ${topic.toLowerCase()} need more practice?`,
-      "How will you use this knowledge in real situations?",
-      "What questions do you still have about this content?"
-    ]
-  }
-
-  // Generate dialogue practice section (Engoo-style)
-  private async generateDialoguePractice(sourceText: string, studentLevel: string, vocabularyWords: string[]): Promise<{instruction: string, dialogue: Array<{character: string, line: string}>, followUpQuestions: string[]}> {
-    const topics = this.extractBetterTopics(sourceText)
-    const mainTopic = topics[0] || 'this topic'
-    
-    try {
-      const context = sourceText.substring(0, 150)
-      const prompt = `Create a ${studentLevel} level dialogue between 2-3 characters about: ${context}. Include vocabulary: ${vocabularyWords.slice(0, 3).join(', ')}. Format: Character Name: dialogue line. Make it natural and conversational.`
-      
-      console.log("🎭 Dialogue practice prompt:", prompt.length, "chars")
-      const response = await this.getGoogleAI().prompt(prompt)
-      
-      const dialogue = this.parseDialogue(response)
-      const followUpQuestions = this.generateDialogueFollowUpQuestions(mainTopic, studentLevel)
-      
-      return {
-        instruction: "Practice this dialogue with your tutor. Take turns reading different characters:",
-        dialogue: dialogue,
-        followUpQuestions: followUpQuestions
-      }
-    } catch (error) {
-      console.log("⚠️ Dialogue practice generation failed, using template")
-      return this.generateTemplateDialoguePractice(mainTopic, studentLevel, vocabularyWords)
-    }
-  }
-
-  // Generate dialogue fill-in-the-gap section
-  private async generateDialogueFillGap(sourceText: string, studentLevel: string, vocabularyWords: string[]): Promise<{instruction: string, dialogue: Array<{character: string, line: string, isGap?: boolean}>, answers: string[]}> {
-    const topics = this.extractBetterTopics(sourceText)
-    const mainTopic = topics[0] || 'this topic'
-    
-    try {
-      const context = sourceText.substring(0, 150)
-      const prompt = `Create a short ${studentLevel} level dialogue between 2 characters about: ${context}. Leave 3-4 blanks for students to fill. Format: Character: dialogue with _____ for blanks.`
-      
-      console.log("📝 Fill-gap dialogue prompt:", prompt.length, "chars")
-      const response = await this.getGoogleAI().prompt(prompt)
-      
-      const { dialogue, answers } = this.parseDialogueWithGaps(response)
-      
-      return {
-        instruction: "Complete the dialogue by filling in the missing words or phrases:",
-        dialogue: dialogue,
-        answers: answers
-      }
-    } catch (error) {
-      console.log("⚠️ Fill-gap dialogue generation failed, using template")
-      return this.generateTemplateDialogueFillGap(mainTopic, studentLevel, vocabularyWords)
-    }
-  }
-
-  // Parse dialogue from AI response
-  private parseDialogue(response: string): Array<{character: string, line: string}> {
-    const lines = response.split('\n').filter(line => line.trim().length > 0)
-    const dialogue = []
-    
-    for (const line of lines) {
-      const match = line.match(/^([A-Za-z\s]+):\s*(.+)$/)
-      if (match) {
-        dialogue.push({
-          character: match[1].trim(),
-          line: match[2].trim()
-        })
-      }
-    }
-    
-    return dialogue.length > 0 ? dialogue : this.getDefaultDialogue()
-  }
-
-  // Parse dialogue with gaps
-  private parseDialogueWithGaps(response: string): {dialogue: Array<{character: string, line: string, isGap?: boolean}>, answers: string[]} {
-    const lines = response.split('\n').filter(line => line.trim().length > 0)
-    const dialogue = []
-    const answers = []
-    
-    for (const line of lines) {
-      const match = line.match(/^([A-Za-z\s]+):\s*(.+)$/)
-      if (match) {
-        const character = match[1].trim()
-        const text = match[2].trim()
-        
-        if (text.includes('_____')) {
-          dialogue.push({
-            character: character,
-            line: text,
-            isGap: true
-          })
-          answers.push("answer")
-        } else {
-          dialogue.push({
-            character: character,
-            line: text
-          })
-        }
-      }
-    }
-    
-    return { dialogue, answers }
-  }
-
-  // Generate follow-up questions for dialogue practice
-  private generateDialogueFollowUpQuestions(topic: string, studentLevel: string): string[] {
-    const levelQuestions = {
-      'A1': [
-        "What did the characters talk about?",
-        "Which character do you like more?",
-        "Is this conversation easy or difficult?"
-      ],
-      'A2': [
-        "What is the main problem in the dialogue?",
-        "How do the characters feel?",
-        "What would you say in this situation?"
-      ],
-      'B1': [
-        "What is the relationship between the characters?",
-        "How would you handle this situation differently?",
-        "What cultural differences do you notice?"
-      ],
-      'B2': [
-        "What are the underlying motivations of each character?",
-        "How effective is their communication?",
-        "What assumptions are being made in this conversation?"
-      ],
-      'C1': [
-        "How do the characters' communication styles reflect their backgrounds?",
-        "What implicit meanings can you identify in their exchanges?",
-        "How might this conversation unfold in different cultural contexts?"
-      ]
-    }
-    
-    return levelQuestions[studentLevel] || levelQuestions['B1']
-  }
-
-  // Template dialogue practice fallback
-  private generateTemplateDialoguePractice(topic: string, studentLevel: string, vocabularyWords: string[]): {instruction: string, dialogue: Array<{character: string, line: string}>, followUpQuestions: string[]} {
-    const dialogue = [
-      { character: "Alex", line: `Have you heard about ${topic}?` },
-      { character: "Sam", line: `Yes, I think it's very interesting.` },
-      { character: "Alex", line: `What do you think about it?` },
-      { character: "Sam", line: `I believe it will change many things.` },
-      { character: "Alex", line: `I agree. It's important to understand it better.` }
-    ]
-    
-    return {
-      instruction: "Practice this dialogue with your tutor. Take turns reading different characters:",
-      dialogue: dialogue,
-      followUpQuestions: this.generateDialogueFollowUpQuestions(topic, studentLevel)
-    }
-  }
-
-  // Template fill-gap dialogue fallback
-  private generateTemplateDialogueFillGap(topic: string, studentLevel: string, vocabularyWords: string[]): {instruction: string, dialogue: Array<{character: string, line: string, isGap?: boolean}>, answers: string[]} {
-    const dialogue = [
-      { character: "Person A", line: `What do you think about _____?`, isGap: true },
-      { character: "Person B", line: `I think it's very _____.`, isGap: true },
-      { character: "Person A", line: `Why do you feel that way?` },
-      { character: "Person B", line: `Because it _____ our daily lives.`, isGap: true }
-    ]
-    
-    return {
-      instruction: "Complete the dialogue by filling in the missing words or phrases:",
-      dialogue: dialogue,
-      answers: [topic, "interesting", "affects"]
-    }
-  }
-
-  // Default dialogue fallback
-  private getDefaultDialogue(): Array<{character: string, line: string}> {
-    return [
-      { character: "Alex", line: "What do you think about this topic?" },
-      { character: "Sam", line: "I find it very interesting." },
-      { character: "Alex", line: "Can you tell me more?" },
-      { character: "Sam", line: "Sure, I'd be happy to explain." }
-    ]
-  }
-
-  // Helper method to determine source country from domain
-  private determineSourceCountry(domain: string): string {
-    const countryMap = {
-      'bbc.com': 'United Kingdom',
-      'bbc.co.uk': 'United Kingdom',
-      'cnn.com': 'United States',
-      'nytimes.com': 'United States',
-      'theguardian.com': 'United Kingdom',
-      'washingtonpost.com': 'United States',
-      'reuters.com': 'International',
-      'ap.org': 'United States',
-      'npr.org': 'United States',
-      'abc.net.au': 'Australia',
-      'cbc.ca': 'Canada',
-    }
-
-    for (const [domainKey, country] of Object.entries(countryMap)) {
-      if (domain.includes(domainKey)) {
-        return country
+  private generateTemplateDialogueFillGap(topic: string, studentLevel: string, vocabularyWords: string[]): any {
+    const levelGapDialogues = {
+      'A1': {
+        instruction: "Fill in the gaps in this conversation:",
+        dialogue: [
+          { character: "Student", line: `I _____ to learn about ${topic}.`, isGap: true },
+          { character: "Tutor", line: `That's great! What _____ you already know?`, isGap: true },
+          { character: "Student", line: "I know _____ little bit.", isGap: true },
+          { character: "Tutor", line: `Let's _____ together.`, isGap: true }
+        ],
+        answers: ["want", "do", "a", "learn"]
+      },
+      'A2': {
+        instruction: "Complete this conversation with the missing words:",
+        dialogue: [
+          { character: "Student", line: `I've been _____ about ${topic}.`, isGap: true },
+          { character: "Tutor", line: `What did you _____ most interesting?`, isGap: true },
+          { character: "Student", line: "I _____ some new things.", isGap: true },
+          { character: "Tutor", line: `Can you _____ what you learned?`, isGap: true }
+        ],
+        answers: ["reading", "find", "learned", "share"]
+      },
+      'B1': {
+        instruction: "Fill in the blanks to complete this discussion:",
+        dialogue: [
+          { character: "Student", line: `I've been _____ about ${topic} and its implications.`, isGap: true },
+          { character: "Tutor", line: `What _____ interest you most?`, isGap: true },
+          { character: "Student", line: "There are several _____ to consider.", isGap: true },
+          { character: "Tutor", line: `What do you think is most _____ ?`, isGap: true }
+        ],
+        answers: ["thinking", "aspects", "factors", "important"]
+      },
+      'B2': {
+        instruction: "Complete this analytical discussion:",
+        dialogue: [
+          { character: "Student", line: `The _____ of ${topic} requires careful analysis.`, isGap: true },
+          { character: "Tutor", line: `How do different _____ view this topic?`, isGap: true },
+          { character: "Student", line: "Each perspective brings unique _____ .", isGap: true },
+          { character: "Tutor", line: `What _____ supports your analysis?`, isGap: true }
+        ],
+        answers: ["complexity", "stakeholders", "insights", "evidence"]
+      },
+      'C1': {
+        instruction: "Fill in the sophisticated vocabulary:",
+        dialogue: [
+          { character: "Student", line: `The _____ nature of ${topic} demands a multifaceted approach.`, isGap: true },
+          { character: "Tutor", line: `How do you _____ the apparent contradictions?`, isGap: true },
+          { character: "Student", line: "The _____ reflect broader complexities.", isGap: true },
+          { character: "Tutor", line: `What theoretical _____ best illuminate this?`, isGap: true }
+        ],
+        answers: ["nuanced", "reconcile", "paradoxes", "frameworks"]
       }
     }
 
-    return 'International'
-  }
-
-  // Fallback warm-up question generator
-  private getFallbackWarmupQuestion(level: string, contentAnalysis: any, questionIndex: number): string {
-    const topic = contentAnalysis.topics[0] || 'this topic'
-    const contentType = contentAnalysis.contentType
-
-    const fallbackQuestions = {
-      'A1': [
-        `Do you know about ${topic.toLowerCase()}?`,
-        `Is ${topic.toLowerCase()} important in your country?`,
-        `Do you like to read about ${topic.toLowerCase()}?`
-      ],
-      'A2': [
-        `Have you heard about ${topic.toLowerCase()} before?`,
-        `What do you know about ${topic.toLowerCase()}?`,
-        `Is ${topic.toLowerCase()} different in your country?`
-      ],
-      'B1': [
-        `What do you think about ${topic.toLowerCase()}?`,
-        `How is ${topic.toLowerCase()} important in your daily life?`,
-        `What would you like to know about ${topic.toLowerCase()}?`
-      ],
-      'B2': [
-        `What are your thoughts on ${topic.toLowerCase()}?`,
-        `How might ${topic.toLowerCase()} affect people in different countries?`,
-        `What questions would you ask about ${topic.toLowerCase()}?`
-      ],
-      'C1': [
-        `How do cultural perspectives influence attitudes toward ${topic.toLowerCase()}?`,
-        `What are the broader implications of ${topic.toLowerCase()} in modern society?`,
-        `How might ${topic.toLowerCase()} evolve in the coming years?`
-      ]
-    }
-
-    const levelQuestions = fallbackQuestions[level] || fallbackQuestions['B1']
-    return levelQuestions[questionIndex] || levelQuestions[0]
-  }
-
-  // Contextual warm-up fallback when AI fails
-  private getContextualWarmupFallback(level: string, contentAnalysis: any, metadata?: any): string[] {
-    const topic = contentAnalysis.topics[0] || 'this topic'
-    const sourceCountry = contentAnalysis.sourceCountry || 'this country'
-    const title = metadata?.title || 'this content'
-
-    const fallbackSets = {
-      'A1': [
-        `Do you know about ${topic.toLowerCase()}?`,
-        `Is this topic common in your country?`,
-        `Do you want to learn about ${topic.toLowerCase()}?`
-      ],
-      'A2': [
-        `Have you experienced ${topic.toLowerCase()} before?`,
-        `What is ${topic.toLowerCase()} like in your country?`,
-        `Why is ${topic.toLowerCase()} interesting to you?`
-      ],
-      'B1': [
-        `What do you think about ${topic.toLowerCase()}?`,
-        `How is ${topic.toLowerCase()} different in your country compared to ${sourceCountry}?`,
-        `What would you expect to learn from this ${contentAnalysis.contentType}?`
-      ],
-      'B2': [
-        `What are your thoughts on how ${topic.toLowerCase()} is presented in ${sourceCountry} media?`,
-        `What challenges do you think people face with ${topic.toLowerCase()}?`,
-        `How might your perspective on ${topic.toLowerCase()} differ from the author's?`
-      ],
-      'C1': [
-        `How do cultural attitudes toward ${topic.toLowerCase()} vary between ${sourceCountry} and your country?`,
-        `What are the broader societal implications of ${topic.toLowerCase()}?`,
-        `How might the perspective in this ${contentAnalysis.contentType} reflect ${sourceCountry} values?`
-      ]
-    }
-
-    return fallbackSets[level] || fallbackSets['B1']
+    return levelGapDialogues[studentLevel as keyof typeof levelGapDialogues] || levelGapDialogues['B1']
   }
 }
 
