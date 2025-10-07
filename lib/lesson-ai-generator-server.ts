@@ -277,15 +277,16 @@ Rewrite the content clearly and completely:`
       currentContext = progressiveGen.updateContext(currentContext, generatedSection)
     }
 
-    // Step 4: Generate dialogue sections using template methods
-    const vocabularyWords = generatedSections
-      .find(s => s.sectionName === 'vocabulary')?.content
-      ?.filter((item: any) => item.word !== 'INSTRUCTION')
-      ?.map((item: any) => item.word) || []
-
-    const mainTopic = sharedContext.mainThemes[0] || 'this topic'
-    const dialoguePractice = this.generateTemplateDialoguePractice(mainTopic, studentLevel, vocabularyWords)
-    const dialogueFillGap = this.generateTemplateDialogueFillGap(mainTopic, studentLevel, vocabularyWords)
+    // Step 4: Generate dialogue sections using AI-based progressive generation
+    console.log("🎭 Generating dialogue sections with AI...")
+    const dialoguePractice = await progressiveGen.generateDialoguePracticeWithContext(
+      sharedContext,
+      generatedSections
+    )
+    const dialogueFillGap = await progressiveGen.generateDialogueFillGapWithContext(
+      sharedContext,
+      generatedSections
+    )
 
     // Step 5: Assemble final lesson structure
     const lessonStructure: any = {}

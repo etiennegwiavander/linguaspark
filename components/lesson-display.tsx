@@ -34,14 +34,24 @@ interface LessonData {
   targetLanguage: string
   sections: {
     warmup: string[]
-    vocabulary: Array<{ word: string; meaning: string; example: string }>
+    vocabulary: Array<{ word: string; meaning: string; example?: string; examples?: string[] }>
     reading: string
     comprehension: string[]
     discussion: string[]
     grammar: {
       focus: string
+      explanation?: {
+        form: string
+        usage: string
+        levelNotes?: string
+      }
       examples: string[]
-      exercise: string[]
+      exercise?: string[]
+      exercises?: Array<{
+        prompt: string
+        answer: string
+        explanation?: string
+      }>
     }
     pronunciation: {
       word: string
@@ -217,8 +227,15 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               )
             }
             
-            // Split multiple examples if they exist
-            const examples = item.example.split(' | ').filter(ex => ex.trim().length > 0)
+            // Handle both old format (example string) and new format (examples array)
+            let examples: string[] = []
+            if (item.examples && Array.isArray(item.examples)) {
+              // New format: examples array
+              examples = item.examples.filter(ex => ex.trim().length > 0)
+            } else if (item.example) {
+              // Old format: single example string, possibly with | separator
+              examples = item.example.split(' | ').filter(ex => ex.trim().length > 0)
+            }
             
             return (
               <div key={index} className="border rounded-lg p-3 bg-muted/30">
@@ -229,22 +246,26 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3 leading-relaxed">{item.meaning}</p>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Examples:</p>
-                  <ul className="space-y-1">
-                    {examples.map((example, exIndex) => (
-                      <li key={exIndex} className="flex items-start gap-2">
-                        <span className="text-primary mt-1">•</span>
-                        <span 
-                          className="text-sm text-slate-700"
-                          dangerouslySetInnerHTML={{
-                            __html: example.trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {examples.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {examples.length === 1 ? 'Example:' : 'Examples:'}
+                    </p>
+                    <ul className="space-y-1">
+                      {examples.map((example, exIndex) => (
+                        <li key={exIndex} className="flex items-start gap-2">
+                          <span className="text-primary mt-1">•</span>
+                          <span 
+                            className="text-sm text-slate-700"
+                            dangerouslySetInnerHTML={{
+                              __html: example.trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -453,23 +474,74 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       content: (
         <div className="space-y-4">
           <div>
-            <h4 className="font-medium text-sm mb-2">Focus: {safeLesson.sections.grammar.focus}</h4>
-            <div className="space-y-1">
-              {safeLesson.sections.grammar.examples.map((example, index) => (
-                <p key={index} className="text-sm bg-muted/30 rounded px-2 py-1">
-                  {example}
-                </p>
-              ))}
+            <h4 className="font-semibold text-base mb-3">{safeLesson.sections.grammar.focus}</h4>
+            
+            {/* Grammar Explanation */}
+            {safeLesson.sections.grammar.explanation && (
+              <div className="space-y-3 mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                {safeLesson.sections.grammar.explanation.form && (
+                  <div>
+                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Form:</h5>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">{safeLesson.sections.grammar.explanation.form}</p>
+                  </div>
+                )}
+                {safeLesson.sections.grammar.explanation.usage && (
+                  <div>
+                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Usage:</h5>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">{safeLesson.sections.grammar.explanation.usage}</p>
+                  </div>
+                )}
+                {safeLesson.sections.grammar.explanation.levelNotes && (
+                  <div>
+                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Note:</h5>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 italic">{safeLesson.sections.grammar.explanation.levelNotes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Examples */}
+            <div className="mb-4">
+              <h5 className="font-medium text-sm mb-2">Examples:</h5>
+              <div className="space-y-1">
+                {safeLesson.sections.grammar.examples.map((example, index) => (
+                  <p key={index} className="text-sm bg-muted/30 rounded px-3 py-2 border-l-2 border-primary/50">
+                    {example}
+                  </p>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <h4 className="font-medium text-sm mb-2">Practice Exercise</h4>
-            <div className="space-y-1">
-              {safeLesson.sections.grammar.exercise.map((exercise, index) => (
-                <p key={index} className="text-sm font-mono bg-accent/30 rounded px-2 py-1">
-                  {exercise}
-                </p>
-              ))}
+
+            {/* Practice Exercises */}
+            <div>
+              <h5 className="font-medium text-sm mb-2">Practice Exercises:</h5>
+              <div className="space-y-2">
+                {safeLesson.sections.grammar.exercises ? (
+                  // New format with structured exercises
+                  safeLesson.sections.grammar.exercises.map((exercise: any, index: number) => (
+                    <div key={index} className="bg-accent/30 rounded px-3 py-2 space-y-1">
+                      <p className="text-sm font-medium">{index + 1}. {exercise.prompt}</p>
+                      {exercise.answer && (
+                        <p className="text-xs text-muted-foreground ml-4">
+                          <span className="font-medium">Answer:</span> {exercise.answer}
+                        </p>
+                      )}
+                      {exercise.explanation && (
+                        <p className="text-xs text-muted-foreground ml-4 italic">
+                          {exercise.explanation}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  // Fallback for old format
+                  safeLesson.sections.grammar.exercise?.map((exercise, index) => (
+                    <p key={index} className="text-sm font-mono bg-accent/30 rounded px-3 py-2">
+                      {exercise}
+                    </p>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

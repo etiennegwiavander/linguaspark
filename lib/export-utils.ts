@@ -7,7 +7,7 @@ interface LessonData {
   targetLanguage: string
   sections: {
     warmup: string[]
-    vocabulary: Array<{ word: string; meaning: string; example: string }>
+    vocabulary: Array<{ word: string; meaning: string; example?: string; examples?: string[] }>
     reading: string
     comprehension: string[]
     discussion: string[]
@@ -98,7 +98,16 @@ export class LessonExporter {
         lessonData.sections.vocabulary.forEach((item, index) => {
           addText(`${index + 1}. ${item.word}`, 12, true, 10)
           addText(`   Meaning: ${item.meaning}`, 11, false, 15)
-          addText(`   Example: "${item.example}"`, 11, false, 15)
+          
+          // Handle both old format (example) and new format (examples array)
+          if (item.examples && Array.isArray(item.examples) && item.examples.length > 0) {
+            addText(`   Examples:`, 11, true, 15)
+            item.examples.forEach((example, exIndex) => {
+              addText(`   ${exIndex + 1}. "${example}"`, 11, false, 20)
+            })
+          } else if (item.example) {
+            addText(`   Example: "${item.example}"`, 11, false, 15)
+          }
           yPosition += 3
         })
       })
@@ -277,18 +286,55 @@ export class LessonExporter {
             spacing: { after: 100 },
           }),
         )
-        vocabContent.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `   Example: "${item.example}"`,
-                size: 22,
-                italics: true,
+        
+        // Handle both old format (example) and new format (examples array)
+        if (item.examples && Array.isArray(item.examples) && item.examples.length > 0) {
+          vocabContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `   Examples:`,
+                  size: 22,
+                  bold: true,
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+          )
+          item.examples.forEach((example, exIndex) => {
+            vocabContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `      ${exIndex + 1}. "${example}"`,
+                    size: 22,
+                    italics: true,
+                  }),
+                ],
+                spacing: { after: 100 },
               }),
-            ],
-            spacing: { after: 200 },
-          }),
-        )
+            )
+          })
+          vocabContent.push(
+            new Paragraph({
+              children: [new TextRun({ text: "" })],
+              spacing: { after: 100 },
+            }),
+          )
+        } else if (item.example) {
+          vocabContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `   Example: "${item.example}"`,
+                  size: 22,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          )
+        }
       })
       addSection("Key Vocabulary", vocabContent)
     }
