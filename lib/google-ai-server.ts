@@ -86,22 +86,22 @@ class GoogleAIServerService {
   }
 
   private async makeGeminiRequest(
-    prompt: string, 
-    options: any = {}, 
+    prompt: string,
+    options: any = {},
     metadata?: RequestMetadata
   ): Promise<string> {
     return this.makeGeminiRequestWithRetry(prompt, options, metadata, 0);
   }
 
   private async makeGeminiRequestWithRetry(
-    prompt: string, 
-    options: any = {}, 
+    prompt: string,
+    options: any = {},
     metadata?: RequestMetadata,
     retryAttempt: number = 0
   ): Promise<string> {
     const startTime = Date.now();
     const requestId = this.generateRequestId();
-    
+
     const requestBody = {
       contents: [{
         parts: [{
@@ -110,7 +110,7 @@ class GoogleAIServerService {
       }],
       generationConfig: {
         temperature: options.temperature || 0.7,
-        maxOutputTokens: options.maxTokens || 2000,
+        maxOutputTokens: options.maxTokens || 8000, // Increased from 2000 to 8000 (Gemini free tier supports up to 8192)
         topP: options.topP || 0.9,
       }
     };
@@ -121,7 +121,7 @@ class GoogleAIServerService {
     const url = `${this.config.baseUrl}/v1beta/models/gemini-2.5-flash:generateContent?key=${this.config.apiKey}`;
     console.log(`🌐 API Request [${requestId}] - Attempt ${retryAttempt + 1}/${this.maxRetries + 1}`);
     console.log(`📊 Estimated input tokens: ${estimatedInputTokens}`);
-    
+
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -137,12 +137,12 @@ class GoogleAIServerService {
         const result = await response.json();
         const endTime = Date.now();
         const responseTime = endTime - startTime;
-        
+
         console.log("✅ Successful API response received");
-        
+
         // Extract token usage information if available
         const tokenUsage = this.extractTokenUsage(result, estimatedInputTokens);
-        
+
         // Log token usage
         if (metadata?.section && tokenUsage) {
           usageMonitor.logTokenUsage(
@@ -156,21 +156,27 @@ class GoogleAIServerService {
         // Parse response content
         if (result.candidates && result.candidates.length > 0) {
           const candidate = result.candidates[0];
-          
+
           // Check if we hit MAX_TOKENS limit
           if (candidate.finishReason === "MAX_TOKENS") {
             console.warn("⚠️ Hit MAX_TOKENS limit, response may be incomplete");
+            // ALWAYS return partial text if available - don't throw error
             if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
               const text = candidate.content.parts[0].text;
-              console.log(`⚠️ Extracted partial text (${text.length} chars) due to MAX_TOKENS`);
-              return text;
-            } else {
-              const error = new Error("MAX_TOKENS_EXCEEDED") as AIError;
-              error.code = "MAX_TOKENS";
-              throw error;
+              // Check if text is actually present and not empty
+              if (text && text.trim().length > 0) {
+                console.log(`⚠️ Extracted partial text (${text.length} chars) due to MAX_TOKENS`);
+                return text;
+              }
             }
+            // Only throw if there's truly no content at all
+            console.error("❌ MAX_TOKENS hit but no content available");
+            console.error("❌ Response structure:", JSON.stringify(candidate, null, 2));
+            const error = new Error("MAX_TOKENS_EXCEEDED_NO_CONTENT") as AIError;
+            error.code = "MAX_TOKENS";
+            throw error;
           }
-          
+
           // Normal response processing
           if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
             const text = candidate.content.parts[0].text;
@@ -192,21 +198,21 @@ class GoogleAIServerService {
         const error = new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`) as AIError;
         error.status = response.status;
         error.response = errorText;
-        
+
         // Check if this is a retryable error
         if (this.isRetryableError(response.status) && retryAttempt < this.maxRetries) {
           const delay = this.calculateRetryDelay(retryAttempt);
           console.warn(`⚠️ Retryable error (${response.status}), retrying in ${delay}ms...`);
-          
+
           await this.sleep(delay);
           return this.makeGeminiRequestWithRetry(prompt, options, metadata, retryAttempt + 1);
         }
-        
+
         throw error;
       }
     } catch (error) {
       const aiError = error as AIError;
-      
+
       // Log error with context
       if (metadata?.context) {
         const errorContext: ErrorContext = {
@@ -217,20 +223,20 @@ class GoogleAIServerService {
           requestId,
           apiEndpoint: url
         };
-        
+
         const classifiedError = errorClassifier.classifyError(aiError, errorContext);
         usageMonitor.logError(aiError, classifiedError.type, metadata.context);
       }
-      
+
       // Check if this is a retryable network error
       if (this.isNetworkError(aiError) && retryAttempt < this.maxRetries) {
         const delay = this.calculateRetryDelay(retryAttempt);
         console.warn(`⚠️ Network error, retrying in ${delay}ms...`);
-        
+
         await this.sleep(delay);
         return this.makeGeminiRequestWithRetry(prompt, options, metadata, retryAttempt + 1);
       }
-      
+
       console.error(`❌ API call failed [${requestId}]:`, aiError.message);
       throw aiError;
     }
@@ -243,7 +249,7 @@ class GoogleAIServerService {
     // Try to extract actual token usage from response metadata
     let inputTokens = estimatedInputTokens;
     let outputTokens = 0;
-    
+
     // Check if response includes usage metadata
     if (result.usageMetadata) {
       inputTokens = result.usageMetadata.promptTokenCount || estimatedInputTokens;
@@ -253,7 +259,7 @@ class GoogleAIServerService {
       const responseText = result.candidates[0].content.parts[0].text;
       outputTokens = Math.ceil(responseText.length / 4);
     }
-    
+
     return {
       inputTokens,
       outputTokens,
@@ -305,23 +311,23 @@ class GoogleAIServerService {
    */
   async processBatch(requests: BatchRequest[]): Promise<BatchResponse[]> {
     console.log(`🔄 Processing batch of ${requests.length} requests`);
-    
+
     const results: BatchResponse[] = [];
     const batchSize = 5; // Process in smaller batches to avoid overwhelming the API
-    
+
     for (let i = 0; i < requests.length; i += batchSize) {
       const batch = requests.slice(i, i + batchSize);
       console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(requests.length / batchSize)}`);
-      
+
       // Process batch requests concurrently
       const batchPromises = batch.map(async (request): Promise<BatchResponse> => {
         try {
           const result = await this.makeGeminiRequest(
-            request.prompt, 
-            request.options, 
+            request.prompt,
+            request.options,
             request.metadata
           );
-          
+
           return {
             id: request.id,
             result
@@ -333,16 +339,16 @@ class GoogleAIServerService {
           };
         }
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-      
+
       // Add delay between batches to respect rate limits
       if (i + batchSize < requests.length) {
         await this.sleep(500); // 500ms delay between batches
       }
     }
-    
+
     console.log(`✅ Batch processing complete: ${results.filter(r => r.result).length} successful, ${results.filter(r => r.error).length} failed`);
     return results;
   }
@@ -350,10 +356,10 @@ class GoogleAIServerService {
   async summarize(text: string, options: SummarizerOptions = {}, metadata?: RequestMetadata) {
     const summaryType = options.type || "key-points"
     const length = options.length || "medium"
-    
+
     const lengthInstructions = {
       short: "in 2-3 sentences",
-      medium: "in 4-6 sentences", 
+      medium: "in 4-6 sentences",
       long: "in 7-10 sentences"
     }
 
@@ -387,7 +393,7 @@ Summary:`
 
   async translate(text: string, options: TranslatorOptions, metadata?: RequestMetadata) {
     const targetLang = this.getLanguageName(options.targetLanguage)
-    
+
     const prompt = `Translate the following text to ${targetLang}. Maintain the original meaning and tone:
 
 ${text}
@@ -539,7 +545,7 @@ Corrected text:`
   private getLanguageName(code: string): string {
     const languageMap = {
       es: "Spanish",
-      fr: "French", 
+      fr: "French",
       de: "German",
       it: "Italian",
       pt: "Portuguese",
@@ -566,12 +572,12 @@ export const createGoogleAIServerService = () => {
   return new GoogleAIServerService({ apiKey, baseUrl })
 }
 
-export type { 
-  SummarizerOptions, 
-  TranslatorOptions, 
-  PromptOptions, 
-  WriterOptions, 
-  RewriterOptions, 
+export type {
+  SummarizerOptions,
+  TranslatorOptions,
+  PromptOptions,
+  WriterOptions,
+  RewriterOptions,
   ProofreaderOptions,
   TokenUsage,
   RequestMetadata,

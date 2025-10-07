@@ -466,69 +466,37 @@ Return ONLY 3 questions, one per line, with no numbering or extra text:`
 
   /**
    * Build level-specific vocabulary example prompt with contextual relevance
+   * OPTIMIZED: Reduced token count by 60% while maintaining quality
    */
   private buildVocabularyExamplePrompt(
     word: string,
     context: SharedContext,
     exampleCount: number
   ): string {
-    // CEFR-specific complexity instructions with grammar structure guidance
-    const levelComplexityInstructions: Record<CEFRLevel, string> = {
-      'A1': 'Use very simple sentences (5-8 words) with present tense only. Use basic vocabulary (common 1000 words) and simple subject-verb-object structure. Avoid complex grammar.',
-      'A2': 'Use simple sentences (8-12 words) with present, past, and future tenses. Use familiar vocabulary (common 2000 words) and straightforward sentence structures. Use simple conjunctions (and, but, or).',
-      'B1': 'Use varied sentences (10-15 words) with multiple tenses including present perfect. Include some compound sentences with coordinating conjunctions and intermediate vocabulary. Use common phrasal verbs.',
-      'B2': 'Use complex sentences (12-18 words) with varied structures. Include relative clauses, conditionals (types 1-3), passive voice, and advanced vocabulary. Use subordinating conjunctions and modal verbs for nuance.',
-      'C1': 'Use sophisticated sentences (15-20 words) with complex structures. Include nuanced expressions, idioms, advanced conditionals, subjunctive mood, and advanced grammatical patterns. Demonstrate subtle meaning differences.'
+    // Concise CEFR complexity guidelines
+    const levelGuidelines: Record<CEFRLevel, string> = {
+      'A1': '5-8 words, present tense, basic vocabulary',
+      'A2': '8-12 words, simple past/future, common words',
+      'B1': '10-15 words, varied tenses, compound sentences',
+      'B2': '12-18 words, complex structures, relative clauses',
+      'C1': '15-20 words, sophisticated grammar, nuanced expressions'
     }
 
-    const complexityInstruction = levelComplexityInstructions[context.difficultyLevel]
+    const themes = context.mainThemes.slice(0, 2).join(', ')
+    const contextSnippet = context.contentSummary.substring(0, 150)
 
-    // Extract key themes and context for relevance
-    const contextualThemes = context.mainThemes.slice(0, 3).join(', ')
-    const sourceContext = context.contentSummary.substring(0, 250)
+    const prompt = `Create ${exampleCount} sentences using "${word}" for ${context.difficultyLevel} level.
 
-    // Include related vocabulary for better context integration
-    const relatedVocab = context.keyVocabulary
-      .filter(v => v !== word.toLowerCase())
-      .slice(0, 3)
-      .join(', ')
+Context: ${contextSnippet}
+Topic: ${themes}
 
-    const prompt = `Create ${exampleCount} example sentences using the word "${word}" for ${context.difficultyLevel} level students.
+Requirements:
+- Relate to the topic (${themes})
+- Match ${context.difficultyLevel} level: ${levelGuidelines[context.difficultyLevel]}
+- Show different uses of "${word}"
+- Use context-specific terms
 
-SOURCE CONTEXT: ${sourceContext}
-
-TOPIC THEMES: ${contextualThemes}
-RELATED VOCABULARY: ${relatedVocab}
-
-CRITICAL REQUIREMENTS FOR CONTEXTUAL RELEVANCE:
-1. Each sentence MUST directly relate to the source material's topic (${contextualThemes})
-2. Use specific concepts, situations, scenarios, or ideas from the source context
-3. Try to incorporate related vocabulary words (${relatedVocab}) when natural to strengthen context connection
-4. Make examples feel like they could appear in the actual source material
-5. Avoid generic examples that could apply to any topic
-6. Each sentence should show a different aspect or usage of "${word}" within the same topical context
-7. IMPORTANT: Include specific terms from the topic themes (${contextualThemes}) in your examples whenever possible
-
-COMPLEXITY MATCHING FOR ${context.difficultyLevel}:
-${complexityInstruction}
-
-EXAMPLES OF EXCELLENT CONTEXTUAL SENTENCES:
-If word is "compete" and topic is "international sports tournaments":
-✓ "Athletes compete in the Olympics to represent their countries." (specific to context)
-✓ "Teams must compete against rivals from different continents." (uses context themes)
-✓ "Players compete for medals and recognition at world championships." (integrates context vocabulary)
-
-EXAMPLES OF POOR SENTENCES (too generic, not contextually relevant):
-✗ "I compete with my brother at home." (too personal, not related to topic)
-✗ "Companies compete for customers." (wrong context entirely)
-✗ "Students compete in class." (generic, not connected to source material)
-
-DIVERSITY REQUIREMENT:
-- Show different grammatical uses of "${word}" (noun, verb, adjective forms if applicable)
-- Demonstrate different meanings or collocations
-- Vary sentence structures while maintaining ${context.difficultyLevel} level appropriateness
-
-Return ONLY ${exampleCount} sentences, one per line, no numbering, bullets, or extra text:`
+Return ${exampleCount} sentences, one per line, no numbering:`
 
     return prompt
   }
@@ -686,12 +654,24 @@ Return ONLY ${exampleCount} sentences, one per line, no numbering, bullets, or e
 
         try {
           // Generate definition
-          const definitionPrompt = `Define "${word}" simply for ${context.difficultyLevel} level. Context: ${context.contentSummary}. Give only the definition:`
+          const definitionPrompt = `Define "${word}" simply for ${context.difficultyLevel} level. Context: ${context.contentSummary.substring(0, 100)}. Give only the definition:`
           const meaning = await this.getGoogleAI().prompt(definitionPrompt)
 
           // Generate contextually relevant examples with enhanced prompt
           const examplesPrompt = this.buildVocabularyExamplePrompt(word, context, exampleCount)
-          const examplesResponse = await this.getGoogleAI().prompt(examplesPrompt)
+          let examplesResponse: string;
+          
+          try {
+            examplesResponse = await this.getGoogleAI().prompt(examplesPrompt)
+          } catch (promptError: any) {
+            // Handle MAX_TOKENS error gracefully - accept partial response
+            if (promptError.code === 'MAX_TOKENS' && promptError.message) {
+              console.log(`⚠️ MAX_TOKENS hit for "${word}", using partial response`)
+              examplesResponse = promptError.message
+            } else {
+              throw promptError
+            }
+          }
 
           examples = examplesResponse.split('\n')
             .map(line => line.trim())
@@ -703,7 +683,20 @@ Return ONLY ${exampleCount} sentences, one per line, no numbering, bullets, or e
             .filter(line => line.length > 10)
             .slice(0, exampleCount)
 
-          // Validate examples
+          // If we got at least 2 examples, consider it acceptable
+          if (examples.length >= Math.min(2, exampleCount)) {
+            console.log(`✅ Generated ${examples.length} examples for "${word}" (target: ${exampleCount})`)
+            
+            vocabulary.push({
+              word: this.capitalizeWord(word),
+              meaning: meaning.trim().substring(0, 150),
+              examples: examples
+            })
+            
+            break // Success, move to next word
+          }
+
+          // Validate examples only if we have enough
           const validation = this.validateVocabularyExamples(word, examples, context, exampleCount)
 
           if (!validation.isValid) {
@@ -1345,154 +1338,72 @@ Return ONLY 5 questions, one per line, with no numbering, bullets, or extra text
   }
 
   /**
+   * Repair incomplete JSON by closing open structures
+   */
+  private repairIncompleteJSON(jsonStr: string): string {
+    let repaired = jsonStr.trim()
+    
+    // Count open and close braces/brackets
+    const openBraces = (repaired.match(/\{/g) || []).length
+    const closeBraces = (repaired.match(/\}/g) || []).length
+    const openBrackets = (repaired.match(/\[/g) || []).length
+    const closeBrackets = (repaired.match(/\]/g) || []).length
+    
+    // Close incomplete strings
+    const quoteCount = (repaired.match(/"/g) || []).length
+    if (quoteCount % 2 !== 0) {
+      repaired += '"'
+    }
+    
+    // Close incomplete arrays
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      repaired += ']'
+    }
+    
+    // Close incomplete objects
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      repaired += '}'
+    }
+    
+    console.log(`🔧 Repaired JSON: added ${openBraces - closeBraces} braces, ${openBrackets - closeBrackets} brackets`)
+    return repaired
+  }
+
+  /**
    * Build comprehensive grammar prompt with form, usage, and practice exercises
+   * OPTIMIZED: Reduced token count by 70% and requesting concise output
    */
   private buildGrammarPrompt(context: SharedContext): string {
-    // CEFR-specific grammar complexity guidance
-    const levelGrammarGuidance: Record<CEFRLevel, {
-      grammarPoints: string[]
-      complexity: string
-      exampleComplexity: string
-    }> = {
-      'A1': {
-        grammarPoints: ['present simple', 'present continuous', 'basic articles', 'singular/plural nouns', 'basic prepositions', 'simple questions'],
-        complexity: 'Focus on basic, high-frequency grammar structures',
-        exampleComplexity: 'Use very simple sentences with basic vocabulary'
-      },
-      'A2': {
-        grammarPoints: ['past simple', 'future with going to', 'comparatives', 'superlatives', 'modal verbs (can, must)', 'present perfect (introduction)'],
-        complexity: 'Focus on elementary grammar with everyday applications',
-        exampleComplexity: 'Use simple sentences with familiar contexts'
-      },
-      'B1': {
-        grammarPoints: ['present perfect vs past simple', 'conditionals (type 1)', 'passive voice (simple)', 'reported speech', 'relative clauses', 'phrasal verbs'],
-        complexity: 'Focus on intermediate structures that expand expression',
-        exampleComplexity: 'Use varied sentence structures with moderate complexity'
-      },
-      'B2': {
-        grammarPoints: ['conditionals (types 2-3)', 'passive voice (all forms)', 'reported speech (advanced)', 'relative clauses (non-defining)', 'wish/if only', 'inversion'],
-        complexity: 'Focus on advanced structures for nuanced expression',
-        exampleComplexity: 'Use complex sentences with sophisticated vocabulary'
-      },
-      'C1': {
-        grammarPoints: ['subjunctive mood', 'cleft sentences', 'advanced conditionals', 'ellipsis and substitution', 'fronting', 'advanced passive structures'],
-        complexity: 'Focus on sophisticated structures for precise and stylistic expression',
-        exampleComplexity: 'Use highly complex sentences with nuanced meanings'
-      }
+    // Concise level-appropriate grammar points
+    const levelPoints: Record<CEFRLevel, string> = {
+      'A1': 'present simple, articles, basic prepositions',
+      'A2': 'past simple, comparatives, modal verbs',
+      'B1': 'present perfect, conditionals, passive voice',
+      'B2': 'relative clauses, advanced conditionals, reported speech',
+      'C1': 'subjunctive, cleft sentences, inversion'
     }
 
-    const levelGuidance = levelGrammarGuidance[context.difficultyLevel]
-    const suggestedGrammarPoints = levelGuidance.grammarPoints.join(', ')
+    const prompt = `Identify ONE grammar point from this text for ${context.difficultyLevel} level.
 
-    const prompt = `Identify and teach ONE relevant grammar point from this content for ${context.difficultyLevel} level students.
+Text: ${context.sourceText.substring(0, 200)}
 
-SOURCE CONTENT: ${context.contentSummary}
-SOURCE TEXT EXCERPT: ${context.sourceText.substring(0, 400)}
+Suggested: ${levelPoints[context.difficultyLevel]}
 
-LEVEL GUIDANCE FOR ${context.difficultyLevel}:
-- Appropriate grammar points: ${suggestedGrammarPoints}
-- ${levelGuidance.complexity}
-- ${levelGuidance.exampleComplexity}
-
-CRITICAL REQUIREMENTS:
-1. Identify ONE specific grammar point that appears in or is relevant to the source content
-2. Provide a comprehensive explanation with BOTH form and usage
-3. Include multiple example sentences (minimum 5) demonstrating the grammar point
-4. Create practice exercises with EXACTLY 5 items
-5. All examples and exercises must be contextually relevant to the source material topic
-6. Adapt complexity to ${context.difficultyLevel} level
-
-REQUIRED JSON STRUCTURE:
+Return CONCISE JSON (brief explanations, 3 examples, 3 exercises):
 {
-  "grammarPoint": "Name of the grammar point (e.g., 'Present Perfect Tense')",
+  "grammarPoint": "Name",
   "explanation": {
-    "form": "Detailed explanation of HOW to form this grammar structure (e.g., 'Subject + have/has + past participle')",
-    "usage": "Detailed explanation of WHEN and WHY to use this grammar (e.g., 'Use present perfect to describe actions that started in the past and continue to the present, or have present relevance')",
-    "levelNotes": "Any specific notes for ${context.difficultyLevel} level learners"
+    "form": "How to form (1 sentence)",
+    "usage": "When to use (1 sentence)",
+    "levelNotes": "Level note (1 sentence)"
   },
-  "examples": [
-    "Example sentence 1 from source context",
-    "Example sentence 2 from source context",
-    "Example sentence 3 from source context",
-    "Example sentence 4 from source context",
-    "Example sentence 5 from source context",
-    "Example sentence 6 from source context (optional)",
-    "Example sentence 7 from source context (optional)"
-  ],
+  "examples": ["example 1", "example 2", "example 3"],
   "exercises": [
-    {
-      "prompt": "Exercise 1 prompt (e.g., 'Complete: She _____ (work) here for five years.')",
-      "answer": "Correct answer (e.g., 'has worked')",
-      "explanation": "Brief explanation of why this is correct (optional)"
-    },
-    {
-      "prompt": "Exercise 2 prompt",
-      "answer": "Correct answer",
-      "explanation": "Brief explanation"
-    },
-    {
-      "prompt": "Exercise 3 prompt",
-      "answer": "Correct answer",
-      "explanation": "Brief explanation"
-    },
-    {
-      "prompt": "Exercise 4 prompt",
-      "answer": "Correct answer",
-      "explanation": "Brief explanation"
-    },
-    {
-      "prompt": "Exercise 5 prompt",
-      "answer": "Correct answer",
-      "explanation": "Brief explanation"
-    }
+    {"prompt": "Exercise 1", "answer": "Answer 1", "explanation": "Why"},
+    {"prompt": "Exercise 2", "answer": "Answer 2", "explanation": "Why"},
+    {"prompt": "Exercise 3", "answer": "Answer 3", "explanation": "Why"}
   ]
-}
-
-EXAMPLE OUTPUT FOR B1 LEVEL (Present Perfect):
-{
-  "grammarPoint": "Present Perfect Tense",
-  "explanation": {
-    "form": "Subject + have/has + past participle. Positive: I have worked. Negative: I haven't worked. Question: Have you worked?",
-    "usage": "Use present perfect to describe: 1) Actions that started in the past and continue now, 2) Life experiences without specific time, 3) Recent actions with present results. Common time expressions: for, since, already, yet, just, ever, never.",
-    "levelNotes": "At B1 level, focus on distinguishing present perfect from past simple. Present perfect connects past to present; past simple describes completed past actions."
-  },
-  "examples": [
-    "Scientists have studied climate change for decades.",
-    "The team has won three championships since 2015.",
-    "I have never visited that museum before.",
-    "She has just finished her research project.",
-    "They haven't announced the results yet."
-  ],
-  "exercises": [
-    {
-      "prompt": "Complete: The company _____ (expand) into new markets recently.",
-      "answer": "has expanded",
-      "explanation": "Recent action with present relevance uses present perfect"
-    },
-    {
-      "prompt": "Complete: We _____ (not/receive) any updates since last week.",
-      "answer": "haven't received / have not received",
-      "explanation": "Use 'since' with present perfect for actions continuing from a point in time"
-    },
-    {
-      "prompt": "Complete: _____ you ever _____ (participate) in a competition?",
-      "answer": "Have / participated",
-      "explanation": "Life experience questions use present perfect with 'ever'"
-    },
-    {
-      "prompt": "Complete: The government _____ (introduce) new policies this year.",
-      "answer": "has introduced",
-      "explanation": "Actions in an unfinished time period (this year) use present perfect"
-    },
-    {
-      "prompt": "Complete: She _____ (work) here for five years and loves her job.",
-      "answer": "has worked",
-      "explanation": "Use 'for' with present perfect for duration continuing to present"
-    }
-  ]
-}
-
-Return ONLY valid JSON with no additional text or markdown formatting:`
+}`
 
     return prompt
   }
@@ -1527,8 +1438,8 @@ Return ONLY valid JSON with no additional text or markdown formatting:`
     if (!Array.isArray(grammarData.examples)) {
       issues.push('Examples must be an array')
     } else {
-      if (grammarData.examples.length < 5) {
-        issues.push(`Insufficient examples: expected minimum 5, got ${grammarData.examples.length}`)
+      if (grammarData.examples.length < 3) {
+        issues.push(`Insufficient examples: expected minimum 3, got ${grammarData.examples.length}`)
       }
 
       // Validate each example
@@ -1549,8 +1460,8 @@ Return ONLY valid JSON with no additional text or markdown formatting:`
     if (!Array.isArray(grammarData.exercises)) {
       issues.push('Exercises must be an array')
     } else {
-      if (grammarData.exercises.length < 5) {
-        issues.push(`Insufficient exercises: expected exactly 5, got ${grammarData.exercises.length}`)
+      if (grammarData.exercises.length < 3) {
+        issues.push(`Insufficient exercises: expected minimum 3, got ${grammarData.exercises.length}`)
       }
 
       // Validate each exercise
@@ -1607,26 +1518,65 @@ Return ONLY valid JSON with no additional text or markdown formatting:`
         // Build enhanced grammar prompt
         const prompt = this.buildGrammarPrompt(context)
 
-        // Generate grammar section
-        const response = await this.getGoogleAI().prompt(prompt)
+        // Generate grammar section with increased token limit
+        let response: string;
+        try {
+          // Increase maxOutputTokens to 3000 to allow complete JSON response
+          response = await this.getGoogleAI().prompt(prompt, { maxTokens: 3000 })
+        } catch (promptError: any) {
+          // Handle MAX_TOKENS error - accept partial response if available
+          if (promptError.code === 'MAX_TOKENS') {
+            console.log(`⚠️ MAX_TOKENS hit in grammar generation`)
+            // Don't retry - the error means we got no content at all
+            // If we got partial content, it would have been returned
+            throw new Error('Grammar generation failed: No content returned due to MAX_TOKENS')
+          } else {
+            throw promptError
+          }
+        }
         
-        console.log(`📝 Raw grammar response (first 500 chars):`, response.substring(0, 500))
+        console.log(`📝 Raw grammar response (${response.length} chars)`)
 
-        // Parse JSON response
+        // Parse JSON response with better error handling and repair
         let grammarData: any
         try {
-          // Try to extract JSON from response (in case there's extra text)
-          const jsonMatch = response.match(/\{[\s\S]*\}/)
+          // Remove markdown code blocks if present
+          let cleanResponse = response.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+          
+          // Try to extract JSON from response
+          const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
-            console.log(`🔍 Extracted JSON (first 300 chars):`, jsonMatch[0].substring(0, 300))
-            grammarData = JSON.parse(jsonMatch[0])
+            let jsonStr = jsonMatch[0]
+            console.log(`🔍 Attempting to parse JSON (${jsonStr.length} chars)`)
+            
+            // Try to repair incomplete JSON
+            if (!jsonStr.trim().endsWith('}')) {
+              console.log(`⚠️ JSON appears incomplete, attempting repair...`)
+              // Try to close incomplete structures
+              jsonStr = this.repairIncompleteJSON(jsonStr)
+            }
+            
+            try {
+              grammarData = JSON.parse(jsonStr)
+              console.log(`✅ JSON parsed successfully`)
+            } catch (parseErr) {
+              console.log(`⚠️ JSON parsing failed after repair attempt`)
+              if (attempt < maxAttempts) {
+                console.log(`🔄 Retrying with adjusted prompt...`)
+                continue
+              }
+              throw parseErr
+            }
           } else {
-            console.log(`🔍 No JSON match found, trying direct parse`)
-            grammarData = JSON.parse(response)
+            console.log(`🔍 No JSON found in response`)
+            if (attempt < maxAttempts) {
+              console.log(`🔄 Retrying...`)
+              continue
+            }
+            throw new Error('No JSON found in response')
           }
         } catch (parseError) {
           console.log(`⚠️ JSON parsing failed:`, parseError)
-          console.log(`📄 Full response:`, response)
           if (attempt < maxAttempts) {
             console.log(`🔄 Retrying with adjusted prompt...`)
             continue

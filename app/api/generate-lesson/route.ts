@@ -8,20 +8,34 @@ import { usageMonitor, type GenerationContext } from "@/lib/usage-monitor"
 export async function POST(request: NextRequest) {
   let userId: string | undefined;
   let requestContext: any = {};
+  let lessonType: string | undefined;
+  let studentLevel: string | undefined;
+  let targetLanguage: string | undefined;
+  let sourceText: string | undefined;
 
   try {
     const body = await request.json()
-    const { 
-      sourceText, 
-      lessonType, 
-      studentLevel, 
-      targetLanguage, 
-      sourceUrl,
-      contentMetadata,
-      structuredContent,
-      wordCount,
-      readingTime
-    } = body
+    const bodyData = body as { 
+      sourceText: string;
+      lessonType: string;
+      studentLevel: string;
+      targetLanguage: string;
+      sourceUrl?: string;
+      contentMetadata?: any;
+      structuredContent?: any;
+      wordCount?: number;
+      readingTime?: number;
+    };
+    
+    sourceText = bodyData.sourceText;
+    lessonType = bodyData.lessonType;
+    studentLevel = bodyData.studentLevel;
+    targetLanguage = bodyData.targetLanguage;
+    const sourceUrl = bodyData.sourceUrl;
+    const contentMetadata = bodyData.contentMetadata;
+    const structuredContent = bodyData.structuredContent;
+    const wordCount = bodyData.wordCount;
+    const readingTime = bodyData.readingTime;
 
     // Set up request context for error logging
     requestContext = {

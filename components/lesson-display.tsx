@@ -53,10 +53,23 @@ interface LessonData {
         explanation?: string
       }>
     }
-    pronunciation: {
-      word: string
-      ipa: string
-      practice: string
+    pronunciation?: {
+      instruction?: string
+      word?: string
+      ipa?: string
+      practice?: string
+      words?: Array<{
+        word: string
+        ipa: string
+        difficultSounds?: string[]
+        tips?: string[]
+        practiceSentence?: string
+      }>
+      tongueTwisters?: Array<{
+        text: string
+        targetSounds?: string[]
+        difficulty?: string
+      }>
     }
     wrapup: string[]
   }
@@ -553,18 +566,116 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Volume2,
       enabled: sectionStates.pronunciation,
       content: (
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold text-lg">{safeLesson.sections.pronunciation.word}</span>
-            <span className="text-muted-foreground font-mono">{safeLesson.sections.pronunciation.ipa}</span>
-            <Button variant="outline" size="sm">
-              <Volume2 className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-sm">Practice sentence:</p>
-            <p className="text-sm font-medium mt-1">"{safeLesson.sections.pronunciation.practice}"</p>
-          </div>
+        <div className="space-y-4">
+          {/* Instruction */}
+          {safeLesson.sections.pronunciation?.instruction && (
+            <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+              {safeLesson.sections.pronunciation.instruction}
+            </p>
+          )}
+
+          {/* New format: Multiple words with detailed practice */}
+          {safeLesson.sections.pronunciation?.words && safeLesson.sections.pronunciation.words.length > 0 ? (
+            <div className="space-y-6">
+              {safeLesson.sections.pronunciation.words.map((wordItem, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-3">
+                  {/* Word and IPA */}
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-lg">{wordItem.word}</span>
+                    <span className="text-muted-foreground font-mono text-sm">{wordItem.ipa}</span>
+                    <Button variant="outline" size="sm">
+                      <Volume2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Difficult Sounds */}
+                  {wordItem.difficultSounds && wordItem.difficultSounds.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Difficult Sounds:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {wordItem.difficultSounds.map((sound, i) => (
+                          <Badge key={i} variant="secondary" className="font-mono text-xs">
+                            {sound}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tips */}
+                  {wordItem.tips && wordItem.tips.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Pronunciation Tips:</p>
+                      <ul className="space-y-1.5 text-sm">
+                        {wordItem.tips.map((tip, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-primary mt-0.5">•</span>
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Practice Sentence */}
+                  {wordItem.practiceSentence && (
+                    <div className="bg-muted/30 rounded-lg p-3 mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">Practice Sentence:</p>
+                      <p className="text-sm font-medium">{wordItem.practiceSentence}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Old format: Single word */
+            safeLesson.sections.pronunciation?.word && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-lg">{safeLesson.sections.pronunciation.word}</span>
+                  <span className="text-muted-foreground font-mono">{safeLesson.sections.pronunciation.ipa}</span>
+                  <Button variant="outline" size="sm">
+                    <Volume2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                {safeLesson.sections.pronunciation.practice && (
+                  <div className="bg-muted/30 rounded-lg p-3">
+                    <p className="text-sm">Practice sentence:</p>
+                    <p className="text-sm font-medium mt-1">"{safeLesson.sections.pronunciation.practice}"</p>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+
+          {/* Tongue Twisters */}
+          {safeLesson.sections.pronunciation?.tongueTwisters && safeLesson.sections.pronunciation.tongueTwisters.length > 0 && (
+            <div className="mt-6 pt-4 border-t">
+              <p className="text-sm font-medium mb-3">Tongue Twisters:</p>
+              <div className="space-y-3">
+                {safeLesson.sections.pronunciation.tongueTwisters.map((twister, index) => (
+                  <div key={index} className="bg-primary/5 rounded-lg p-3">
+                    <p className="text-sm font-medium mb-1">{twister.text}</p>
+                    {twister.targetSounds && twister.targetSounds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className="text-xs text-muted-foreground">Target sounds:</span>
+                        {twister.targetSounds.map((sound, i) => (
+                          <Badge key={i} variant="outline" className="font-mono text-xs">
+                            {sound}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {twister.difficulty && (
+                      <Badge variant="secondary" className="mt-2 text-xs">
+                        {twister.difficulty}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ),
     },
