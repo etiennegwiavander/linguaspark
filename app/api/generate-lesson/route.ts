@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("✅ AI lesson generation successful:", {
+      lessonTitle: lesson.lessonTitle,
       sectionKeys: Object.keys(lesson.sections),
       lessonType: lesson.lessonType,
       studentLevel: lesson.studentLevel,
@@ -163,6 +164,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare final lesson structure (AI-only, no fallbacks)
     const finalLesson = {
+      lessonTitle: lesson.lessonTitle, // Include the AI-generated contextual title
       lessonType: lesson.lessonType,
       studentLevel: lesson.studentLevel,
       targetLanguage: lesson.targetLanguage,
@@ -174,7 +176,7 @@ export async function POST(request: NextRequest) {
       .from("lessons")
       .insert({
         tutor_id: user.id,
-        title: `${lessonType} Lesson - ${new Date().toLocaleDateString()}`,
+        title: lesson.lessonTitle || `${lessonType} Lesson - ${new Date().toLocaleDateString()}`,
         lesson_type: lessonType,
         student_level: studentLevel,
         target_language: targetLanguage,

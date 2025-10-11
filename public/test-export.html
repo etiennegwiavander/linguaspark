@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+        .success { color: green; }
+        .error { color: red; }
+        #log { margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Export Functionality Test</h1>
+    
+    <button onclick="testPDFExport()">Test PDF Export</button>
+    <button onclick="testWordExport()">Test Word Export</button>
+    <button onclick="fetchTestData()">Fetch Test Data</button>
+    
+    <div id="log"></div>
+
+    <script>
+        const log = (message, isError = false) => {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('p');
+            p.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            p.className = isError ? 'error' : 'success';
+            logDiv.appendChild(p);
+            console.log(message);
+        };
+
+        let testLessonData = null;
+        let testEnabledSections = null;
+
+        async function fetchTestData() {
+            try {
+                log('Fetching test data...');
+                const response = await fetch('/api/test-export');
+                const data = await response.json();
+                
+                if (data.success) {
+                    testLessonData = data.testData;
+                    testEnabledSections = data.enabledSections;
+                    log('Test data loaded successfully');
+                    log(`Lesson: ${testLessonData.lessonTitle} (${testLessonData.lessonType})`);
+                } else {
+                    log('Failed to fetch test data', true);
+                }
+            } catch (error) {
+                log(`Error fetching test data: ${error.message}`, true);
+            }
+        }
+
+        async function testPDFExport() {
+            if (!testLessonData) {
+                log('Please fetch test data first', true);
+                return;
+            }
+
+            try {
+                log('Starting PDF export test...');
+                
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                
+                // Add title
+                pdf.setFontSize(20);
+                pdf.text(`${testLessonData.lessonType} Lesson - ${testLessonData.studentLevel}`, 20, 30);
+                
+                // Add some content
+                pdf.setFontSize(12);
+                let yPos = 50;
+                
+                if (testLessonData.sections.warmup) {
+                    pdf.text('Warm-up Questions:', 20, yPos);
+                    yPos += 10;
+                    testLessonData.sections.warmup.forEach((question, index) => {
+                        pdf.text(`${index + 1}. ${question}`, 25, yPos);
+                        yPos += 8;
+                    });
+                    yPos += 10;
+                }
+                
+                if (testLessonData.sections.vocabulary) {
+                    pdf.text('Vocabulary:', 20, yPos);
+                    yPos += 10;
+                    testLessonData.sections.vocabulary.forEach((item, index) => {
+                        pdf.text(`${index + 1}. ${item.word} - ${item.meaning}`, 25, yPos);
+                        yPos += 8;
+                    });
+                }
+                
+                // Save the PDF
+                const fileName = `test-lesson-${Date.now()}.pdf`;
+                pdf.save(fileName);
+                log(`PDF exported successfully: ${fileName}`);
+                
+            } catch (error) {
+                log(`PDF export failed: ${error.message}`, true);
+                console.error('PDF export error:', error);
+            }
+        }
+
+        async function testWordExport() {
+            if (!testLessonData) {
+                log('Please fetch test data first', true);
+                return;
+            }
+
+            try {
+                log('Starting Word export test...');
+                
+                // Simple Word document creation
+                const content = `
+${testLessonData.lessonType.toUpperCase()} LESSON - ${testLessonData.studentLevel} LEVEL
+
+Target Language: ${testLessonData.targetLanguage}
+
+WARM-UP QUESTIONS:
+${testLessonData.sections.warmup.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+VOCABULARY:
+${testLessonData.sections.vocabulary.map((v, i) => `${i + 1}. ${v.word} - ${v.meaning}\n   Example: ${v.example}`).join('\n')}
+
+READING PASSAGE:
+${testLessonData.sections.reading}
+
+DISCUSSION QUESTIONS:
+${testLessonData.sections.discussion.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+                `;
+                
+                const blob = new Blob([content], { 
+                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+                });
+                
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                const fileName = `test-lesson-${Date.now()}.docx`;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                log(`Word document exported successfully: ${fileName}`);
+                
+            } catch (error) {
+                log(`Word export failed: ${error.message}`, true);
+                console.error('Word export error:', error);
+            }
+        }
+
+        // Auto-fetch test data on page load
+        window.addEventListener('load', fetchTestData);
+    </script>
+</body>
+</html>

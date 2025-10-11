@@ -90,27 +90,31 @@ export default function PopupPage() {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto p-4 space-y-4">
-      <div className="text-center">
-        <h1 className="text-xl font-bold text-primary">LinguaSpark</h1>
-        <p className="text-sm text-muted-foreground">Transform content into lessons</p>
-      </div>
+    <div className="w-full min-h-screen">
+      <div className="w-full px-6 lg:px-8 py-4 space-y-4">
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-primary">LinguaSpark</h1>
+          <p className="text-sm text-muted-foreground">Transform content into lessons</p>
+        </div>
 
-      {!generatedLesson ? (
-        <LessonGenerator
-          initialText={selectedText}
-          sourceUrl={sourceUrl}
-          onLessonGenerated={handleLessonGenerated}
-          onExtractFromPage={handleExtractFromPage}
-        />
-      ) : (
-        <LessonDisplay
-          lesson={generatedLesson}
-          onExportPDF={handleExportPDF}
-          onExportWord={handleExportWord}
-          onNewLesson={handleNewLesson}
-        />
-      )}
+        {!generatedLesson ? (
+          <div className="max-w-2xl mx-auto">
+            <LessonGenerator
+              initialText={selectedText}
+              sourceUrl={sourceUrl}
+              onLessonGenerated={handleLessonGenerated}
+              onExtractFromPage={handleExtractFromPage}
+            />
+          </div>
+        ) : (
+          <LessonDisplay
+            lesson={generatedLesson}
+            onExportPDF={handleExportPDF}
+            onExportWord={handleExportWord}
+            onNewLesson={handleNewLesson}
+          />
+        )}
+      </div>
     </div>
   )
 }

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Export Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        #log { margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 5px; max-height: 400px; overflow-y: auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Integrated Export Test</h1>
+    
+    <div class="test-section">
+        <h2>Library Tests</h2>
+        <button onclick="testLibraries()">Test Libraries</button>
+        <button onclick="testBasicPDF()">Test Basic PDF</button>
+        <button onclick="testBasicWord()">Test Basic Word</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Lesson Export Tests</h2>
+        <button onclick="testLessonPDFExport()">Test Lesson PDF Export</button>
+        <button onclick="testLessonWordExport()">Test Lesson Word Export</button>
+        <button onclick="fetchAndTestExport()">Fetch Data & Test Export</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Debug Information</h2>
+        <button onclick="showDebugInfo()">Show Debug Info</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="log"></div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('p');
+            p.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            p.className = type;
+            logDiv.appendChild(p);
+            console.log(`[${type.toUpperCase()}]`, message);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        const clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+        };
+
+        let testLessonData = null;
+        let testEnabledSections = null;
+
+        // Test if libraries are loaded correctly
+        function testLibraries() {
+            log('Testing library availability...', 'info');
+            
+            // Test jsPDF
+            if (typeof window.jspdf !== 'undefined') {
+                log('✅ jsPDF library loaded successfully', 'success');
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const testPdf = new jsPDF();
+                    log('✅ jsPDF constructor works', 'success');
+                } catch (error) {
+                    log(`❌ jsPDF constructor failed: ${error.message}`, 'error');
+                }
+            } else {
+                log('❌ jsPDF library not found', 'error');
+            }
+
+            // Test docx
+            if (typeof window.docx !== 'undefined') {
+                log('✅ docx library loaded successfully', 'success');
+                try {
+                    const { Document, Packer } = window.docx;
+                    log('✅ docx classes available', 'success');
+                } catch (error) {
+                    log(`❌ docx classes not available: ${error.message}`, 'error');
+                }
+            } else {
+                log('❌ docx library not found', 'error');
+            }
+        }
+
+        function testBasicPDF() {
+            try {
+                log('Testing basic PDF creation...', 'info');
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                pdf.text('Hello World!', 10, 10);
+                pdf.save('basic-test.pdf');
+                log('✅ Basic PDF export successful', 'success');
+            } catch (error) {
+                log(`❌ Basic PDF export failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testBasicWord() {
+            try {
+                log('Testing basic Word creation...', 'info');
+                const content = 'Hello World! This is a basic Word document test.';
+                const blob = new Blob([content], { 
+                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+                });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'basic-test.docx';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                log('✅ Basic Word export successful', 'success');
+            } catch (error) {
+                log(`❌ Basic Word export failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function fetchAndTestExport() {
+            try {
+                log('Fetching test lesson data...', 'info');
+                const response = await fetch('/api/test-export');
+                const data = await response.json();
+                
+                if (data.success) {
+                    testLessonData = data.testData;
+                    testEnabledSections = data.enabledSections;
+                    log('✅ Test data loaded successfully', 'success');
+                    log(`Lesson: ${testLessonData.lessonTitle} (${testLessonData.lessonType})`, 'info');
+                    
+                    // Now test exports
+                    await testLessonPDFExport();
+                    await testLessonWordExport();
+                } else {
+                    log('❌ Failed to fetch test data', 'error');
+                }
+            } catch (error) {
+                log(`❌ Error fetching test data: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLessonPDFExport() {
+            if (!testLessonData) {
+                log('⚠️ No test data available. Fetching...', 'warning');
+                await fetchTestData();
+                if (!testLessonData) {
+                    log('❌ Could not load test data', 'error');
+                    return;
+                }
+            }
+
+            try {
+                log('Starting comprehensive PDF export test...', 'info');
+                
+                // Validate lesson data structure
+                log('Validating lesson data structure...', 'info');
+                if (!testLessonData.lessonType) throw new Error('Missing lessonType');
+                if (!testLessonData.studentLevel) throw new Error('Missing studentLevel');
+                if (!testLessonData.targetLanguage) throw new Error('Missing targetLanguage');
+                if (!testLessonData.sections) throw new Error('Missing sections');
+                log('✅ Lesson data structure valid', 'success');
+                
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                let yPosition = 20;
+                const pageHeight = pdf.internal.pageSize.height;
+                const margin = 20;
+                const lineHeight = 7;
+
+                // Add title
+                pdf.setFontSize(20);
+                pdf.setFont("helvetica", "bold");
+                const title = `${testLessonData.lessonType.charAt(0).toUpperCase() + testLessonData.lessonType.slice(1)} Lesson - ${testLessonData.studentLevel} Level`;
+                pdf.text(title, margin, yPosition);
+                yPosition += 15;
+
+                // Add metadata
+                pdf.setFontSize(12);
+                pdf.setFont("helvetica", "normal");
+                pdf.text(`Target Language: ${testLessonData.targetLanguage.charAt(0).toUpperCase() + testLessonData.targetLanguage.slice(1)}`, margin, yPosition);
+                yPosition += 10;
+                pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yPosition);
+                yPosition += 20;
+
+                // Add sections
+                const sections = [
+                    { key: 'warmup', title: 'Warm-up Questions', data: testLessonData.sections.warmup },
+                    { key: 'vocabulary', title: 'Key Vocabulary', data: testLessonData.sections.vocabulary },
+                    { key: 'reading', title: 'Reading Passage', data: testLessonData.sections.reading },
+                    { key: 'comprehension', title: 'Reading Comprehension', data: testLessonData.sections.comprehension },
+                    { key: 'discussion', title: 'Discussion Questions', data: testLessonData.sections.discussion }
+                ];
+
+                sections.forEach(section => {
+                    if (testEnabledSections[section.key] && section.data) {
+                        // Check if we need a new page
+                        if (yPosition > pageHeight - 50) {
+                            pdf.addPage();
+                            yPosition = 20;
+                        }
+
+                        // Section title
+                        pdf.setFontSize(16);
+                        pdf.setFont("helvetica", "bold");
+                        pdf.text(section.title, margin, yPosition);
+                        yPosition += 10;
+
+                        pdf.setFontSize(12);
+                        pdf.setFont("helvetica", "normal");
+
+                        if (Array.isArray(section.data)) {
+                            section.data.forEach((item, index) => {
+                                if (typeof item === 'string') {
+                                    const text = `${index + 1}. ${item}`;
+                                    const lines = pdf.splitTextToSize(text, pdf.internal.pageSize.width - margin * 2);
+                                    lines.forEach(line => {
+                                        if (yPosition > pageHeight - 20) {
+                                            pdf.addPage();
+                                            yPosition = 20;
+                                        }
+                                        pdf.text(line, margin + 5, yPosition);
+                                        yPosition += lineHeight;
+                                    });
+                                } else if (typeof item === 'object' && item.word) {
+                                    // Vocabulary item
+                                    if (yPosition > pageHeight - 30) {
+                                        pdf.addPage();
+                                        yPosition = 20;
+                                    }
+                                    pdf.setFont("helvetica", "bold");
+                                    pdf.text(`${index + 1}. ${item.word}`, margin + 5, yPosition);
+                                    yPosition += lineHeight;
+                                    pdf.setFont("helvetica", "normal");
+                                    pdf.text(`   Meaning: ${item.meaning}`, margin + 5, yPosition);
+                                    yPosition += lineHeight;
+                                    if (item.example) {
+                                        pdf.text(`   Example: "${item.example}"`, margin + 5, yPosition);
+                                        yPosition += lineHeight;
+                                    }
+                                }
+                                yPosition += 3;
+                            });
+                        } else if (typeof section.data === 'string') {
+                            const lines = pdf.splitTextToSize(section.data, pdf.internal.pageSize.width - margin * 2);
+                            lines.forEach(line => {
+                                if (yPosition > pageHeight - 20) {
+                                    pdf.addPage();
+                                    yPosition = 20;
+                                }
+                                pdf.text(line, margin + 5, yPosition);
+                                yPosition += lineHeight;
+                            });
+                        }
+                        yPosition += 15;
+                    }
+                });
+
+                // Save the PDF
+                const fileName = `lesson-export-test-${Date.now()}.pdf`;
+                pdf.save(fileName);
+                log(`✅ Comprehensive PDF export successful: ${fileName}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Comprehensive PDF export failed: ${error.message}`, 'error');
+                console.error('PDF export error:', error);
+            }
+        }
+
+        async function testLessonWordExport() {
+            if (!testLessonData) {
+                log('⚠️ No test data available. Fetching...', 'warning');
+                await fetchTestData();
+                if (!testLessonData) {
+                    log('❌ Could not load test data', 'error');
+                    return;
+                }
+            }
+
+            try {
+                log('Starting comprehensive Word export test...', 'info');
+                
+                // Create comprehensive Word document content
+                let content = `${testLessonData.lessonType.toUpperCase()} LESSON - ${testLessonData.studentLevel} LEVEL\n\n`;
+                content += `Target Language: ${testLessonData.targetLanguage.charAt(0).toUpperCase() + testLessonData.targetLanguage.slice(1)}\n`;
+                content += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+
+                // Add sections
+                if (testEnabledSections.warmup && testLessonData.sections.warmup) {
+                    content += `WARM-UP QUESTIONS\n`;
+                    content += `${testLessonData.sections.warmup.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n`;
+                }
+
+                if (testEnabledSections.vocabulary && testLessonData.sections.vocabulary) {
+                    content += `KEY VOCABULARY\n`;
+                    testLessonData.sections.vocabulary.forEach((item, i) => {
+                        content += `${i + 1}. ${item.word} - ${item.meaning}\n`;
+                        if (item.example) {
+                            content += `   Example: "${item.example}"\n`;
+                        }
+                    });
+                    content += '\n';
+                }
+
+                if (testEnabledSections.reading && testLessonData.sections.reading) {
+                    content += `READING PASSAGE\n`;
+                    content += `${testLessonData.sections.reading}\n\n`;
+                }
+
+                if (testEnabledSections.comprehension && testLessonData.sections.comprehension) {
+                    content += `READING COMPREHENSION\n`;
+                    content += `${testLessonData.sections.comprehension.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n`;
+                }
+
+                if (testEnabledSections.discussion && testLessonData.sections.discussion) {
+                    content += `DISCUSSION QUESTIONS\n`;
+                    content += `${testLessonData.sections.discussion.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\n`;
+                }
+
+                content += '\nGenerated by LinguaSpark';
+
+                // Create and download the Word document
+                const blob = new Blob([content], { 
+                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+                });
+                
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                const fileName = `lesson-export-test-${Date.now()}.docx`;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                log(`✅ Comprehensive Word export successful: ${fileName}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Comprehensive Word export failed: ${error.message}`, 'error');
+                console.error('Word export error:', error);
+            }
+        }
+
+        async function fetchTestData() {
+            try {
+                const response = await fetch('/api/test-export');
+                const data = await response.json();
+                
+                if (data.success) {
+                    testLessonData = data.testData;
+                    testEnabledSections = data.enabledSections;
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                log(`Error fetching test data: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function showDebugInfo() {
+            log('=== DEBUG INFORMATION ===', 'info');
+            log(`User Agent: ${navigator.userAgent}`, 'info');
+            log(`jsPDF available: ${typeof window.jspdf !== 'undefined'}`, 'info');
+            log(`docx available: ${typeof window.docx !== 'undefined'}`, 'info');
+            log(`Test data loaded: ${testLessonData !== null}`, 'info');
+            if (testLessonData) {
+                log(`Lesson type: ${testLessonData.lessonType}`, 'info');
+                log(`Student level: ${testLessonData.studentLevel}`, 'info');
+                log(`Sections available: ${Object.keys(testLessonData.sections).join(', ')}`, 'info');
+            }
+            log('=== END DEBUG INFO ===', 'info');
+        }
+
+        // Auto-load test data and libraries on page load
+        window.addEventListener('load', () => {
+            log('Page loaded, initializing tests...', 'info');
+            testLibraries();
+            fetchTestData();
+        });
+    </script>
+</body>
+</html>

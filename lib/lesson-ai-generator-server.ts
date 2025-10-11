@@ -31,6 +31,7 @@ interface LessonGenerationParams {
 }
 
 interface GeneratedLesson {
+  lessonTitle: string
   lessonType: string
   studentLevel: string
   targetLanguage: string
@@ -199,6 +200,7 @@ Rewrite the content clearly and completely:`
 
       // Return properly structured GeneratedLesson object
       const finalLesson: GeneratedLesson = {
+        lessonTitle: lessonStructure.lessonTitle || `${lessonType.charAt(0).toUpperCase() + lessonType.slice(1)} Lesson - ${studentLevel} Level`,
         lessonType,
         studentLevel,
         targetLanguage,
@@ -297,6 +299,9 @@ Rewrite the content clearly and completely:`
 
     lessonStructure.dialoguePractice = dialoguePractice
     lessonStructure.dialogueFillGap = dialogueFillGap
+    
+    // Include lesson title from shared context
+    lessonStructure.lessonTitle = sharedContext.lessonTitle
 
     console.log("✅ Progressive lesson generation complete!")
     return lessonStructure

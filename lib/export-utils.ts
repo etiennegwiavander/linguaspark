@@ -38,15 +38,46 @@ export class LessonExporter {
     return `${lessonData.lessonType.charAt(0).toUpperCase() + lessonData.lessonType.slice(1)} Lesson - ${lessonData.studentLevel} Level`
   }
 
+  private validateLessonData(lessonData: LessonData): void {
+    if (!lessonData) {
+      throw new Error('Lesson data is required')
+    }
+    if (!lessonData.lessonType) {
+      throw new Error('Lesson type is required')
+    }
+    if (!lessonData.studentLevel) {
+      throw new Error('Student level is required')
+    }
+    if (!lessonData.targetLanguage) {
+      throw new Error('Target language is required')
+    }
+    if (!lessonData.sections) {
+      throw new Error('Lesson sections are required')
+    }
+  }
+
   async exportToPDF(lessonData: LessonData, enabledSections: Record<string, boolean>): Promise<void> {
-    const pdf = new jsPDF()
-    let yPosition = 20
-    const pageHeight = pdf.internal.pageSize.height
-    const margin = 20
-    const lineHeight = 7
+    try {
+      console.log('Starting PDF export with data:', { lessonData, enabledSections })
+      this.validateLessonData(lessonData)
+      
+      const pdf = new jsPDF()
+      let yPosition = 20
+      const pageHeight = pdf.internal.pageSize.height
+      const margin = 20
+      const lineHeight = 7
+
+    // Typography hierarchy constants (matching web interface)
+    const FONT_SIZES = {
+      LESSON_TITLE: 32,      // Primary heading
+      SECTION_HEADER: 28,    // Secondary headings
+      MAIN_CONTENT: 16,      // Body text
+      INSTRUCTIONS: 15,      // Guidance text
+      SUPPLEMENTARY: 14      // Answer keys, explanations
+    }
 
     // Helper function to add text with word wrapping
-    const addText = (text: string, fontSize = 12, isBold = false, indent = 0) => {
+    const addText = (text: string, fontSize = FONT_SIZES.MAIN_CONTENT, isBold = false, indent = 0) => {
       pdf.setFontSize(fontSize)
       pdf.setFont("helvetica", isBold ? "bold" : "normal")
 
@@ -69,26 +100,26 @@ export class LessonExporter {
         pdf.addPage()
         yPosition = 20
       }
-      addText(title, 14, true)
+      addText(title, FONT_SIZES.SECTION_HEADER, true)
       yPosition += 5
       content()
       yPosition += 10
     }
 
     // Title and metadata
-    addText(this.formatTitle(lessonData), 18, true)
+    addText(this.formatTitle(lessonData), FONT_SIZES.LESSON_TITLE, true)
     addText(
       `Target Language: ${lessonData.targetLanguage.charAt(0).toUpperCase() + lessonData.targetLanguage.slice(1)}`,
-      12,
+      FONT_SIZES.SUPPLEMENTARY,
     )
-    addText(`Generated on: ${this.formatDate()}`, 12)
+    addText(`Generated on: ${this.formatDate()}`, FONT_SIZES.SUPPLEMENTARY)
     yPosition += 10
 
     // Add sections based on enabled state
     if (enabledSections.warmup && lessonData.sections.warmup) {
       addSection("Warm-up Questions", () => {
         lessonData.sections.warmup.forEach((question, index) => {
-          addText(`${index + 1}. ${question}`, 11, false, 10)
+          addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
         })
       })
     }
@@ -96,17 +127,17 @@ export class LessonExporter {
     if (enabledSections.vocabulary && lessonData.sections.vocabulary) {
       addSection("Key Vocabulary", () => {
         lessonData.sections.vocabulary.forEach((item, index) => {
-          addText(`${index + 1}. ${item.word}`, 12, true, 10)
-          addText(`   Meaning: ${item.meaning}`, 11, false, 15)
+          addText(`${index + 1}. ${item.word}`, FONT_SIZES.MAIN_CONTENT, true, 10)
+          addText(`   Meaning: ${item.meaning}`, FONT_SIZES.MAIN_CONTENT, false, 15)
           
           // Handle both old format (example) and new format (examples array)
           if (item.examples && Array.isArray(item.examples) && item.examples.length > 0) {
-            addText(`   Examples:`, 11, true, 15)
+            addText(`   Examples:`, FONT_SIZES.INSTRUCTIONS, true, 15)
             item.examples.forEach((example, exIndex) => {
-              addText(`   ${exIndex + 1}. "${example}"`, 11, false, 20)
+              addText(`   ${exIndex + 1}. "${example}"`, FONT_SIZES.SUPPLEMENTARY, false, 20)
             })
           } else if (item.example) {
-            addText(`   Example: "${item.example}"`, 11, false, 15)
+            addText(`   Example: "${item.example}"`, FONT_SIZES.SUPPLEMENTARY, false, 15)
           }
           yPosition += 3
         })
@@ -115,14 +146,14 @@ export class LessonExporter {
 
     if (enabledSections.reading && lessonData.sections.reading) {
       addSection("Reading Passage", () => {
-        addText(lessonData.sections.reading, 11, false, 10)
+        addText(lessonData.sections.reading, FONT_SIZES.MAIN_CONTENT, false, 10)
       })
     }
 
     if (enabledSections.comprehension && lessonData.sections.comprehension) {
       addSection("Reading Comprehension", () => {
         lessonData.sections.comprehension.forEach((question, index) => {
-          addText(`${index + 1}. ${question}`, 11, false, 10)
+          addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
         })
       })
     }
@@ -130,45 +161,45 @@ export class LessonExporter {
     if (enabledSections.discussion && lessonData.sections.discussion) {
       addSection("Discussion Questions", () => {
         lessonData.sections.discussion.forEach((question, index) => {
-          addText(`${index + 1}. ${question}`, 11, false, 10)
+          addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
         })
       })
     }
 
     if (enabledSections.grammar && lessonData.sections.grammar) {
       addSection("Grammar Focus", () => {
-        addText(`Focus: ${lessonData.sections.grammar.focus}`, 12, true, 10)
+        addText(`Focus: ${lessonData.sections.grammar.focus}`, FONT_SIZES.MAIN_CONTENT, true, 10)
         yPosition += 3
-        addText("Examples:", 11, true, 10)
+        addText("Examples:", FONT_SIZES.INSTRUCTIONS, true, 10)
         lessonData.sections.grammar.examples.forEach((example, index) => {
-          addText(`• ${example}`, 11, false, 15)
+          addText(`• ${example}`, FONT_SIZES.SUPPLEMENTARY, false, 15)
         })
         yPosition += 3
-        addText("Practice Exercise:", 11, true, 10)
+        addText("Practice Exercise:", FONT_SIZES.INSTRUCTIONS, true, 10)
         lessonData.sections.grammar.exercise.forEach((exercise, index) => {
-          addText(`${index + 1}. ${exercise}`, 11, false, 15)
+          addText(`${index + 1}. ${exercise}`, FONT_SIZES.MAIN_CONTENT, false, 15)
         })
       })
     }
 
     if (enabledSections.pronunciation && lessonData.sections.pronunciation) {
       addSection("Pronunciation Practice", () => {
-        addText(`Word: ${lessonData.sections.pronunciation.word}`, 12, true, 10)
-        addText(`IPA: ${lessonData.sections.pronunciation.ipa}`, 11, false, 10)
-        addText(`Practice: "${lessonData.sections.pronunciation.practice}"`, 11, false, 10)
+        addText(`Word: ${lessonData.sections.pronunciation.word}`, FONT_SIZES.MAIN_CONTENT, true, 10)
+        addText(`IPA: ${lessonData.sections.pronunciation.ipa}`, FONT_SIZES.SUPPLEMENTARY, false, 10)
+        addText(`Practice: "${lessonData.sections.pronunciation.practice}"`, FONT_SIZES.MAIN_CONTENT, false, 10)
       })
     }
 
     if (enabledSections.wrapup && lessonData.sections.wrapup) {
       addSection("Lesson Wrap-up", () => {
         lessonData.sections.wrapup.forEach((question, index) => {
-          addText(`${index + 1}. ${question}`, 11, false, 10)
+          addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
         })
       })
     }
 
     // Footer
-    const pageCount = pdf.internal.getNumberOfPages()
+    const pageCount = (pdf as any).internal.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
       pdf.setPage(i)
       pdf.setFontSize(8)
@@ -178,11 +209,31 @@ export class LessonExporter {
 
     // Download the PDF
     const fileName = `${lessonData.lessonType}-lesson-${lessonData.studentLevel}-${Date.now()}.pdf`
+    console.log('Saving PDF with filename:', fileName)
     pdf.save(fileName)
+    console.log('PDF export completed successfully')
+    } catch (error) {
+      console.error('PDF export error:', error)
+      throw new Error(`PDF export failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async exportToWord(lessonData: LessonData, enabledSections: Record<string, boolean>): Promise<void> {
-    const children: any[] = []
+    try {
+      console.log('Starting Word export with data:', { lessonData, enabledSections })
+      this.validateLessonData(lessonData)
+      
+      const children: any[] = []
+
+    // Typography hierarchy constants (in half-points for Word - multiply by 2)
+    // 32px = 24pt, 28px = 21pt, 16px = 12pt, 15px = 11.25pt, 14px = 10.5pt
+    const WORD_FONT_SIZES = {
+      LESSON_TITLE: 48,      // 24pt (32px equivalent)
+      SECTION_HEADER: 42,    // 21pt (28px equivalent)  
+      MAIN_CONTENT: 24,      // 12pt (16px equivalent)
+      INSTRUCTIONS: 23,      // 11.5pt (15px equivalent)
+      SUPPLEMENTARY: 21      // 10.5pt (14px equivalent)
+    }
 
     // Title and metadata
     children.push(
@@ -191,7 +242,7 @@ export class LessonExporter {
           new TextRun({
             text: this.formatTitle(lessonData),
             bold: true,
-            size: 32,
+            size: WORD_FONT_SIZES.LESSON_TITLE,
           }),
         ],
         heading: HeadingLevel.TITLE,
@@ -205,7 +256,7 @@ export class LessonExporter {
         children: [
           new TextRun({
             text: `Target Language: ${lessonData.targetLanguage.charAt(0).toUpperCase() + lessonData.targetLanguage.slice(1)}`,
-            size: 24,
+            size: WORD_FONT_SIZES.SUPPLEMENTARY,
           }),
         ],
         spacing: { after: 200 },
@@ -217,7 +268,7 @@ export class LessonExporter {
         children: [
           new TextRun({
             text: `Generated on: ${this.formatDate()}`,
-            size: 24,
+            size: WORD_FONT_SIZES.SUPPLEMENTARY,
           }),
         ],
         spacing: { after: 400 },
@@ -232,7 +283,7 @@ export class LessonExporter {
             new TextRun({
               text: title,
               bold: true,
-              size: 28,
+              size: WORD_FONT_SIZES.SECTION_HEADER,
               underline: { type: UnderlineType.SINGLE },
             }),
           ],
@@ -251,7 +302,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `${index + 1}. ${question}`,
-                size: 22,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 150 },
@@ -269,7 +320,7 @@ export class LessonExporter {
               new TextRun({
                 text: `${index + 1}. ${item.word}`,
                 bold: true,
-                size: 24,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 100 },
@@ -280,7 +331,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `   Meaning: ${item.meaning}`,
-                size: 22,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 100 },
@@ -294,7 +345,7 @@ export class LessonExporter {
               children: [
                 new TextRun({
                   text: `   Examples:`,
-                  size: 22,
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
                   bold: true,
                 }),
               ],
@@ -307,7 +358,7 @@ export class LessonExporter {
                 children: [
                   new TextRun({
                     text: `      ${exIndex + 1}. "${example}"`,
-                    size: 22,
+                    size: WORD_FONT_SIZES.SUPPLEMENTARY,
                     italics: true,
                   }),
                 ],
@@ -327,7 +378,7 @@ export class LessonExporter {
               children: [
                 new TextRun({
                   text: `   Example: "${item.example}"`,
-                  size: 22,
+                  size: WORD_FONT_SIZES.SUPPLEMENTARY,
                   italics: true,
                 }),
               ],
@@ -345,7 +396,7 @@ export class LessonExporter {
           children: [
             new TextRun({
               text: lessonData.sections.reading,
-              size: 22,
+              size: WORD_FONT_SIZES.MAIN_CONTENT,
             }),
           ],
           spacing: { after: 200 },
@@ -361,7 +412,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `${index + 1}. ${question}`,
-                size: 22,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 150 },
@@ -377,7 +428,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `${index + 1}. ${question}`,
-                size: 22,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 150 },
@@ -394,7 +445,7 @@ export class LessonExporter {
             new TextRun({
               text: `Focus: ${lessonData.sections.grammar.focus}`,
               bold: true,
-              size: 24,
+              size: WORD_FONT_SIZES.MAIN_CONTENT,
             }),
           ],
           spacing: { after: 200 },
@@ -406,7 +457,7 @@ export class LessonExporter {
             new TextRun({
               text: "Examples:",
               bold: true,
-              size: 22,
+              size: WORD_FONT_SIZES.INSTRUCTIONS,
             }),
           ],
           spacing: { after: 100 },
@@ -418,7 +469,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `• ${example}`,
-                size: 22,
+                size: WORD_FONT_SIZES.SUPPLEMENTARY,
               }),
             ],
             spacing: { after: 100 },
@@ -431,7 +482,7 @@ export class LessonExporter {
             new TextRun({
               text: "Practice Exercise:",
               bold: true,
-              size: 22,
+              size: WORD_FONT_SIZES.INSTRUCTIONS,
             }),
           ],
           spacing: { before: 200, after: 100 },
@@ -443,7 +494,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `${index + 1}. ${exercise}`,
-                size: 22,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 100 },
@@ -460,7 +511,7 @@ export class LessonExporter {
             new TextRun({
               text: `Word: ${lessonData.sections.pronunciation.word}`,
               bold: true,
-              size: 24,
+              size: WORD_FONT_SIZES.MAIN_CONTENT,
             }),
           ],
           spacing: { after: 150 },
@@ -469,7 +520,7 @@ export class LessonExporter {
           children: [
             new TextRun({
               text: `IPA: ${lessonData.sections.pronunciation.ipa}`,
-              size: 22,
+              size: WORD_FONT_SIZES.SUPPLEMENTARY,
             }),
           ],
           spacing: { after: 150 },
@@ -478,7 +529,7 @@ export class LessonExporter {
           children: [
             new TextRun({
               text: `Practice: "${lessonData.sections.pronunciation.practice}"`,
-              size: 22,
+              size: WORD_FONT_SIZES.MAIN_CONTENT,
               italics: true,
             }),
           ],
@@ -495,7 +546,7 @@ export class LessonExporter {
             children: [
               new TextRun({
                 text: `${index + 1}. ${question}`,
-                size: 22,
+                size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
             ],
             spacing: { after: 150 },
@@ -510,7 +561,7 @@ export class LessonExporter {
         children: [
           new TextRun({
             text: "Generated by LinguaSpark",
-            size: 18,
+            size: WORD_FONT_SIZES.SUPPLEMENTARY,
             italics: true,
           }),
         ],
@@ -530,16 +581,27 @@ export class LessonExporter {
     })
 
     // Generate and download
+    console.log('Creating Word document...')
     const buffer = await Packer.toBuffer(doc)
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+    console.log('Document buffer created, size:', buffer.byteLength)
+    
+    const blob = new Blob([buffer as any], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
     const url = URL.createObjectURL(blob)
+    const fileName = `${lessonData.lessonType}-lesson-${lessonData.studentLevel}-${Date.now()}.docx`
+    
+    console.log('Downloading Word document with filename:', fileName)
     const link = document.createElement("a")
     link.href = url
-    link.download = `${lessonData.lessonType}-lesson-${lessonData.studentLevel}-${Date.now()}.docx`
+    link.download = fileName
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+    console.log('Word export completed successfully')
+    } catch (error) {
+      console.error('Word export error:', error)
+      throw new Error(`Word export failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 }
 

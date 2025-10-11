@@ -3,6 +3,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Custom Typography Classes for Lesson Display */
+.lesson-title {
+  @apply text-2xl lg:text-3xl font-bold text-foreground leading-tight;
+}
+
+.lesson-section-title {
+  @apply text-xl lg:text-2xl font-semibold text-foreground;
+}
+
+.lesson-content {
+  @apply text-base text-foreground;
+}
+
+.lesson-instruction {
+  @apply text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r;
+}
+
+.lesson-answer {
+  @apply text-sm text-muted-foreground;
+}
+
+.lesson-number {
+  @apply text-[15px] font-medium text-primary;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -125,7 +150,7 @@
 
 /* Extension-specific styles */
 body {
-  width: 400px;
+  width: 100vw;
   min-height: 500px;
   margin: 0;
   padding: 0;
