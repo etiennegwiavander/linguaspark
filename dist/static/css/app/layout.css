@@ -1434,6 +1434,9 @@
   .border-blue-200 {
     border-color: var(--color-blue-200);
   }
+  .border-border {
+    border-color: var(--border);
+  }
   .border-border\/50 {
     border-color: var(--border);
     @supports (color: color-mix(in lab, red, red)) {

@@ -87,29 +87,55 @@ interface LessonDisplayProps {
 
 // Avatar component for dialogue sections
 function AvatarImage({ avatar, size = "sm" }: { avatar: Avatar; size?: "sm" | "md" }) {
-  const sizeClasses = size === "md" ? "w-10 h-10" : "w-8 h-8"
-  
+  const sizeClasses = size === "md" ? "w-12 h-12" : "w-10 h-10"
+
   return (
-    <div className={`${sizeClasses} rounded-full overflow-hidden bg-muted flex-shrink-0`}>
-      <img 
-        src={avatar.image} 
-        alt={avatar.name}
-        className="w-full h-full object-cover"
-        onError={(e) => {
-          // Fallback to initials if image fails to load
-          const target = e.target as HTMLImageElement
-          target.style.display = 'none'
-          const parent = target.parentElement
-          if (parent) {
-            parent.innerHTML = `<div class="w-full h-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">${avatar.name.charAt(0)}</div>`
-          }
-        }}
-      />
+    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+      <div className={`${sizeClasses} rounded-md overflow-hidden bg-muted border border-border`}>
+        <img
+          src={avatar.image}
+          alt={avatar.name}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // Fallback to initials if image fails to load
+            const target = e.target as HTMLImageElement
+            target.style.display = 'none'
+            const parent = target.parentElement
+            if (parent) {
+              parent.innerHTML = `<div class="w-full h-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">${avatar.name.charAt(0)}</div>`
+            }
+          }}
+        />
+      </div>
+      <span className="text-xs text-muted-foreground font-medium">{avatar.name}</span>
     </div>
   )
 }
 
 export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNewLesson }: LessonDisplayProps) {
+  // Create a consistent lesson ID for avatar persistence
+  const lessonId = React.useMemo(() => {
+    if (lesson.id) return lesson.id
+
+    // Create hash from lesson content for consistency
+    const content = JSON.stringify({
+      type: lesson.lessonType,
+      level: lesson.studentLevel,
+      title: lesson.lessonTitle,
+      // Use first few dialogue lines as unique identifier
+      dialogue: lesson.sections?.dialoguePractice?.dialogue?.slice(0, 2) ||
+        lesson.sections?.dialogueFillGap?.dialogue?.slice(0, 2) || []
+    })
+
+    let hash = 0
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash
+    }
+    return `lesson-${Math.abs(hash)}`
+  }, [lesson])
+
   // Ensure lesson has proper structure with fallbacks
   const safeLesson = {
     ...lesson,
@@ -197,7 +223,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           wrapup: safeLesson.sections.wrapup || []
         }
       }
-      
+
       console.log('Exporting PDF with lesson data:', exportLesson)
       await lessonExporter.exportToPDF(exportLesson, sectionStates)
     } catch (error) {
@@ -237,7 +263,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           wrapup: safeLesson.sections.wrapup || []
         }
       }
-      
+
       console.log('Exporting Word with lesson data:', exportLesson)
       await lessonExporter.exportToWord(exportLesson, sectionStates)
     } catch (error) {
@@ -441,14 +467,11 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           <div className="bg-muted/30 rounded-lg p-4 border">
             <div className="space-y-4">
               {(() => {
-                const enhancedDialogue = enhanceDialogueWithAvatars(safeLesson.sections.dialoguePractice.dialogue)
+                const enhancedDialogue = enhanceDialogueWithAvatars(safeLesson.sections.dialoguePractice.dialogue, lessonId, 'dialoguePractice')
                 return enhancedDialogue.map((line, index) => (
-                  <div key={index} className="flex items-start gap-3">
+                  <div key={index} className="flex items-start gap-4">
                     {line.avatar && <AvatarImage avatar={line.avatar} size="md" />}
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-primary text-sm">{line.character}</span>
-                      </div>
                       <p className="text-base text-foreground leading-relaxed">{line.line}</p>
                     </div>
                   </div>
@@ -487,14 +510,11 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           <div className="bg-muted/30 rounded-lg p-4 border">
             <div className="space-y-4">
               {(() => {
-                const enhancedDialogue = enhanceDialogueWithAvatars(safeLesson.sections.dialogueFillGap.dialogue)
+                const enhancedDialogue = enhanceDialogueWithAvatars(safeLesson.sections.dialogueFillGap.dialogue, lessonId, 'dialogueFillGap')
                 return enhancedDialogue.map((line, index) => (
-                  <div key={index} className="flex items-start gap-3">
+                  <div key={index} className="flex items-start gap-4">
                     {line.avatar && <AvatarImage avatar={line.avatar} size="md" />}
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-primary text-sm">{line.character}</span>
-                      </div>
                       <div className="text-base text-foreground leading-relaxed">
                         {line.isGap ? (
                           <span

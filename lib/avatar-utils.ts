@@ -19,18 +19,57 @@ export const AVAILABLE_AVATARS: Avatar[] = [
   { name: 'Jose', image: '/avatars/Jose.png', role: 'tutor' },
 ]
 
-// Get random avatars for dialogue (one student, one tutor)
-export function getDialogueAvatars(): { student: Avatar; tutor: Avatar } {
+// Get persistent avatars for dialogue (one student, one tutor)
+// Uses lesson ID and section name to ensure same avatars persist across refreshes
+// Different sections get different avatars but remain consistent for that section
+export function getDialogueAvatars(lessonId?: string, sectionName?: string): { student: Avatar; tutor: Avatar } {
   const students = AVAILABLE_AVATARS.filter(avatar => avatar.role === 'student')
   const tutors = AVAILABLE_AVATARS.filter(avatar => avatar.role === 'tutor')
   
-  const randomStudent = students[Math.floor(Math.random() * students.length)]
-  const randomTutor = tutors[Math.floor(Math.random() * tutors.length)]
+  // Create a base seed from lesson ID
+  const baseSeed = lessonId || 'default-lesson'
   
-  return {
-    student: randomStudent,
-    tutor: randomTutor
+  // Simple but effective hash function
+  const hashCode = (str: string): number => {
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    return Math.abs(hash)
   }
+  
+  // Get base hash from lesson ID
+  const baseHash = hashCode(baseSeed)
+  
+  // Add section-specific offsets to ensure different selections
+  let sectionOffset = 0
+  if (sectionName === 'dialoguePractice') {
+    sectionOffset = 0
+  } else if (sectionName === 'dialogueFillGap') {
+    sectionOffset = 7 // Prime number to ensure different distribution
+  } else {
+    sectionOffset = 3 // Default offset for other sections
+  }
+  
+  // Calculate indices with section offset
+  const studentIndex = (baseHash + sectionOffset) % students.length
+  const tutorIndex = (baseHash + sectionOffset + 11) % tutors.length // Another prime offset
+  
+  const selectedAvatars = {
+    student: students[studentIndex],
+    tutor: tutors[tutorIndex]
+  }
+  
+  // Debug logging for development (uncomment if needed)
+  // console.log(`🎭 Avatar Selection for ${sectionName}:`, {
+  //   lessonId, sectionName, baseHash, sectionOffset,
+  //   selectedStudent: selectedAvatars.student.name,
+  //   selectedTutor: selectedAvatars.tutor.name
+  // })
+  
+  return selectedAvatars
 }
 
 // Get avatar by name
@@ -41,8 +80,12 @@ export function getAvatarByName(name: string): Avatar | undefined {
 }
 
 // Replace generic character names with avatar names in dialogue
-export function enhanceDialogueWithAvatars(dialogue: Array<{ character: string; line: string; isGap?: boolean }>): Array<{ character: string; line: string; isGap?: boolean; avatar?: Avatar }> {
-  const avatars = getDialogueAvatars()
+export function enhanceDialogueWithAvatars(
+  dialogue: Array<{ character: string; line: string; isGap?: boolean }>, 
+  lessonId?: string,
+  sectionName?: string
+): Array<{ character: string; line: string; isGap?: boolean; avatar?: Avatar }> {
+  const avatars = getDialogueAvatars(lessonId, sectionName)
   
   return dialogue.map(item => {
     let avatar: Avatar | undefined
