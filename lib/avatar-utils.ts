@@ -25,10 +25,10 @@ export const AVAILABLE_AVATARS: Avatar[] = [
 export function getDialogueAvatars(lessonId?: string, sectionName?: string): { student: Avatar; tutor: Avatar } {
   const students = AVAILABLE_AVATARS.filter(avatar => avatar.role === 'student')
   const tutors = AVAILABLE_AVATARS.filter(avatar => avatar.role === 'tutor')
-  
+
   // Create a base seed from lesson ID
   const baseSeed = lessonId || 'default-lesson'
-  
+
   // Simple but effective hash function
   const hashCode = (str: string): number => {
     let hash = 0
@@ -39,10 +39,10 @@ export function getDialogueAvatars(lessonId?: string, sectionName?: string): { s
     }
     return Math.abs(hash)
   }
-  
+
   // Get base hash from lesson ID
   const baseHash = hashCode(baseSeed)
-  
+
   // Add section-specific offsets to ensure different selections
   let sectionOffset = 0
   if (sectionName === 'dialoguePractice') {
@@ -52,45 +52,45 @@ export function getDialogueAvatars(lessonId?: string, sectionName?: string): { s
   } else {
     sectionOffset = 3 // Default offset for other sections
   }
-  
+
   // Calculate indices with section offset
   const studentIndex = (baseHash + sectionOffset) % students.length
   const tutorIndex = (baseHash + sectionOffset + 11) % tutors.length // Another prime offset
-  
+
   const selectedAvatars = {
     student: students[studentIndex],
     tutor: tutors[tutorIndex]
   }
-  
+
   // Debug logging for development (uncomment if needed)
   // console.log(`🎭 Avatar Selection for ${sectionName}:`, {
   //   lessonId, sectionName, baseHash, sectionOffset,
   //   selectedStudent: selectedAvatars.student.name,
   //   selectedTutor: selectedAvatars.tutor.name
   // })
-  
+
   return selectedAvatars
 }
 
 // Get avatar by name
 export function getAvatarByName(name: string): Avatar | undefined {
-  return AVAILABLE_AVATARS.find(avatar => 
+  return AVAILABLE_AVATARS.find(avatar =>
     avatar.name.toLowerCase() === name.toLowerCase()
   )
 }
 
 // Replace generic character names with avatar names in dialogue
 export function enhanceDialogueWithAvatars(
-  dialogue: Array<{ character: string; line: string; isGap?: boolean }>, 
+  dialogue: Array<{ character: string; line: string; isGap?: boolean }>,
   lessonId?: string,
   sectionName?: string
 ): Array<{ character: string; line: string; isGap?: boolean; avatar?: Avatar }> {
   const avatars = getDialogueAvatars(lessonId, sectionName)
-  
+
   return dialogue.map(item => {
     let avatar: Avatar | undefined
     let character = item.character
-    
+
     // Replace generic names with avatar names
     if (item.character.toLowerCase().includes('student') || item.character.toLowerCase().includes('learner')) {
       character = avatars.student.name
@@ -99,7 +99,7 @@ export function enhanceDialogueWithAvatars(
       character = avatars.tutor.name
       avatar = avatars.tutor
     }
-    
+
     return {
       ...item,
       character,

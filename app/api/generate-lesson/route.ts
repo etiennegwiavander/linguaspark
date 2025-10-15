@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       .from("lessons")
       .insert({
         tutor_id: user.id,
-        title: lesson.lessonTitle || `${lessonType} Lesson - ${new Date().toLocaleDateString()}`,
+        title: lesson.lessonTitle,
         lesson_type: lessonType,
         student_level: studentLevel,
         target_language: targetLanguage,

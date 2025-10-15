@@ -242,98 +242,28 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
   // Private helper methods for extracting shared context
 
   private async generateLessonTitle(sourceText: string, lessonType: string, studentLevel: CEFRLevel): Promise<string> {
-    // First try to generate a contextual title using AI
-    try {
-      console.log("🎯 Generating contextual lesson title with AI...")
-      
-      // Use a shorter, more focused prompt to avoid token issues
-      const shortPrompt = `Create a lesson title for ${studentLevel} level ${lessonType} about: ${sourceText.substring(0, 150)}
+    console.log("🎯 Generating AI-powered lesson title...")
+    
+    // Use a shorter, more focused prompt to avoid token issues
+    const shortPrompt = `Create a lesson title for ${studentLevel} level ${lessonType} about: ${sourceText.substring(0, 150)}
 
 Title (3-8 words):`
 
-      const response = await this.getGoogleAI().prompt(shortPrompt, { maxTokens: 50 })
-      const title = response.trim().replace(/['"]/g, '').replace(/^Title:?\s*/i, '').substring(0, 80)
-      
-      console.log("🤖 AI generated title:", title)
-      
-      // Validate the title
-      if (title.length > 5 && title.length < 80 && !title.toLowerCase().includes('lesson')) {
-        console.log("✅ Using AI-generated contextual title:", title)
-        return title
-      }
-      
-      console.log("⚠️ AI title invalid, trying contextual fallback...")
-      // Try contextual fallback before generic fallback
-      return this.generateContextualFallbackTitle(sourceText, lessonType, studentLevel)
-      
-    } catch (error) {
-      console.log("⚠️ AI title generation failed:", error)
-      console.log("🔄 Using contextual fallback title generation")
-      return this.generateContextualFallbackTitle(sourceText, lessonType, studentLevel)
+    const response = await this.getGoogleAI().prompt(shortPrompt, { maxTokens: 50 })
+    const title = response.trim().replace(/['"]/g, '').replace(/^Title:?\s*/i, '').substring(0, 80)
+    
+    console.log("🤖 AI generated title:", title)
+    
+    // Validate the title - if invalid, throw error (no fallbacks)
+    if (title.length > 5 && title.length < 80 && !title.toLowerCase().includes('lesson')) {
+      console.log("✅ Using AI-generated title:", title)
+      return title
     }
+    
+    throw new Error(`AI generated invalid title: "${title}". No fallbacks allowed per LinguaSpark vision.`)
   }
 
-  private generateContextualFallbackTitle(sourceText: string, lessonType: string, studentLevel: CEFRLevel): string {
-    console.log("🎯 Generating contextual fallback title...")
-    
-    // Extract key terms from the source text
-    const text = sourceText.toLowerCase()
-    const words = text.split(/\s+/).filter(word => word.length > 3)
-    
-    // Look for specific topics/themes
-    const topics = {
-      'ryder cup': 'Ryder Cup Golf',
-      'golf': 'Golf Competition',
-      'competition': 'Sports Competition',
-      'travel': 'Travel & Tourism',
-      'business': 'Business Communication',
-      'technology': 'Technology Today',
-      'environment': 'Environmental Issues',
-      'health': 'Health & Wellness',
-      'education': 'Education System',
-      'culture': 'Cultural Exchange',
-      'food': 'Food & Cuisine',
-      'sports': 'Sports & Recreation',
-      'music': 'Music & Arts',
-      'history': 'Historical Events',
-      'science': 'Science & Discovery'
-    }
-    
-    // Find matching topics
-    for (const [keyword, topic] of Object.entries(topics)) {
-      if (text.includes(keyword)) {
-        console.log("✅ Found contextual topic:", topic)
-        return `${topic} Discussion`
-      }
-    }
-    
-    // Look for proper nouns (capitalized words) that might be topics
-    const properNouns = sourceText.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []
-    if (properNouns.length > 0) {
-      const mainTopic = properNouns[0]
-      if (mainTopic.length < 20) {
-        console.log("✅ Using proper noun as topic:", mainTopic)
-        return `${mainTopic} Discussion`
-      }
-    }
-    
-    // Generic fallback
-    console.log("🔄 Using generic fallback title")
-    return this.generateFallbackTitle(lessonType, studentLevel)
-  }
 
-  private generateFallbackTitle(lessonType: string, studentLevel: CEFRLevel): string {
-    const typeMap = {
-      discussion: 'Discussion',
-      grammar: 'Grammar Focus',
-      travel: 'Travel & Tourism',
-      business: 'Business English',
-      pronunciation: 'Pronunciation Practice'
-    }
-    
-    const lessonTypeName = typeMap[lessonType as keyof typeof typeMap] || 'English'
-    return `${lessonTypeName} - ${studentLevel} Level`
-  }
 
   private async extractKeyVocabulary(sourceText: string, studentLevel: CEFRLevel): Promise<string[]> {
     const prompt = `Extract 8-12 key vocabulary words from this text for ${studentLevel} level students. Return only the words, one per line:

@@ -200,7 +200,7 @@ Rewrite the content clearly and completely:`
 
       // Return properly structured GeneratedLesson object
       const finalLesson: GeneratedLesson = {
-        lessonTitle: lessonStructure.lessonTitle || `${lessonType.charAt(0).toUpperCase() + lessonType.slice(1)} Lesson - ${studentLevel} Level`,
+        lessonTitle: lessonStructure.lessonTitle,
         lessonType,
         studentLevel,
         targetLanguage,

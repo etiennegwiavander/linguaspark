@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "./supabase"
 
 export interface LessonData {
+  lessonTitle: string
   lessonType: string
   studentLevel: string
   targetLanguage: string

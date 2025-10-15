@@ -30,7 +30,7 @@ interface LessonSection {
 }
 
 interface LessonData {
-  lessonTitle?: string
+  lessonTitle: string
   lessonType: string
   studentLevel: string
   targetLanguage: string
@@ -139,7 +139,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
   // Ensure lesson has proper structure with fallbacks
   const safeLesson = {
     ...lesson,
-    lessonTitle: lesson.lessonTitle || undefined,
+    lessonTitle: lesson.lessonTitle,
     sections: {
       warmup: lesson.sections?.warmup || [],
       vocabulary: lesson.sections?.vocabulary || [],
@@ -201,6 +201,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     try {
       // Create export-compatible lesson structure with fallbacks
       const exportLesson = {
+        lessonTitle: safeLesson.lessonTitle,
         lessonType: safeLesson.lessonType || "discussion",
         studentLevel: safeLesson.studentLevel || "B1",
         targetLanguage: safeLesson.targetLanguage || "english",
@@ -210,6 +211,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           reading: safeLesson.sections.reading || "",
           comprehension: safeLesson.sections.comprehension || [],
           discussion: safeLesson.sections.discussion || [],
+          dialoguePractice: safeLesson.sections.dialoguePractice || undefined,
+          dialogueFillGap: safeLesson.sections.dialogueFillGap || undefined,
           grammar: safeLesson.sections.grammar || {
             focus: "Grammar Focus",
             examples: [],
@@ -225,6 +228,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       }
 
       console.log('Exporting PDF with lesson data:', exportLesson)
+      console.log('Section states:', sectionStates)
+      console.log('Safe lesson structure:', safeLesson)
       await lessonExporter.exportToPDF(exportLesson, sectionStates)
     } catch (error) {
       console.error("PDF export error:", error)
@@ -241,6 +246,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     try {
       // Create export-compatible lesson structure with fallbacks
       const exportLesson = {
+        lessonTitle: safeLesson.lessonTitle,
         lessonType: safeLesson.lessonType || "discussion",
         studentLevel: safeLesson.studentLevel || "B1",
         targetLanguage: safeLesson.targetLanguage || "english",
@@ -250,6 +256,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           reading: safeLesson.sections.reading || "",
           comprehension: safeLesson.sections.comprehension || [],
           discussion: safeLesson.sections.discussion || [],
+          dialoguePractice: safeLesson.sections.dialoguePractice || undefined,
+          dialogueFillGap: safeLesson.sections.dialogueFillGap || undefined,
           grammar: safeLesson.sections.grammar || {
             focus: "Grammar Focus",
             examples: [],
@@ -821,7 +829,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         <div className="flex-1">
           {/* AI-Generated Lesson Title */}
           <h1 className="text-2xl lg:text-[32px] font-bold text-foreground leading-tight mb-2">
-            {safeLesson.lessonTitle || "English Language Lesson"}
+            {safeLesson.lessonTitle}
           </h1>
 
           {/* Lesson Metadata */}

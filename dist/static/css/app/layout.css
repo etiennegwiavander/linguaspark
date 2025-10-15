@@ -962,9 +962,6 @@
   .min-w-\[12rem\] {
     min-width: 12rem;
   }
-  .min-w-\[80px\] {
-    min-width: 80px;
-  }
   .min-w-\[var\(--radix-select-trigger-width\)\] {
     min-width: var(--radix-select-trigger-width);
   }
