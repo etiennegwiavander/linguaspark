@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Article - Language Learning Techniques</title>
+    <meta name="description" content="Educational article about effective language learning techniques and methods">
+</head>
+<body>
+    <header>
+        <nav>Navigation menu</nav>
+    </header>
+    
+    <main>
+        <article>
+            <h1>Effective Language Learning Techniques for Modern Students</h1>
+            
+            <p>Language learning has evolved significantly in recent years, with new methodologies and technologies making it more accessible and effective than ever before. This comprehensive guide explores the most effective techniques that modern students can use to accelerate their language acquisition journey.</p>
+            
+            <h2>Immersion-Based Learning</h2>
+            <p>One of the most powerful approaches to language learning is immersion. This technique involves surrounding yourself with the target language as much as possible throughout your daily routine. Research has shown that immersion can dramatically accelerate the learning process by forcing the brain to adapt and process information in the new language naturally.</p>
+            
+            <p>Immersion doesn't necessarily require traveling to a country where the language is spoken. Modern technology allows us to create immersive environments at home through various digital tools and resources. You can change your phone's language settings, watch movies and TV shows in your target language, listen to podcasts during commutes, and even think in the new language whenever possible.</p>
+            
+            <h2>Spaced Repetition Systems</h2>
+            <p>Spaced repetition is a learning technique that involves reviewing information at increasing intervals. This method is particularly effective for vocabulary acquisition and retention. The system works by presenting information just as you're about to forget it, which strengthens the neural pathways and improves long-term memory retention.</p>
+            
+            <p>Popular spaced repetition applications like Anki and Memrise have revolutionized how students approach vocabulary learning. These tools use algorithms to determine the optimal timing for reviewing each word or phrase, ensuring maximum efficiency in the learning process.</p>
+            
+            <h2>Conversational Practice</h2>
+            <p>Regular conversation practice is essential for developing fluency and confidence in any language. Speaking with native speakers or other learners helps you apply grammatical rules in real-time, improve pronunciation, and develop natural speech patterns. Many online platforms now connect language learners with conversation partners from around the world.</p>
+            
+            <p>Don't be afraid to make mistakes during conversations. Errors are a natural part of the learning process and provide valuable feedback for improvement. Focus on communication rather than perfection, and gradually work on refining your accuracy as your confidence grows.</p>
+            
+            <h2>Multimodal Learning Approaches</h2>
+            <p>Effective language learning engages multiple senses and learning modalities. Visual learners benefit from reading texts, watching videos, and using flashcards with images. Auditory learners should focus on listening exercises, music, and pronunciation drills. Kinesthetic learners can benefit from writing exercises, role-playing activities, and physical movement while studying.</p>
+            
+            <p>Combining different approaches creates a more comprehensive learning experience. For example, you might read a text aloud while following along visually, or write vocabulary words while saying them out loud. This multimodal approach helps reinforce learning through multiple neural pathways.</p>
+            
+            <h2>Setting Realistic Goals</h2>
+            <p>Goal setting is crucial for maintaining motivation and tracking progress in language learning. Set specific, measurable, achievable, relevant, and time-bound (SMART) goals. Instead of saying "I want to be fluent," set goals like "I will learn 50 new vocabulary words this month" or "I will have a 10-minute conversation in Spanish every week."</p>
+            
+            <p>Break larger goals into smaller, manageable tasks. This approach makes the learning process less overwhelming and provides regular opportunities for celebration and motivation. Track your progress regularly and adjust your goals as needed based on your learning pace and circumstances.</p>
+            
+            <h2>Conclusion</h2>
+            <p>Language learning is a journey that requires patience, consistency, and the right strategies. By combining immersion techniques, spaced repetition, regular conversation practice, multimodal approaches, and realistic goal setting, you can create an effective learning system that works for your lifestyle and learning preferences. Remember that everyone learns differently, so experiment with these techniques to find the combination that works best for you.</p>
+        </article>
+    </main>
+    
+    <footer>
+        <p>© 2024 Language Learning Resources</p>
+    </footer>
+
+    <!-- Load the integration scripts -->
+    <script src="content-integration.js"></script>
+    <script src="content.js"></script>
+    
+    <script>
+        // Test the integration
+        console.log('Testing Extract Button Integration...');
+        
+        // Wait for scripts to load
+        setTimeout(() => {
+            if (window.ExtractButtonIntegration && window.ContentAnalysisEngine) {
+                console.log('Integration classes loaded successfully');
+                
+                // Create integration instance
+                const integration = new window.ExtractButtonIntegration({
+                    debugMode: true,
+                    enablePerformanceOptimizations: false
+                });
+                
+                // Initialize with callback
+                integration.initialize((decision) => {
+                    console.log('Button visibility decision:', decision);
+                    
+                    if (decision.shouldShow) {
+                        console.log('✅ Button should be shown - content is suitable');
+                        console.log('Word count:', decision.contentAnalysis.wordCount);
+                        console.log('Content type:', decision.contentAnalysis.contentType);
+                        console.log('Quality score:', decision.contentAnalysis.qualityScore);
+                    } else {
+                        console.log('❌ Button should be hidden:', decision.reason);
+                    }
+                });
+                
+                // Test force analysis
+                setTimeout(() => {
+                    console.log('Testing force analysis...');
+                    const forcedDecision = integration.forceAnalysis();
+                    console.log('Forced analysis result:', forcedDecision);
+                }, 2000);
+                
+            } else {
+                console.error('Integration classes not loaded');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

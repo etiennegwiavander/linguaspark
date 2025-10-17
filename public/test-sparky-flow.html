@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sparky Flow - BBC Article Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-controls {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        .test-button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #1d4ed8;
+        }
+        .results {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .article-content {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-controls">
+        <h2>🧪 Sparky Flow Test</h2>
+        <p>This page simulates the BBC article and tests the complete Sparky extraction flow.</p>
+        
+        <button class="test-button" onclick="testSparkyFlow()">🚀 Test Complete Sparky Flow</button>
+        <button class="test-button" onclick="testContentExtraction()">📄 Test Content Extraction Only</button>
+        <button class="test-button" onclick="testStorageOperations()">💾 Test Storage Operations</button>
+        <button class="test-button" onclick="clearAllStorage()">🗑️ Clear All Storage</button>
+        
+        <div id="test-results" class="results"></div>
+    </div>
+
+    <article class="article-content">
+        <h1>Why big tech's nuclear plans could blow up</h1>
+        <p class="byline">By BBC Worklife | Published: October 8, 2024</p>
+        
+        <p>Technology giants including Google, Microsoft, and Amazon are making unprecedented investments in nuclear power as they race to meet the enormous energy demands of artificial intelligence and data centers. However, industry experts are raising serious concerns about the feasibility and risks of these ambitious nuclear plans.</p>
+
+        <p>The surge in AI development has created an energy crisis for tech companies. Training large language models and running AI services requires massive computational power, which translates to enormous electricity consumption. Data centers already account for approximately 1% of global electricity use, and this figure is expected to triple by 2030 as AI adoption accelerates.</p>
+
+        <p>In response, major tech companies are turning to nuclear power as a potential solution. Google recently announced a partnership to develop small modular reactors (SMRs), while Microsoft has signed agreements to restart the Three Mile Island nuclear plant. Amazon has committed billions to nuclear energy projects, viewing them as essential for achieving carbon neutrality while meeting growing energy demands.</p>
+
+        <p>Small modular reactors represent a new generation of nuclear technology, designed to be safer, more efficient, and easier to deploy than traditional large-scale nuclear plants. These compact reactors can be manufactured in factories and assembled on-site, potentially reducing construction costs and timeframes. Proponents argue that SMRs could revolutionize the nuclear industry by making nuclear power more accessible and economically viable.</p>
+
+        <p>However, nuclear energy experts are expressing skepticism about the timeline and feasibility of these plans. Dr. Sarah Chen, a nuclear engineer at MIT, warns that "the technology is still largely unproven at commercial scale, and regulatory approval processes could take much longer than tech companies anticipate." The Nuclear Regulatory Commission has yet to approve any SMR designs for commercial deployment in the United States.</p>
+
+        <p>Financial analysts also question whether the economics of nuclear power align with the tech industry's expectations. Nuclear projects have historically suffered from cost overruns and delays, with recent projects in Europe and the United States experiencing budget increases of 200-300%. The Vogtle nuclear plant in Georgia, completed in 2023, took 14 years to build and cost $35 billion, nearly double the original estimate.</p>
+
+        <p>Environmental groups present a mixed response to big tech's nuclear ambitions. While some welcome the shift away from fossil fuels, others worry about nuclear waste management and the potential for accidents. The long-term storage of radioactive waste remains an unsolved challenge, with the United States still lacking a permanent disposal facility for high-level nuclear waste.</p>
+
+        <p>Geopolitical considerations add another layer of complexity. The global nuclear supply chain is dominated by a few countries, including Russia and China, raising concerns about energy security and technological dependence. Recent international tensions have highlighted the vulnerability of global supply chains, particularly for critical technologies like nuclear fuel and reactor components.</p>
+
+        <p>Alternative energy solutions are also competing for attention and investment. Renewable energy sources like solar and wind power have seen dramatic cost reductions and efficiency improvements in recent years. Battery storage technology is advancing rapidly, potentially addressing the intermittency issues that have traditionally limited renewable energy adoption for large-scale industrial applications.</p>
+
+        <p>The success or failure of big tech's nuclear bet could have far-reaching implications for the global energy landscape. If successful, it could accelerate the adoption of nuclear power and help address climate change concerns. However, if these projects encounter significant delays or cost overruns, it could set back nuclear energy development for decades and force tech companies to seek alternative solutions for their growing energy needs.</p>
+
+        <p>Industry observers suggest that diversification may be the key to managing these risks. Rather than relying solely on nuclear power, tech companies might need to pursue a portfolio approach that includes renewable energy, energy efficiency improvements, and demand management strategies. This balanced approach could provide more resilience and flexibility as the energy landscape continues to evolve.</p>
+
+        <p>As the AI revolution continues to reshape the technology industry, the energy question remains one of the most critical challenges facing tech giants. The decisions made today about nuclear power and energy infrastructure will likely determine the sustainability and scalability of AI technologies for decades to come. Whether big tech's nuclear gamble pays off remains to be seen, but the stakes could not be higher for both the technology industry and the global energy system.</p>
+    </article>
+
+    <script>
+        let testResults = document.getElementById('test-results');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            testResults.textContent += `[${timestamp}] ${message}\n`;
+            testResults.scrollTop = testResults.scrollHeight;
+            console.log(`[Test] ${message}`);
+        }
+
+        function clearLog() {
+            testResults.textContent = '';
+        }
+
+        async function testSparkyFlow() {
+            clearLog();
+            log('🚀 Starting complete Sparky flow test...');
+            
+            try {
+                // Step 1: Test content extraction
+                log('📄 Step 1: Testing content extraction...');
+                const content = extractTestContent();
+                log(`✅ Content extracted: ${content.text.length} characters, ${content.wordCount} words`);
+                
+                // Step 2: Create lesson configuration
+                log('⚙️ Step 2: Creating lesson configuration...');
+                const lessonConfig = createLessonConfiguration(content);
+                log(`✅ Lesson config created: ${lessonConfig.suggestedType} lesson, ${lessonConfig.suggestedLevel} level`);
+                
+                // Step 3: Test storage
+                log('💾 Step 3: Testing storage...');
+                await testStorage(lessonConfig);
+                log('✅ Storage test completed');
+                
+                // Step 4: Test interface opening
+                log('🌐 Step 4: Testing interface opening...');
+                await testInterfaceOpening(lessonConfig);
+                log('✅ Interface opening test completed');
+                
+                log('🎉 Complete Sparky flow test PASSED!');
+                
+            } catch (error) {
+                log(`❌ Test FAILED: ${error.message}`);
+                console.error('Test error:', error);
+            }
+        }
+
+        async function testContentExtraction() {
+            clearLog();
+            log('📄 Testing content extraction only...');
+            
+            try {
+                const content = extractTestContent();
+                log(`✅ Content extracted successfully:`);
+                log(`   - Text length: ${content.text.length} characters`);
+                log(`   - Word count: ${content.wordCount} words`);
+                log(`   - Title: ${content.metadata.title}`);
+                log(`   - Domain: ${content.metadata.domain}`);
+                log(`   - Content type: ${content.metadata.contentType}`);
+                
+            } catch (error) {
+                log(`❌ Content extraction FAILED: ${error.message}`);
+            }
+        }
+
+        async function testStorageOperations() {
+            clearLog();
+            log('💾 Testing storage operations...');
+            
+            try {
+                const content = extractTestContent();
+                const lessonConfig = createLessonConfiguration(content);
+                
+                // Test storage
+                log('📝 Storing lesson configuration...');
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify({
+                    lessonConfiguration: lessonConfig,
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now(),
+                    sourceUrl: window.location.href,
+                    sourceTitle: document.title
+                }));
+                
+                // Test retrieval
+                log('📖 Retrieving stored data...');
+                const stored = localStorage.getItem('linguaspark_lesson_config');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    log(`✅ Storage test PASSED:`);
+                    log(`   - Keys: ${Object.keys(parsed).join(', ')}`);
+                    log(`   - Content length: ${parsed.lessonConfiguration?.sourceContent?.length || 0}`);
+                    log(`   - Lesson type: ${parsed.lessonConfiguration?.suggestedType}`);
+                    log(`   - CEFR level: ${parsed.lessonConfiguration?.suggestedLevel}`);
+                } else {
+                    log('❌ Storage test FAILED: No data retrieved');
+                }
+                
+            } catch (error) {
+                log(`❌ Storage test FAILED: ${error.message}`);
+            }
+        }
+
+        async function clearAllStorage() {
+            clearLog();
+            log('🗑️ Clearing all storage...');
+            
+            try {
+                localStorage.removeItem('linguaspark_lesson_config');
+                sessionStorage.clear();
+                log('✅ All storage cleared');
+                
+            } catch (error) {
+                log(`❌ Clear storage FAILED: ${error.message}`);
+            }
+        }
+
+        function extractTestContent() {
+            const article = document.querySelector('.article-content');
+            const text = article.textContent || article.innerText || '';
+            const cleanText = text.replace(/\s+/g, ' ').trim();
+            
+            return {
+                text: cleanText,
+                wordCount: cleanText.split(' ').length,
+                metadata: {
+                    title: document.title,
+                    author: 'BBC Worklife',
+                    description: 'Tech giants are investing in nuclear power for AI energy needs',
+                    sourceUrl: window.location.href,
+                    domain: window.location.hostname,
+                    contentType: 'news'
+                },
+                structuredContent: {},
+                suggestedLessonType: 'business',
+                suggestedCEFRLevel: 'B2',
+                validation: { isValid: true, issues: [] },
+                enhanced: true
+            };
+        }
+
+        function createLessonConfiguration(content) {
+            return {
+                sourceContent: content.text,
+                suggestedType: content.suggestedLessonType,
+                suggestedLevel: content.suggestedCEFRLevel,
+                metadata: {
+                    title: content.metadata.title,
+                    author: content.metadata.author,
+                    sourceUrl: content.metadata.sourceUrl,
+                    domain: content.metadata.domain,
+                    extractedAt: new Date(),
+                    wordCount: content.wordCount,
+                    readingTime: Math.ceil(content.wordCount / 200),
+                    complexity: content.wordCount < 500 ? 'intermediate' : 'advanced',
+                    suitabilityScore: 0.9
+                },
+                extractionSource: 'webpage',
+                allowContentEditing: true,
+                userCanModifySettings: true,
+                attribution: `Extracted from ${content.metadata.title} - ${content.metadata.sourceUrl}`
+            };
+        }
+
+        async function testStorage(lessonConfig) {
+            const storageData = {
+                lessonConfiguration: lessonConfig,
+                extractionSource: 'webpage',
+                extractionTimestamp: Date.now(),
+                sourceUrl: window.location.href,
+                sourceTitle: document.title
+            };
+            
+            localStorage.setItem('linguaspark_lesson_config', JSON.stringify(storageData));
+            
+            // Verify storage
+            const verification = localStorage.getItem('linguaspark_lesson_config');
+            if (!verification) {
+                throw new Error('Storage verification failed');
+            }
+            
+            const parsed = JSON.parse(verification);
+            if (!parsed.lessonConfiguration || !parsed.lessonConfiguration.sourceContent) {
+                throw new Error('Stored data is incomplete');
+            }
+        }
+
+        async function testInterfaceOpening(lessonConfig) {
+            const params = new URLSearchParams();
+            params.set('source', 'extraction');
+            params.set('autoPopulate', 'true');
+            params.set('title', lessonConfig.metadata.title);
+            params.set('sourceUrl', lessonConfig.metadata.sourceUrl);
+            params.set('type', lessonConfig.suggestedType);
+            params.set('level', lessonConfig.suggestedLevel);
+            
+            const url = `http://localhost:3000/popup?${params.toString()}`;
+            log(`🌐 Would open URL: ${url}`);
+            log(`📝 Content stored in localStorage for interface to read`);
+            
+            // Simulate opening (don't actually open to avoid popup)
+            // window.open(url, '_blank');
+        }
+
+        // Auto-run basic test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🔄 Page loaded - ready for testing');
+                log('📊 Page stats:');
+                log(`   - Title: ${document.title}`);
+                log(`   - URL: ${window.location.href}`);
+                log(`   - Content length: ${document.body.textContent.length} characters`);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

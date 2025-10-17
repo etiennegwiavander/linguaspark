@@ -1,14 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, BookOpen, Globe, Users, FileText, Mic, AlertCircle, Sparkles } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Loader2, BookOpen, Globe, Users, FileText, Mic, AlertCircle, Sparkles, ExternalLink, Info } from "lucide-react"
 import { useAuth } from "./auth-wrapper"
+import { LessonInterfaceBridge, LessonInterfaceUtils } from "@/lib/lesson-interface-bridge"
+import type { LessonPreConfiguration } from "@/lib/lesson-interface-bridge"
 
 const LESSON_TYPES = [
   { value: "discussion", label: "Discussion", icon: Users, description: "Conversation-focused lessons" },
@@ -53,6 +57,18 @@ interface LessonGeneratorProps {
   onExtractFromPage: () => void
 }
 
+interface ExtractionMetadata {
+  title: string
+  author?: string
+  sourceUrl: string
+  domain: string
+  extractedAt: Date
+  wordCount: number
+  readingTime: number
+  complexity: 'beginner' | 'intermediate' | 'advanced'
+  suitabilityScore: number
+}
+
 export default function LessonGenerator({
   initialText = "",
   sourceUrl = "",
@@ -69,10 +85,96 @@ export default function LessonGenerator({
   const [error, setError] = useState<ErrorState | null>(null)
   const { user } = useAuth()
 
+  // Extraction-related state
+  const [isExtractionSource, setIsExtractionSource] = useState(false)
+  const [extractionConfig, setExtractionConfig] = useState<LessonPreConfiguration | null>(null)
+  const [showExtractionInfo, setShowExtractionInfo] = useState(false)
+  const [hasAppliedInitialValues, setHasAppliedInitialValues] = useState(false)
+
+  // Update selectedText when initialText prop changes
+  useEffect(() => {
+    console.log('[LessonGenerator] Props received - initialText length:', initialText.length, 'sourceUrl:', sourceUrl)
+    if (initialText && initialText !== selectedText) {
+      console.log('[LessonGenerator] Updating selectedText from initialText:', initialText.substring(0, 100) + '...')
+      setSelectedText(initialText)
+      
+      // CRITICAL FIX: Also set lesson type and level from URL parameters
+      const urlParams = new URLSearchParams(window.location.search)
+      const urlType = urlParams.get('type')
+      const urlLevel = urlParams.get('level')
+      
+      if (urlType && !lessonType) {
+        console.log('[LessonGenerator] Setting lesson type from URL:', urlType)
+        setLessonType(urlType)
+      }
+      
+      if (urlLevel && !studentLevel) {
+        console.log('[LessonGenerator] Setting student level from URL:', urlLevel)
+        setStudentLevel(urlLevel)
+      }
+      
+      if (!targetLanguage) {
+        console.log('[LessonGenerator] Setting default target language: english')
+        setTargetLanguage("english")
+      }
+    }
+  }, [initialText, sourceUrl, lessonType, studentLevel, targetLanguage])
+
   // Clear error when user makes changes
   const clearError = () => {
     if (error) {
       setError(null)
+    }
+  }
+
+  // Check for extraction source and load configuration
+  useEffect(() => {
+    const checkExtractionSource = async () => {
+      try {
+        // Check if this is from extraction
+        const isExtraction = await LessonInterfaceBridge.isExtractionSource()
+        
+        if (isExtraction) {
+          setIsExtractionSource(true)
+          
+          // Load extraction configuration
+          const config = await LessonInterfaceBridge.loadExtractionConfiguration()
+          
+          if (config) {
+            setExtractionConfig(config)
+            setShowExtractionInfo(true)
+            
+            // Auto-populate fields if not already done (Requirement 4.2, 4.3)
+            if (!hasAppliedInitialValues) {
+              setSelectedText(config.sourceContent)
+              setLessonType(config.suggestedType)
+              setStudentLevel(config.suggestedLevel)
+              setTargetLanguage("english") // Default to English for now
+              setHasAppliedInitialValues(true)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check extraction source:', error)
+      }
+    }
+
+    checkExtractionSource()
+  }, [hasAppliedInitialValues])
+
+  // Handle clearing extraction data
+  const handleClearExtraction = async () => {
+    try {
+      await LessonInterfaceBridge.clearExtractionConfiguration()
+      setIsExtractionSource(false)
+      setExtractionConfig(null)
+      setShowExtractionInfo(false)
+      setSelectedText("")
+      setLessonType("")
+      setStudentLevel("")
+      setHasAppliedInitialValues(false)
+    } catch (error) {
+      console.error('Failed to clear extraction data:', error)
     }
   }
 
@@ -188,7 +290,30 @@ export default function LessonGenerator({
         return
       }
 
-      onLessonGenerated(result.lesson)
+      // Add extraction metadata to lesson if from extraction (Requirement 6.6)
+      let enhancedLesson = result.lesson
+      
+      if (isExtractionSource && extractionConfig) {
+        enhancedLesson = {
+          ...result.lesson,
+          extractionSource: {
+            url: extractionConfig.metadata.sourceUrl,
+            domain: extractionConfig.metadata.domain,
+            title: extractionConfig.metadata.title,
+            author: extractionConfig.metadata.author,
+            extractedAt: extractionConfig.metadata.extractedAt,
+            attribution: extractionConfig.attribution
+          },
+          contentMetadata: {
+            wordCount: extractionConfig.metadata.wordCount,
+            readingTime: extractionConfig.metadata.readingTime,
+            complexity: extractionConfig.metadata.complexity,
+            suitabilityScore: extractionConfig.metadata.suitabilityScore
+          }
+        }
+      }
+
+      onLessonGenerated(enhancedLesson)
       setIsGenerating(false)
     } catch (error) {
       console.error("Error generating lesson:", error)
@@ -212,6 +337,106 @@ export default function LessonGenerator({
 
   return (
     <div className="space-y-4">
+      {/* Extraction Information Card (Requirement 4.4, 6.6) */}
+      {showExtractionInfo && extractionConfig && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe className="h-4 w-4 text-blue-600" />
+              Content Extracted from Web
+              <Badge variant="secondary" className="text-xs">
+                Auto-populated
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              This lesson is being generated from content extracted from a webpage
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Source Information */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Source</span>
+                <a
+                  href={extractionConfig.metadata.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  {extractionConfig.metadata.domain}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+              
+              <div className="text-xs text-gray-600">
+                {LessonInterfaceUtils.createMetadataDisplay(extractionConfig.metadata)}
+              </div>
+              
+              {extractionConfig.metadata.title && (
+                <div className="text-sm font-medium text-gray-900">
+                  "{extractionConfig.metadata.title}"
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* AI Suggestions (Requirement 4.3) */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-xs font-medium text-gray-600">AI Suggested Type</span>
+                <div className="text-sm font-medium capitalize">
+                  {extractionConfig.suggestedType}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-600">AI Suggested Level</span>
+                <div className="text-sm font-medium">
+                  {extractionConfig.suggestedLevel}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Content Quality */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-600">Content Quality</span>
+              <Badge variant="outline" className="text-xs">
+                {Math.round(extractionConfig.metadata.suitabilityScore * 100)}% suitable
+              </Badge>
+            </div>
+
+            {/* Attribution (Requirement 6.6) */}
+            <div className="text-xs text-gray-500 italic">
+              {LessonInterfaceUtils.formatAttribution(extractionConfig.attribution)}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowExtractionInfo(false)}
+                className="text-xs h-7"
+              >
+                <Info className="h-3 w-3 mr-1" />
+                Hide Details
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearExtraction}
+                className="text-xs h-7"
+              >
+                Clear & Start Fresh
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -315,22 +540,45 @@ export default function LessonGenerator({
             </Select>
           </div>
 
+          {/* User customization note (Requirement 4.4) */}
+          {isExtractionSource && extractionConfig?.userCanModifySettings && (
+            <div className="text-xs text-green-600 bg-green-50 p-2 rounded border">
+              <Sparkles className="h-3 w-3 inline mr-1" />
+              AI has pre-selected lesson type and level based on content analysis, but you can modify any settings above
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Source Content</label>
-              <Button variant="outline" size="sm" onClick={onExtractFromPage} className="h-7 text-xs bg-transparent">
-                Extract from Page
-              </Button>
+              {!isExtractionSource && (
+                <Button variant="outline" size="sm" onClick={onExtractFromPage} className="h-7 text-xs bg-transparent">
+                  Extract from Page
+                </Button>
+              )}
             </div>
+            
+            {/* Content editing capability (Requirement 4.5) */}
+            {isExtractionSource && extractionConfig?.allowContentEditing && (
+              <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border">
+                <Info className="h-3 w-3 inline mr-1" />
+                You can edit the extracted content below before generating your lesson
+              </div>
+            )}
+            
             <Textarea
               value={selectedText}
               onChange={(e) => { setSelectedText(e.target.value); clearError(); }}
-              placeholder="Select text on the page or paste content here..."
+              placeholder={isExtractionSource ? "Edit the extracted content as needed..." : "Select text on the page or paste content here..."}
               className="min-h-[100px] text-xs"
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{selectedText.length} characters</span>
-              {sourceUrl && <span className="truncate max-w-[200px]">Source: {sourceUrl}</span>}
+              {(sourceUrl || extractionConfig?.metadata.sourceUrl) && (
+                <span className="truncate max-w-[200px]">
+                  Source: {extractionConfig?.metadata.domain || sourceUrl}
+                </span>
+              )}
             </div>
           </div>
 

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Flow Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .test-button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #1d4ed8;
+        }
+        .results {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Complete Sparky Flow Test</h1>
+    <p>This tests the complete end-to-end flow from content extraction to lesson interface pre-filling.</p>
+    
+    <div class="test-section">
+        <h2>Step 1: Test Storage Operations</h2>
+        <button class="test-button" onclick="testStorage()">Test Storage</button>
+        <div id="storage-results" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 2: Simulate Content Extraction</h2>
+        <button class="test-button" onclick="simulateExtraction()">Simulate Extraction</button>
+        <div id="extraction-results" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 3: Test Lesson Interface Loading</h2>
+        <button class="test-button" onclick="testLessonInterface()">Test Interface Loading</button>
+        <button class="test-button" onclick="openLessonInterface()">Open Lesson Interface</button>
+        <div id="interface-results" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 4: Debug Current Storage</h2>
+        <button class="test-button" onclick="debugCurrentStorage()">Debug Storage</button>
+        <button class="test-button" onclick="clearAllStorage()">Clear Storage</button>
+        <div id="debug-results" class="results"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : type === 'warning' ? 'warning' : '';
+            element.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            element.scrollTop = element.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        async function testStorage() {
+            clearLog('storage-results');
+            log('storage-results', '🧪 Testing basic storage operations...', 'info');
+            
+            try {
+                // Test 1: Basic localStorage
+                localStorage.setItem('test_basic', 'hello world');
+                const basic = localStorage.getItem('test_basic');
+                if (basic === 'hello world') {
+                    log('storage-results', '✅ Basic localStorage: PASS', 'success');
+                } else {
+                    log('storage-results', '❌ Basic localStorage: FAIL', 'error');
+                    return;
+                }
+                localStorage.removeItem('test_basic');
+
+                // Test 2: JSON storage
+                const testObj = { message: 'test', number: 42 };
+                localStorage.setItem('test_json', JSON.stringify(testObj));
+                const jsonStr = localStorage.getItem('test_json');
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.message === 'test' && parsed.number === 42) {
+                    log('storage-results', '✅ JSON storage: PASS', 'success');
+                } else {
+                    log('storage-results', '❌ JSON storage: FAIL', 'error');
+                    return;
+                }
+                localStorage.removeItem('test_json');
+
+                log('storage-results', '✅ All storage tests passed!', 'success');
+
+            } catch (error) {
+                log('storage-results', `❌ Storage test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateExtraction() {
+            clearLog('extraction-results');
+            log('extraction-results', '🚀 Simulating content extraction...', 'info');
+            
+            try {
+                // Simulate the exact data structure that Sparky creates
+                const extractedContent = {
+                    text: "Technology giants including Google, Microsoft, and Amazon are making unprecedented investments in nuclear power as they race to meet the enormous energy demands of artificial intelligence and data centers. However, industry experts are raising serious concerns about the feasibility and risks of these ambitious nuclear plans. The surge in AI development has created an energy crisis for tech companies. Training large language models and running AI services requires massive computational power, which translates to enormous electricity consumption. Data centers already account for approximately 1% of global electricity use, and this figure is expected to triple by 2030 as AI adoption accelerates.",
+                    wordCount: 500,
+                    metadata: {
+                        title: "Why big tech's nuclear plans could blow up",
+                        author: "BBC Worklife",
+                        description: "Tech giants are investing in nuclear power for AI energy needs",
+                        sourceUrl: "https://www.bbc.com/worklife/article/20251008-why-big-tech-is-going-nuclear",
+                        domain: "www.bbc.com"
+                    },
+                    structuredContent: {},
+                    suggestedLessonType: 'business',
+                    suggestedCEFRLevel: 'B2',
+                    validation: { isValid: true, issues: [] },
+                    enhanced: true
+                };
+
+                const lessonConfiguration = {
+                    sourceContent: extractedContent.text,
+                    suggestedType: extractedContent.suggestedLessonType,
+                    suggestedLevel: extractedContent.suggestedCEFRLevel,
+                    metadata: {
+                        title: extractedContent.metadata.title,
+                        author: extractedContent.metadata.author,
+                        sourceUrl: extractedContent.metadata.sourceUrl,
+                        domain: extractedContent.metadata.domain,
+                        extractedAt: new Date(),
+                        wordCount: extractedContent.wordCount,
+                        readingTime: Math.ceil(extractedContent.wordCount / 200),
+                        complexity: 'advanced',
+                        suitabilityScore: 0.9
+                    },
+                    extractionSource: 'webpage',
+                    allowContentEditing: true,
+                    userCanModifySettings: true,
+                    attribution: `Extracted from ${extractedContent.metadata.title} - ${extractedContent.metadata.sourceUrl}`
+                };
+
+                const storageData = {
+                    lessonConfiguration: lessonConfiguration,
+                    extractedContent: extractedContent,
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now(),
+                    sourceUrl: extractedContent.metadata.sourceUrl,
+                    sourceTitle: extractedContent.metadata.title
+                };
+
+                log('extraction-results', `📝 Created lesson configuration with ${lessonConfiguration.sourceContent.length} characters`, 'info');
+                log('extraction-results', `🎯 Lesson type: ${lessonConfiguration.suggestedType}, Level: ${lessonConfiguration.suggestedLevel}`, 'info');
+
+                // Store the data using the exact key Sparky uses
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify(storageData));
+                log('extraction-results', '💾 Stored data in localStorage with key: linguaspark_lesson_config', 'success');
+
+                // Verify storage immediately
+                const verification = localStorage.getItem('linguaspark_lesson_config');
+                if (verification) {
+                    const parsed = JSON.parse(verification);
+                    log('extraction-results', `✅ Storage verification: ${Object.keys(parsed).join(', ')}`, 'success');
+                    log('extraction-results', `✅ Content length: ${parsed.lessonConfiguration?.sourceContent?.length || 0}`, 'success');
+                } else {
+                    log('extraction-results', '❌ Storage verification failed', 'error');
+                }
+
+            } catch (error) {
+                log('extraction-results', `❌ Extraction simulation failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLessonInterface() {
+            clearLog('interface-results');
+            log('interface-results', '🌐 Testing lesson interface loading logic...', 'info');
+            
+            try {
+                // Simulate the exact logic from the popup page
+                const directCheck = localStorage.getItem('linguaspark_lesson_config');
+                log('interface-results', `📖 Direct localStorage check: ${directCheck ? 'Found data' : 'No data'}`, directCheck ? 'success' : 'error');
+                
+                if (directCheck) {
+                    const parsed = JSON.parse(directCheck);
+                    log('interface-results', `📊 Data keys: ${Object.keys(parsed).join(', ')}`, 'info');
+                    log('interface-results', `📝 Has lessonConfiguration: ${!!parsed.lessonConfiguration}`, parsed.lessonConfiguration ? 'success' : 'error');
+                    
+                    if (parsed.lessonConfiguration) {
+                        const contentLength = parsed.lessonConfiguration.sourceContent?.length || 0;
+                        log('interface-results', `📄 Content length: ${contentLength} characters`, contentLength > 0 ? 'success' : 'error');
+                        log('interface-results', `🎯 Lesson type: ${parsed.lessonConfiguration.suggestedType}`, 'info');
+                        log('interface-results', `📈 CEFR level: ${parsed.lessonConfiguration.suggestedLevel}`, 'info');
+                        log('interface-results', `🌐 Source URL: ${parsed.lessonConfiguration.metadata?.sourceUrl}`, 'info');
+                        
+                        if (contentLength > 0) {
+                            log('interface-results', '✅ Interface should pre-fill successfully!', 'success');
+                        } else {
+                            log('interface-results', '❌ No content to pre-fill', 'error');
+                        }
+                    } else {
+                        log('interface-results', '❌ No lessonConfiguration found', 'error');
+                    }
+                } else {
+                    log('interface-results', '❌ No stored data found', 'error');
+                }
+
+            } catch (error) {
+                log('interface-results', `❌ Interface test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function openLessonInterface() {
+            clearLog('interface-results');
+            log('interface-results', '🚀 Opening lesson interface...', 'info');
+            
+            try {
+                // Check if we have stored data
+                const stored = localStorage.getItem('linguaspark_lesson_config');
+                if (!stored) {
+                    log('interface-results', '⚠️ No stored data found. Run extraction simulation first.', 'warning');
+                    return;
+                }
+
+                const parsed = JSON.parse(stored);
+                if (!parsed.lessonConfiguration) {
+                    log('interface-results', '⚠️ No lesson configuration found in stored data.', 'warning');
+                    return;
+                }
+
+                // Create URL with metadata (same as Sparky does)
+                const config = parsed.lessonConfiguration;
+                const params = new URLSearchParams();
+                params.set('source', 'extraction');
+                params.set('autoPopulate', 'true');
+                params.set('title', config.metadata.title);
+                params.set('sourceUrl', config.metadata.sourceUrl);
+                params.set('type', config.suggestedType);
+                params.set('level', config.suggestedLevel);
+                
+                const url = `http://localhost:3000/popup?${params.toString()}`;
+                log('interface-results', `🌐 Opening: ${url}`, 'info');
+                log('interface-results', `📝 Content stored in localStorage for interface to read`, 'success');
+                
+                // Open the lesson interface
+                window.open(url, '_blank');
+                
+            } catch (error) {
+                log('interface-results', `❌ Failed to open interface: ${error.message}`, 'error');
+            }
+        }
+
+        async function debugCurrentStorage() {
+            clearLog('debug-results');
+            log('debug-results', '🔍 Debugging current storage state...', 'info');
+            
+            try {
+                log('debug-results', `📊 localStorage length: ${localStorage.length}`, 'info');
+                
+                // List all localStorage keys
+                const keys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    keys.push(localStorage.key(i));
+                }
+                log('debug-results', `🔑 All keys: ${keys.join(', ')}`, 'info');
+                
+                // Check for our specific key
+                const ourData = localStorage.getItem('linguaspark_lesson_config');
+                if (ourData) {
+                    log('debug-results', '✅ Found linguaspark_lesson_config', 'success');
+                    try {
+                        const parsed = JSON.parse(ourData);
+                        log('debug-results', `📊 Data structure: ${JSON.stringify(Object.keys(parsed), null, 2)}`, 'info');
+                        
+                        if (parsed.lessonConfiguration) {
+                            log('debug-results', `📝 Content preview: "${parsed.lessonConfiguration.sourceContent?.substring(0, 100)}..."`, 'info');
+                            log('debug-results', `📏 Full content length: ${parsed.lessonConfiguration.sourceContent?.length || 0}`, 'info');
+                        }
+                    } catch (parseError) {
+                        log('debug-results', `❌ Failed to parse stored data: ${parseError.message}`, 'error');
+                    }
+                } else {
+                    log('debug-results', '❌ No linguaspark_lesson_config found', 'error');
+                }
+                
+            } catch (error) {
+                log('debug-results', `❌ Debug failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearAllStorage() {
+            clearLog('debug-results');
+            log('debug-results', '🗑️ Clearing all storage...', 'info');
+            
+            try {
+                localStorage.clear();
+                log('debug-results', '✅ All localStorage cleared', 'success');
+                
+            } catch (error) {
+                log('debug-results', `❌ Clear failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run debug on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                debugCurrentStorage();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

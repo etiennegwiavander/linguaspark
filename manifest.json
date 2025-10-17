@@ -1,31 +1,59 @@
 {
   "manifest_version": 3,
-  "name": "LinguaSpark",
+  "name": "LinguaSpark - AI Language Lesson Generator",
   "version": "1.0.0",
-  "description": "Transform any webpage into interactive language lesson material",
-  "permissions": ["activeTab", "contextMenus", "storage", "scripting"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "description": "Transform any webpage into interactive language lessons with AI-powered content extraction and Sparky, your friendly learning assistant.",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  
   "background": {
     "service_worker": "background.js"
   },
+  
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
     }
   ],
+  
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LinguaSpark - Generate Language Lessons"
+    "default_title": "LinguaSpark - Generate Language Lessons",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
+  
   "icons": {
     "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "_next/*"],
+      "resources": [
+        "popup.html",
+        "popup.js",
+        "icons/*",
+        "_next/static/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

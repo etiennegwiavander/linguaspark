@@ -1,70 +1,79 @@
-// Background script for Chrome extension
-const chrome = window.chrome // Declare the chrome variable
+// LinguaSpark Chrome Extension Background Script
+// Handles extension lifecycle and communication between content scripts and popup
 
 chrome.runtime.onInstalled.addListener(() => {
-  // Create context menu for selected text
-  chrome.contextMenus.create({
-    id: "generateLesson",
-    title: "Generate Lesson from Selection",
-    contexts: ["selection"],
-  })
-})
+  console.log('LinguaSpark extension installed');
+});
 
-// Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "generateLesson") {
-    // Send selected text to popup
-    chrome.storage.local.set({
-      selectedText: info.selectionText,
-      sourceUrl: tab.url,
-    })
-
-    // Open popup
-    chrome.action.openPopup()
-  }
-})
-
-// Handle messages from content script and popup
+// Handle messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "extractPageText") {
-    // Inject content script to extract page text
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: sender.tab.id },
-        function: extractPageContent,
-      },
-      (results) => {
-        sendResponse({ content: results[0].result })
-      },
-    )
-    return true // Keep message channel open for async response
+  console.log('[LinguaSpark Background] Received message:', request.action);
+  
+  if (request.action === 'openLessonInterface') {
+    // Get content from Chrome storage and pass it to popup via API
+    chrome.storage.local.get(['lessonConfiguration', 'extractedContent', 'extractionSource', 'extractionTimestamp', 'sourceUrl', 'sourceTitle'], (result) => {
+      if (result.lessonConfiguration) {
+        // Generate unique session ID
+        const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        // Store content in API for popup to retrieve
+        fetch('http://localhost:3000/api/get-extracted-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'store',
+            sessionId: sessionId,
+            data: result
+          })
+        }).then(response => response.json()).then(apiResult => {
+          if (apiResult.success) {
+            // Build URL with metadata and session ID
+            const encodedTitle = encodeURIComponent(result.lessonConfiguration.metadata.title || '');
+            const encodedUrl = encodeURIComponent(result.lessonConfiguration.metadata.sourceUrl || '');
+            
+            let url = `http://localhost:3000/popup?source=extraction&autoPopulate=true&sessionId=${sessionId}`;
+            url += `&title=${encodedTitle}&sourceUrl=${encodedUrl}&type=${result.lessonConfiguration.suggestedType}&level=${result.lessonConfiguration.suggestedLevel}`;
+            
+            console.log('[LinguaSpark Background] Content stored in API for session:', sessionId);
+            console.log('[LinguaSpark Background] Content length:', result.lessonConfiguration.sourceContent.length, 'characters');
+            
+            chrome.tabs.create({ url }).then((tab) => {
+              console.log('[LinguaSpark Background] Opened lesson interface tab:', tab.id);
+              sendResponse({ success: true, tabId: tab.id });
+            }).catch((error) => {
+              console.error('[LinguaSpark Background] Failed to open tab:', error);
+              sendResponse({ success: false, error: error.message });
+            });
+          } else {
+            console.error('[LinguaSpark Background] Failed to store content in API:', apiResult.error);
+            sendResponse({ success: false, error: 'Failed to store content' });
+          }
+        }).catch((error) => {
+          console.error('[LinguaSpark Background] API request failed:', error);
+          sendResponse({ success: false, error: 'API request failed' });
+        });
+      } else {
+        console.error('[LinguaSpark Background] No lesson configuration found in storage');
+        sendResponse({ success: false, error: 'No content found' });
+      }
+    });
+    
+    return true; // Keep message channel open for async response
   }
-
-  if (request.action === "generateLesson") {
-    // Forward lesson generation request to popup
-    chrome.runtime.sendMessage({
-      action: "processLessonGeneration",
-      data: request.data,
-    })
+  
+  if (request.action === 'storeExtractedContent') {
+    // Store extracted content for the lesson interface
+    chrome.storage.local.set({
+      extractedContent: request.content,
+      extractionSource: 'webpage',
+      timestamp: Date.now()
+    }).then(() => {
+      sendResponse({ success: true });
+    }).catch((error) => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep message channel open for async response
   }
-})
-
-// Function to be injected for page content extraction
-function extractPageContent() {
-  // Remove script and style elements
-  const scripts = document.querySelectorAll("script, style, nav, header, footer")
-  scripts.forEach((el) => el.remove())
-
-  // Get main content
-  const mainContent =
-    document.querySelector("main") ||
-    document.querySelector("article") ||
-    document.querySelector(".content") ||
-    document.body
-
-  // Extract text content
-  const textContent = mainContent.innerText || mainContent.textContent || ""
-
-  // Clean up whitespace
-  return textContent.replace(/\s+/g, " ").trim()
-}
+  
+  return false;
+});

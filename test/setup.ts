@@ -1,5 +1,6 @@
 // Test setup file
 import { vi } from 'vitest'
+import '@testing-library/jest-dom'
 
 // Mock environment variables
 process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY = 'test-api-key'

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Bridge Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .sample-content {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Storage Bridge Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Scenario</h2>
+        <p>This test simulates the content extraction and storage process to verify the storage bridge works correctly.</p>
+        
+        <div class="sample-content">
+            <h3>Sample Article: The Future of Renewable Energy</h3>
+            <p>Renewable energy sources are becoming increasingly important in our fight against climate change. Solar panels and wind turbines are now more efficient and cost-effective than ever before.</p>
+            <p>Countries around the world are investing heavily in clean energy infrastructure. This transition not only helps reduce carbon emissions but also creates new job opportunities in the green technology sector.</p>
+            <p>The next decade will be crucial for determining whether we can successfully transition to a sustainable energy future. Innovation in battery technology and smart grid systems will play a key role in this transformation.</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Actions</h2>
+        <button onclick="simulateExtraction()">1. Simulate Content Extraction</button>
+        <button onclick="testStorageRetrieval()">2. Test Storage Retrieval</button>
+        <button onclick="openLessonInterface()">3. Open Lesson Interface</button>
+        <button onclick="clearStorage()">4. Clear Storage</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            results.textContent += `${timestamp}: ${message}\n`;
+            console.log(`[StorageBridgeTest] ${message}`);
+        }
+        
+        function clearLog() {
+            results.textContent = '';
+        }
+
+        // Simulate the content extraction process
+        function simulateExtraction() {
+            clearLog();
+            log('Simulating content extraction...');
+            
+            try {
+                // Extract content from the sample article
+                const article = document.querySelector('.sample-content');
+                const extractedText = article.textContent || article.innerText || '';
+                const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
+                
+                log(`✓ Content extracted: ${extractedText.length} characters, ${wordCount} words`);
+                
+                // Create lesson configuration in the same format as content script
+                const lessonConfiguration = {
+                    sourceContent: extractedText,
+                    suggestedType: 'discussion',
+                    suggestedLevel: 'B1',
+                    metadata: {
+                        title: 'The Future of Renewable Energy',
+                        author: 'Test Author',
+                        sourceUrl: window.location.href,
+                        domain: window.location.hostname,
+                        extractedAt: new Date(),
+                        wordCount: wordCount,
+                        readingTime: Math.ceil(wordCount / 200),
+                        complexity: 'intermediate',
+                        suitabilityScore: 0.8
+                    },
+                    extractionSource: 'webpage',
+                    allowContentEditing: true,
+                    userCanModifySettings: true,
+                    attribution: `Extracted from ${document.title}`
+                };
+                
+                // Store in the same format as content script
+                const storageData = {
+                    lessonConfiguration: lessonConfiguration,
+                    extractedContent: {
+                        text: extractedText,
+                        wordCount: wordCount,
+                        metadata: lessonConfiguration.metadata,
+                        validation: { isValid: true, issues: [] }
+                    },
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now(),
+                    sourceUrl: window.location.href,
+                    sourceTitle: document.title
+                };
+                
+                // Store using the same key as content script
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify(storageData));
+                
+                log('✓ Data stored in localStorage with key: linguaspark_lesson_config');
+                log(`✓ Stored lessonConfiguration with ${lessonConfiguration.sourceContent.length} characters`);
+                
+            } catch (error) {
+                log(`✗ Extraction simulation failed: ${error.message}`);
+            }
+        }
+
+        // Test storage retrieval using the same method as lesson interface
+        function testStorageRetrieval() {
+            log('\nTesting storage retrieval...');
+            
+            try {
+                // Direct localStorage check
+                const directCheck = localStorage.getItem('linguaspark_lesson_config');
+                if (directCheck) {
+                    const parsed = JSON.parse(directCheck);
+                    log('✓ Direct localStorage check successful');
+                    log(`  - Keys found: ${Object.keys(parsed).join(', ')}`);
+                    log(`  - lessonConfiguration exists: ${!!parsed.lessonConfiguration}`);
+                    log(`  - Content length: ${parsed.lessonConfiguration?.sourceContent?.length || 0}`);
+                } else {
+                    log('✗ No data found in localStorage');
+                    return;
+                }
+                
+                // Simulate the lesson interface retrieval logic
+                const result = {};
+                const keys = ['lessonConfiguration', 'extractedContent', 'selectedText', 'sourceUrl'];
+                
+                // Map the stored data to expected keys (same as updated safeStorageGet)
+                if (parsed.lessonConfiguration) {
+                    result.lessonConfiguration = parsed.lessonConfiguration;
+                    log('✓ Mapped lessonConfiguration');
+                }
+                if (parsed.extractedContent) {
+                    result.extractedContent = parsed.extractedContent;
+                    log('✓ Mapped extractedContent');
+                }
+                if (parsed.selectedText) {
+                    result.selectedText = parsed.selectedText;
+                    log('✓ Mapped selectedText');
+                }
+                if (parsed.sourceUrl) {
+                    result.sourceUrl = parsed.sourceUrl;
+                    log('✓ Mapped sourceUrl');
+                }
+                
+                log(`✓ Storage retrieval simulation successful`);
+                log(`  - Result keys: ${Object.keys(result).join(', ')}`);
+                
+                // Test the lesson interface logic
+                if (result.lessonConfiguration) {
+                    log('✓ Lesson interface would find lessonConfiguration');
+                    log(`  - Would set content: ${result.lessonConfiguration.sourceContent.substring(0, 100)}...`);
+                    log(`  - Would set sourceUrl: ${result.lessonConfiguration.metadata.sourceUrl}`);
+                } else {
+                    log('✗ Lesson interface would NOT find lessonConfiguration');
+                }
+                
+            } catch (error) {
+                log(`✗ Storage retrieval test failed: ${error.message}`);
+            }
+        }
+
+        // Open lesson interface with the stored data
+        function openLessonInterface() {
+            log('\nOpening lesson interface...');
+            
+            try {
+                // Check if data exists
+                const directCheck = localStorage.getItem('linguaspark_lesson_config');
+                if (!directCheck) {
+                    log('✗ No data in storage - run extraction simulation first');
+                    return;
+                }
+                
+                const parsed = JSON.parse(directCheck);
+                const config = parsed.lessonConfiguration;
+                
+                if (!config) {
+                    log('✗ No lesson configuration found');
+                    return;
+                }
+                
+                // Create URL with metadata only (no content in URL)
+                const url = new URL('http://localhost:3000/popup', window.location.origin);
+                url.searchParams.set('source', 'extraction');
+                url.searchParams.set('autoPopulate', 'true');
+                url.searchParams.set('sourceUrl', encodeURIComponent(config.metadata.sourceUrl));
+                url.searchParams.set('type', config.suggestedType);
+                url.searchParams.set('level', config.suggestedLevel);
+                url.searchParams.set('title', encodeURIComponent(config.metadata.title));
+                
+                log('✓ Opening lesson interface with metadata-only URL');
+                log(`  - URL length: ${url.toString().length} characters`);
+                log(`  - Content stored separately in localStorage`);
+                
+                // Open in new tab
+                window.open(url.toString(), '_blank');
+                
+            } catch (error) {
+                log(`✗ Failed to open lesson interface: ${error.message}`);
+            }
+        }
+
+        // Clear storage
+        function clearStorage() {
+            log('\nClearing storage...');
+            
+            try {
+                localStorage.removeItem('linguaspark_lesson_config');
+                sessionStorage.clear();
+                log('✓ Storage cleared');
+            } catch (error) {
+                log(`✗ Failed to clear storage: ${error.message}`);
+            }
+        }
+
+        // Initialize
+        log('Storage Bridge Test initialized');
+        log('Click the buttons above to test the storage bridge functionality');
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Storage Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .results {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Simple Storage Test</h1>
+    <p>This tests basic localStorage operations to debug the Sparky storage issue.</p>
+    
+    <button class="test-button" onclick="testBasicStorage()">Test Basic Storage</button>
+    <button class="test-button" onclick="testLargeData()">Test Large Data Storage</button>
+    <button class="test-button" onclick="testSparkyData()">Test Sparky-like Data</button>
+    <button class="test-button" onclick="clearStorage()">Clear Storage</button>
+    
+    <div id="results" class="results"></div>
+
+    <script>
+        function log(message) {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.textContent += `[${timestamp}] ${message}\n`;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('results').textContent = '';
+        }
+
+        function testBasicStorage() {
+            clearLog();
+            log('🧪 Testing basic localStorage operations...');
+            
+            try {
+                // Test 1: Simple string
+                localStorage.setItem('test_simple', 'hello world');
+                const simple = localStorage.getItem('test_simple');
+                log(`✅ Simple string: ${simple}`);
+                
+                // Test 2: JSON object
+                const testObj = { message: 'hello', number: 42 };
+                localStorage.setItem('test_json', JSON.stringify(testObj));
+                const jsonStr = localStorage.getItem('test_json');
+                const parsed = JSON.parse(jsonStr);
+                log(`✅ JSON object: ${JSON.stringify(parsed)}`);
+                
+                // Test 3: Check if localStorage is working
+                log(`✅ localStorage available: ${typeof Storage !== 'undefined'}`);
+                log(`✅ localStorage length: ${localStorage.length}`);
+                
+            } catch (error) {
+                log(`❌ Basic storage test failed: ${error.message}`);
+            }
+        }
+
+        function testLargeData() {
+            clearLog();
+            log('🧪 Testing large data storage...');
+            
+            try {
+                // Create large text (similar to BBC article)
+                const largeText = 'This is a test article. '.repeat(1000); // ~24,000 characters
+                const largeData = {
+                    lessonConfiguration: {
+                        sourceContent: largeText,
+                        suggestedType: 'business',
+                        suggestedLevel: 'B2',
+                        metadata: {
+                            title: 'Test Article',
+                            sourceUrl: window.location.href,
+                            domain: window.location.hostname,
+                            wordCount: largeText.split(' ').length
+                        }
+                    },
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now()
+                };
+                
+                log(`📝 Large data size: ${JSON.stringify(largeData).length} characters`);
+                
+                // Store large data
+                localStorage.setItem('test_large', JSON.stringify(largeData));
+                log('✅ Large data stored successfully');
+                
+                // Verify large data
+                const retrieved = localStorage.getItem('test_large');
+                if (retrieved) {
+                    const parsed = JSON.parse(retrieved);
+                    log(`✅ Large data retrieved: ${parsed.lessonConfiguration.sourceContent.length} chars`);
+                } else {
+                    log('❌ Large data retrieval failed');
+                }
+                
+            } catch (error) {
+                log(`❌ Large data test failed: ${error.message}`);
+            }
+        }
+
+        function testSparkyData() {
+            clearLog();
+            log('🧪 Testing Sparky-like data structure...');
+            
+            try {
+                // Simulate the exact data structure Sparky uses
+                const sparkyData = {
+                    lessonConfiguration: {
+                        sourceContent: "Technology giants including Google, Microsoft, and Amazon are making unprecedented investments in nuclear power as they race to meet the enormous energy demands of artificial intelligence and data centers. However, industry experts are raising serious concerns about the feasibility and risks of these ambitious nuclear plans. The surge in AI development has created an energy crisis for tech companies. Training large language models and running AI services requires massive computational power, which translates to enormous electricity consumption.",
+                        suggestedType: 'business',
+                        suggestedLevel: 'B2',
+                        metadata: {
+                            title: 'Why big tech\'s nuclear plans could blow up',
+                            author: 'BBC Worklife',
+                            sourceUrl: 'https://www.bbc.com/worklife/article/20251008-why-big-tech-is-going-nuclear',
+                            domain: 'www.bbc.com',
+                            extractedAt: new Date(),
+                            wordCount: 500,
+                            readingTime: 3,
+                            complexity: 'advanced',
+                            suitabilityScore: 0.9
+                        },
+                        extractionSource: 'webpage',
+                        allowContentEditing: true,
+                        userCanModifySettings: true,
+                        attribution: 'Extracted from BBC article'
+                    },
+                    extractedContent: {
+                        text: "Same content as above...",
+                        wordCount: 500,
+                        validation: { isValid: true, issues: [] }
+                    },
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now(),
+                    sourceUrl: 'https://www.bbc.com/worklife/article/20251008-why-big-tech-is-going-nuclear',
+                    sourceTitle: 'Why big tech\'s nuclear plans could blow up'
+                };
+                
+                log(`📝 Sparky data size: ${JSON.stringify(sparkyData).length} characters`);
+                
+                // Test the exact key Sparky uses
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify(sparkyData));
+                log('✅ Sparky data stored with correct key');
+                
+                // Verify with exact same method Sparky uses
+                const verification = localStorage.getItem('linguaspark_lesson_config');
+                if (verification) {
+                    const parsed = JSON.parse(verification);
+                    log(`✅ Sparky data verified: ${Object.keys(parsed).join(', ')}`);
+                    log(`✅ Content length: ${parsed.lessonConfiguration?.sourceContent?.length || 0}`);
+                } else {
+                    log('❌ Sparky data verification failed');
+                }
+                
+            } catch (error) {
+                log(`❌ Sparky data test failed: ${error.message}`);
+            }
+        }
+
+        function clearStorage() {
+            clearLog();
+            log('🗑️ Clearing all test storage...');
+            
+            try {
+                localStorage.removeItem('test_simple');
+                localStorage.removeItem('test_json');
+                localStorage.removeItem('test_large');
+                localStorage.removeItem('linguaspark_lesson_config');
+                log('✅ All test storage cleared');
+                
+            } catch (error) {
+                log(`❌ Clear storage failed: ${error.message}`);
+            }
+        }
+
+        // Auto-run basic test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🔄 Page loaded - localStorage available: ' + (typeof Storage !== 'undefined'));
+                log('📊 Current localStorage length: ' + localStorage.length);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

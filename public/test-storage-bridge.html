@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Bridge Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { margin: 5px; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>LinguaSpark Storage Bridge Test</h1>
+    
+    <div class="test-section">
+        <h2>Context Detection</h2>
+        <div id="context-info"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Storage Tests</h2>
+        <button onclick="testChromeStorage()">Test Chrome Storage</button>
+        <button onclick="testSessionStorage()">Test Session Storage</button>
+        <button onclick="testUrlParams()">Test URL Parameters</button>
+        <div id="storage-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Bridge Test</h2>
+        <button onclick="simulateExtraction()">Simulate Content Extraction</button>
+        <button onclick="testBridgeLoad()">Test Bridge Load</button>
+        <div id="bridge-results"></div>
+    </div>
+
+    <script>
+        // Detect context
+        function detectContext() {
+            const info = document.getElementById('context-info');
+            const isChromeExt = typeof chrome !== 'undefined' && chrome.storage;
+            const isWeb = !isChromeExt;
+            
+            info.innerHTML = `
+                <p class="${isChromeExt ? 'success' : 'info'}">Chrome Extension Context: ${isChromeExt}</p>
+                <p class="${isWeb ? 'info' : 'success'}">Web Context: ${isWeb}</p>
+                <p>URL: ${window.location.href}</p>
+                <p>User Agent: ${navigator.userAgent}</p>
+            `;
+        }
+
+        // Test Chrome storage
+        function testChromeStorage() {
+            const results = document.getElementById('storage-results');
+            
+            if (typeof chrome !== 'undefined' && chrome.storage) {
+                chrome.storage.local.get(['lessonConfiguration'], (result) => {
+                    results.innerHTML += `<div class="success">Chrome Storage Test: SUCCESS</div>`;
+                    results.innerHTML += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                });
+            } else {
+                results.innerHTML += `<div class="error">Chrome Storage Test: FAILED - chrome.storage not available</div>`;
+            }
+        }
+
+        // Test session storage
+        function testSessionStorage() {
+            const results = document.getElementById('storage-results');
+            
+            try {
+                const testData = { test: 'session storage test', timestamp: Date.now() };
+                sessionStorage.setItem('linguaspark_test', JSON.stringify(testData));
+                const retrieved = JSON.parse(sessionStorage.getItem('linguaspark_test'));
+                
+                results.innerHTML += `<div class="success">Session Storage Test: SUCCESS</div>`;
+                results.innerHTML += `<pre>${JSON.stringify(retrieved, null, 2)}</pre>`;
+            } catch (error) {
+                results.innerHTML += `<div class="error">Session Storage Test: FAILED - ${error.message}</div>`;
+            }
+        }
+
+        // Test URL parameters
+        function testUrlParams() {
+            const results = document.getElementById('storage-results');
+            const urlParams = new URLSearchParams(window.location.search);
+            const params = Object.fromEntries(urlParams);
+            
+            results.innerHTML += `<div class="info">URL Parameters Test:</div>`;
+            results.innerHTML += `<pre>${JSON.stringify(params, null, 2)}</pre>`;
+        }
+
+        // Simulate content extraction
+        function simulateExtraction() {
+            const results = document.getElementById('bridge-results');
+            
+            const mockConfig = {
+                sourceContent: "This is a test content for lesson generation. It contains enough words to be suitable for creating a language lesson.",
+                suggestedType: "discussion",
+                suggestedLevel: "B1",
+                metadata: {
+                    title: "Test Article",
+                    sourceUrl: "https://example.com/test-article",
+                    domain: "example.com",
+                    extractedAt: new Date().toISOString(),
+                    wordCount: 25,
+                    readingTime: 1,
+                    complexity: "intermediate",
+                    suitabilityScore: 0.8
+                },
+                extractionSource: "webpage",
+                allowContentEditing: true,
+                userCanModifySettings: true,
+                attribution: "Source: example.com"
+            };
+
+            // Store in session storage (always available)
+            sessionStorage.setItem('linguaspark_lesson_config', JSON.stringify(mockConfig));
+            
+            // Try Chrome storage if available
+            if (typeof chrome !== 'undefined' && chrome.storage) {
+                chrome.storage.local.set({ lessonConfiguration: mockConfig });
+                results.innerHTML += `<div class="success">Mock extraction stored in Chrome storage</div>`;
+            } else {
+                results.innerHTML += `<div class="info">Mock extraction stored in session storage only</div>`;
+            }
+            
+            results.innerHTML += `<pre>${JSON.stringify(mockConfig, null, 2)}</pre>`;
+        }
+
+        // Test bridge load
+        function testBridgeLoad() {
+            const results = document.getElementById('bridge-results');
+            
+            // Test URL parameters approach
+            const url = new URL('/popup', window.location.origin);
+            url.searchParams.set('source', 'extraction');
+            url.searchParams.set('autoPopulate', 'true');
+            url.searchParams.set('content', encodeURIComponent('Test content from bridge'));
+            url.searchParams.set('sourceUrl', encodeURIComponent('https://example.com/test'));
+            url.searchParams.set('type', 'discussion');
+            url.searchParams.set('level', 'B1');
+            url.searchParams.set('title', encodeURIComponent('Test Title'));
+            
+            results.innerHTML += `<div class="info">Generated URL for popup:</div>`;
+            results.innerHTML += `<pre>${url.toString()}</pre>`;
+            results.innerHTML += `<button onclick="window.open('${url.toString()}', '_blank')">Open Popup with Test Data</button>`;
+        }
+
+        // Initialize
+        detectContext();
+    </script>
+</body>
+</html>

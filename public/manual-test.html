@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Test - Copy & Paste</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .code-block {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            border-left: 4px solid #2563eb;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Manual Test - Copy & Paste Commands</h1>
+    <p>Copy and paste these commands into the browser console to test Sparky manually.</p>
+
+    <div class="step">
+        <h3>Step 1: Test Basic Storage (Run on any page)</h3>
+        <div class="code-block">
+// Test basic localStorage
+localStorage.setItem('test_basic', 'hello world');
+const basic = localStorage.getItem('test_basic');
+console.log('Basic test:', basic === 'hello world' ? '✅ PASS' : '❌ FAIL');
+localStorage.removeItem('test_basic');
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 2: Simulate Sparky Storage (Run on any page)</h3>
+        <div class="code-block">
+// Simulate the exact data Sparky stores
+const sparkyData = {
+  lessonConfiguration: {
+    sourceContent: "Technology giants including Google, Microsoft, and Amazon are making unprecedented investments in nuclear power as they race to meet the enormous energy demands of artificial intelligence and data centers. However, industry experts are raising serious concerns about the feasibility and risks of these ambitious nuclear plans.",
+    suggestedType: 'business',
+    suggestedLevel: 'B2',
+    metadata: {
+      title: "Why big tech's nuclear plans could blow up",
+      author: "BBC Worklife",
+      sourceUrl: "https://www.bbc.com/worklife/article/20251008-why-big-tech-is-going-nuclear",
+      domain: "www.bbc.com",
+      extractedAt: new Date(),
+      wordCount: 500,
+      readingTime: 3,
+      complexity: 'advanced',
+      suitabilityScore: 0.9
+    },
+    extractionSource: 'webpage',
+    allowContentEditing: true,
+    userCanModifySettings: true,
+    attribution: 'Extracted from BBC article'
+  },
+  extractionSource: 'webpage',
+  extractionTimestamp: Date.now(),
+  sourceUrl: 'https://www.bbc.com/worklife/article/20251008-why-big-tech-is-going-nuclear',
+  sourceTitle: "Why big tech's nuclear plans could blow up"
+};
+
+// Store it
+localStorage.setItem('linguaspark_lesson_config', JSON.stringify(sparkyData));
+console.log('✅ Sparky data stored');
+
+// Verify it
+const verification = localStorage.getItem('linguaspark_lesson_config');
+if (verification) {
+  const parsed = JSON.parse(verification);
+  console.log('✅ Verification success:', Object.keys(parsed));
+  console.log('✅ Content length:', parsed.lessonConfiguration?.sourceContent?.length || 0);
+} else {
+  console.log('❌ Verification failed');
+}
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 3: Open Lesson Interface with Stored Data</h3>
+        <div class="code-block">
+// Check if data exists
+const stored = localStorage.getItem('linguaspark_lesson_config');
+if (stored) {
+  const parsed = JSON.parse(stored);
+  const config = parsed.lessonConfiguration;
+  
+  // Create URL with metadata
+  const params = new URLSearchParams();
+  params.set('source', 'extraction');
+  params.set('autoPopulate', 'true');
+  params.set('title', config.metadata.title);
+  params.set('sourceUrl', config.metadata.sourceUrl);
+  params.set('type', config.suggestedType);
+  params.set('level', config.suggestedLevel);
+  
+  const url = `http://localhost:3000/popup?${params.toString()}`;
+  console.log('🌐 Opening:', url);
+  console.log('📝 Content stored for interface to read');
+  
+  // Open the interface
+  window.open(url, '_blank');
+} else {
+  console.log('❌ No stored data found. Run Step 2 first.');
+}
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 4: Check Content Script on BBC Page</h3>
+        <p>Go to the BBC article page and run these commands:</p>
+        <div class="code-block">
+// Check if content script loaded
+console.log('Checking content script...');
+
+// Check for Sparky button
+const button = document.querySelector('#linguaspark-extract-button');
+console.log('Sparky button found:', !!button);
+
+// Check for debug functions
+console.log('linguaSparkDebug available:', typeof window.linguaSparkDebug !== 'undefined');
+
+// Check for content script functions
+console.log('handleExtractClick available:', typeof handleExtractClick !== 'undefined');
+console.log('extractCleanContent available:', typeof extractCleanContent !== 'undefined');
+
+// If debug functions are available, test them
+if (typeof window.linguaSparkDebug !== 'undefined') {
+  console.log('✅ Debug functions available');
+  // Test storage
+  window.linguaSparkDebug.testStorage();
+} else {
+  console.log('❌ Debug functions not available - content script may not be loaded');
+}
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 5: Debug Lesson Interface Loading</h3>
+        <p>Run this on the lesson interface page (localhost:3000/popup):</p>
+        <div class="code-block">
+// Check what the lesson interface sees
+console.log('=== Lesson Interface Debug ===');
+
+// Check URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+console.log('URL params:', Object.fromEntries(urlParams));
+console.log('Is extraction source:', urlParams.get('source') === 'extraction');
+
+// Check localStorage
+const stored = localStorage.getItem('linguaspark_lesson_config');
+console.log('localStorage data found:', !!stored);
+
+if (stored) {
+  try {
+    const parsed = JSON.parse(stored);
+    console.log('Stored data keys:', Object.keys(parsed));
+    console.log('Has lessonConfiguration:', !!parsed.lessonConfiguration);
+    
+    if (parsed.lessonConfiguration) {
+      console.log('Content length:', parsed.lessonConfiguration.sourceContent?.length || 0);
+      console.log('Lesson type:', parsed.lessonConfiguration.suggestedType);
+      console.log('CEFR level:', parsed.lessonConfiguration.suggestedLevel);
+      console.log('Source URL:', parsed.lessonConfiguration.metadata?.sourceUrl);
+    }
+  } catch (error) {
+    console.error('Failed to parse stored data:', error);
+  }
+} else {
+  console.log('❌ No stored data found');
+}
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 6: Clear Storage (When Done Testing)</h3>
+        <div class="code-block">
+// Clear all test data
+localStorage.removeItem('linguaspark_lesson_config');
+localStorage.removeItem('test_basic');
+console.log('✅ Storage cleared');
+        </div>
+    </div>
+
+    <h2>Expected Results</h2>
+    <ul>
+        <li><strong>Step 1:</strong> Should show "✅ PASS"</li>
+        <li><strong>Step 2:</strong> Should show "✅ Sparky data stored" and "✅ Content length: 500+"</li>
+        <li><strong>Step 3:</strong> Should open lesson interface with pre-filled content</li>
+        <li><strong>Step 4:</strong> Should show Sparky button and debug functions on BBC page</li>
+        <li><strong>Step 5:</strong> Should show stored data and content details on lesson interface</li>
+    </ul>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+        <li><strong>Step 1 fails:</strong> localStorage is disabled or blocked</li>
+        <li><strong>Step 2 fails:</strong> Data serialization issue</li>
+        <li><strong>Step 3 fails:</strong> URL generation or opening issue</li>
+        <li><strong>Step 4 fails:</strong> Content script not loaded - reload extension</li>
+        <li><strong>Step 5 fails:</strong> Interface not reading localStorage properly</li>
+    </ul>
+</body>
+</html>

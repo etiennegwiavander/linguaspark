@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Extraction Flow</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .test-button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .test-button:hover {
+            background: #1d4ed8;
+        }
+        .results {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>LinguaSpark Extraction Flow Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Test Content Extraction</h2>
+        <p>This simulates extracting content from a webpage and storing it for the lesson interface.</p>
+        <button class="test-button" onclick="testContentExtraction()">Extract Content</button>
+        <div id="extraction-results" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Test Storage</h2>
+        <p>Test storing and retrieving lesson configuration data.</p>
+        <button class="test-button" onclick="testStorage()">Test Storage</button>
+        <button class="test-button" onclick="clearStorage()">Clear Storage</button>
+        <div id="storage-results" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Test Lesson Interface Opening</h2>
+        <p>Simulate opening the lesson interface with extracted content.</p>
+        <button class="test-button" onclick="openLessonInterface()">Open Lesson Interface</button>
+        <div id="interface-results" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Sample Article Content</h2>
+        <article id="sample-content">
+            <h1>The Future of Artificial Intelligence in Education</h1>
+            <p>Artificial intelligence is revolutionizing the education sector, offering personalized learning experiences and automated assessment tools. This transformation is reshaping how students learn and teachers teach.</p>
+            
+            <p>Machine learning algorithms can analyze student performance data to identify learning patterns and adapt content delivery accordingly. This personalized approach helps students learn at their own pace and focus on areas where they need the most improvement.</p>
+            
+            <p>Natural language processing enables AI tutoring systems to understand and respond to student questions in real-time. These systems can provide instant feedback and explanations, making learning more interactive and engaging.</p>
+            
+            <p>However, the integration of AI in education also raises important questions about data privacy, algorithmic bias, and the role of human teachers. Educators and policymakers must carefully consider these challenges as they implement AI-powered educational tools.</p>
+            
+            <p>The future of AI in education looks promising, with potential applications in curriculum design, student assessment, and administrative tasks. As technology continues to advance, we can expect to see even more innovative uses of AI in educational settings.</p>
+        </article>
+    </div>
+
+    <script>
+        // Simulate content extraction
+        function testContentExtraction() {
+            const results = document.getElementById('extraction-results');
+            results.textContent = 'Testing content extraction...\n';
+            
+            try {
+                // Get sample content
+                const sampleContent = document.getElementById('sample-content');
+                const text = sampleContent.textContent || sampleContent.innerText;
+                const wordCount = text.split(/\s+/).length;
+                
+                // Create lesson configuration
+                const lessonConfig = {
+                    sourceContent: text,
+                    suggestedType: 'discussion',
+                    suggestedLevel: 'B2',
+                    metadata: {
+                        title: 'The Future of Artificial Intelligence in Education',
+                        author: 'Test Author',
+                        sourceUrl: window.location.href,
+                        domain: window.location.hostname,
+                        extractedAt: new Date(),
+                        wordCount: wordCount,
+                        readingTime: Math.ceil(wordCount / 200),
+                        complexity: 'intermediate',
+                        suitabilityScore: 0.9
+                    },
+                    extractionSource: 'webpage',
+                    allowContentEditing: true,
+                    userCanModifySettings: true,
+                    attribution: `Source: ${window.location.hostname}`
+                };
+                
+                results.textContent += `✅ Content extracted successfully!\n`;
+                results.textContent += `📝 Content length: ${text.length} characters\n`;
+                results.textContent += `📊 Word count: ${wordCount} words\n`;
+                results.textContent += `🎯 Suggested type: ${lessonConfig.suggestedType}\n`;
+                results.textContent += `📈 Suggested level: ${lessonConfig.suggestedLevel}\n`;
+                
+                // Store for next test
+                window.testLessonConfig = lessonConfig;
+                
+            } catch (error) {
+                results.textContent += `❌ Error: ${error.message}\n`;
+            }
+        }
+        
+        // Test storage functionality
+        function testStorage() {
+            const results = document.getElementById('storage-results');
+            results.textContent = 'Testing storage...\n';
+            
+            try {
+                if (!window.testLessonConfig) {
+                    results.textContent += '⚠️ No lesson config found. Run content extraction first.\n';
+                    return;
+                }
+                
+                // Store in localStorage (simulating the storage mechanism)
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify({
+                    lessonConfiguration: window.testLessonConfig,
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now()
+                }));
+                
+                results.textContent += '✅ Data stored in localStorage\n';
+                
+                // Test retrieval
+                const stored = localStorage.getItem('linguaspark_lesson_config');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    results.textContent += '✅ Data retrieved successfully\n';
+                    results.textContent += `📝 Stored content length: ${parsed.lessonConfiguration.sourceContent.length}\n`;
+                    results.textContent += `🎯 Stored type: ${parsed.lessonConfiguration.suggestedType}\n`;
+                } else {
+                    results.textContent += '❌ Failed to retrieve stored data\n';
+                }
+                
+            } catch (error) {
+                results.textContent += `❌ Storage error: ${error.message}\n`;
+            }
+        }
+        
+        // Clear storage
+        function clearStorage() {
+            const results = document.getElementById('storage-results');
+            localStorage.removeItem('linguaspark_lesson_config');
+            results.textContent = '🗑️ Storage cleared\n';
+        }
+        
+        // Open lesson interface
+        function openLessonInterface() {
+            const results = document.getElementById('interface-results');
+            results.textContent = 'Opening lesson interface...\n';
+            
+            try {
+                // Check if data is stored
+                const stored = localStorage.getItem('linguaspark_lesson_config');
+                if (!stored) {
+                    results.textContent += '⚠️ No stored data found. Run storage test first.\n';
+                    return;
+                }
+                
+                // Create URL with metadata only (no content in URL)
+                const config = JSON.parse(stored).lessonConfiguration;
+                const url = new URL('/popup', window.location.origin);
+                url.searchParams.set('source', 'extraction');
+                url.searchParams.set('autoPopulate', 'true');
+                url.searchParams.set('sourceUrl', encodeURIComponent(config.metadata.sourceUrl));
+                url.searchParams.set('type', config.suggestedType);
+                url.searchParams.set('level', config.suggestedLevel);
+                url.searchParams.set('title', encodeURIComponent(config.metadata.title));
+                
+                results.textContent += '✅ Opening lesson interface...\n';
+                results.textContent += `🔗 URL: ${url.toString()}\n`;
+                results.textContent += '📝 Content stored in localStorage (not in URL)\n';
+                
+                // Open in new tab
+                window.open(url.toString(), '_blank');
+                
+            } catch (error) {
+                results.textContent += `❌ Error: ${error.message}\n`;
+            }
+        }
+        
+        // Auto-run content extraction on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testContentExtraction();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

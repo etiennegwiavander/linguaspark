@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Extraction Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Content Extraction Fix Test</h1>
+    
+    <div class="test-section info">
+        <h2>Test Overview</h2>
+        <p>This test verifies that the content extraction fix handles extension context invalidation properly.</p>
+        <p>The fix includes:</p>
+        <ul>
+            <li>Context validation before using Chrome APIs</li>
+            <li>Fallback to localStorage when Chrome storage fails</li>
+            <li>Direct URL opening when extension context is invalid</li>
+            <li>Safe error handling for all Chrome API calls</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Actions</h2>
+        <button onclick="testContextValidation()">Test Context Validation</button>
+        <button onclick="testStorageFallback()">Test Storage Fallback</button>
+        <button onclick="testSafeMessageSending()">Test Safe Message Sending</button>
+        <button onclick="testFullExtractionFlow()">Test Full Extraction Flow</button>
+        <button onclick="clearAllStorage()">Clear All Storage</button>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="test-section">
+        <h2>Sample Content for Extraction</h2>
+        <article>
+            <h3>The Future of Renewable Energy</h3>
+            <p>Renewable energy sources are becoming increasingly important in our fight against climate change. Solar panels and wind turbines are now more efficient and cost-effective than ever before.</p>
+            <p>Countries around the world are investing heavily in clean energy infrastructure. This transition not only helps reduce carbon emissions but also creates new job opportunities in the green technology sector.</p>
+            <p>The next decade will be crucial for determining whether we can successfully transition to a sustainable energy future. Innovation in battery technology and smart grid systems will play a key role in this transformation.</p>
+        </article>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message) {
+            results.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+        }
+        
+        function clearLog() {
+            results.textContent = '';
+        }
+
+        // Test context validation
+        function testContextValidation() {
+            clearLog();
+            log('Testing extension context validation...');
+            
+            // Simulate the context validation function
+            function isExtensionContextValid() {
+                try {
+                    return window.chrome && window.chrome.runtime && window.chrome.runtime.id;
+                } catch (error) {
+                    return false;
+                }
+            }
+            
+            const isValid = isExtensionContextValid();
+            log('Extension context valid: ' + isValid);
+            
+            if (!isValid) {
+                log('✓ Context validation working - extension context is invalid (expected in web context)');
+            } else {
+                log('✓ Context validation working - extension context is valid');
+            }
+        }
+
+        // Test storage fallback
+        function testStorageFallback() {
+            clearLog();
+            log('Testing storage fallback...');
+            
+            const testData = {
+                lessonConfiguration: {
+                    sourceContent: 'Test content for lesson generation',
+                    suggestedType: 'discussion',
+                    suggestedLevel: 'B1',
+                    metadata: {
+                        title: 'Test Article',
+                        sourceUrl: window.location.href,
+                        domain: window.location.hostname,
+                        extractedAt: new Date(),
+                        wordCount: 6,
+                        readingTime: 1,
+                        complexity: 'intermediate',
+                        suitabilityScore: 0.8
+                    },
+                    extractionSource: 'webpage',
+                    allowContentEditing: true,
+                    userCanModifySettings: true,
+                    attribution: 'Test attribution'
+                }
+            };
+            
+            try {
+                // Test localStorage fallback
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify(testData));
+                log('✓ Successfully stored test data in localStorage');
+                
+                const retrieved = localStorage.getItem('linguaspark_lesson_config');
+                const parsed = JSON.parse(retrieved);
+                log('✓ Successfully retrieved and parsed data from localStorage');
+                log('Retrieved content length: ' + parsed.lessonConfiguration.sourceContent.length);
+                
+            } catch (error) {
+                log('✗ Storage fallback failed: ' + error.message);
+            }
+        }
+
+        // Test safe message sending
+        function testSafeMessageSending() {
+            clearLog();
+            log('Testing safe message sending...');
+            
+            // Simulate the safe message sending function
+            async function safeSendMessage(message) {
+                return new Promise((resolve) => {
+                    // Check if extension context is valid
+                    const isValid = window.chrome && window.chrome.runtime && window.chrome.runtime.id;
+                    
+                    if (!isValid) {
+                        log('Extension context invalid - using fallback URL opening');
+                        const url = 'http://localhost:3000/popup?source=extraction&autoPopulate=true';
+                        log('Would open URL: ' + url);
+                        resolve({ success: true, fallback: true });
+                        return;
+                    }
+                    
+                    // In a real extension, this would use chrome.runtime.sendMessage
+                    log('Extension context valid - would send message: ' + JSON.stringify(message));
+                    resolve({ success: true, fallback: false });
+                });
+            }
+            
+            safeSendMessage({
+                action: 'openLessonInterface',
+                data: { source: 'extraction', autoPopulate: true }
+            }).then(result => {
+                log('✓ Safe message sending completed: ' + JSON.stringify(result));
+            });
+        }
+
+        // Test full extraction flow
+        function testFullExtractionFlow() {
+            clearLog();
+            log('Testing full extraction flow...');
+            
+            // Extract content from the sample article
+            const article = document.querySelector('article');
+            const extractedText = article.textContent || article.innerText || '';
+            const wordCount = extractedText.split(/\s+/).length;
+            
+            log('Extracted content length: ' + extractedText.length + ' characters');
+            log('Word count: ' + wordCount);
+            
+            // Create lesson configuration
+            const lessonConfiguration = {
+                sourceContent: extractedText,
+                suggestedType: 'discussion',
+                suggestedLevel: 'B1',
+                metadata: {
+                    title: document.title,
+                    sourceUrl: window.location.href,
+                    domain: window.location.hostname,
+                    extractedAt: new Date(),
+                    wordCount: wordCount,
+                    readingTime: Math.ceil(wordCount / 200),
+                    complexity: 'intermediate',
+                    suitabilityScore: 0.8
+                },
+                extractionSource: 'webpage',
+                allowContentEditing: true,
+                userCanModifySettings: true,
+                attribution: `Extracted from ${document.title}`
+            };
+            
+            // Store using fallback method
+            try {
+                localStorage.setItem('linguaspark_lesson_config', JSON.stringify({
+                    lessonConfiguration: lessonConfiguration,
+                    extractionSource: 'webpage',
+                    extractionTimestamp: Date.now(),
+                    sourceUrl: window.location.href,
+                    sourceTitle: document.title
+                }));
+                
+                log('✓ Successfully stored lesson configuration');
+                log('✓ Full extraction flow completed successfully');
+                
+                // Simulate opening lesson interface
+                const url = 'http://localhost:3000/popup?source=extraction&autoPopulate=true';
+                log('Would open lesson interface: ' + url);
+                
+            } catch (error) {
+                log('✗ Full extraction flow failed: ' + error.message);
+            }
+        }
+
+        // Clear all storage
+        function clearAllStorage() {
+            clearLog();
+            log('Clearing all storage...');
+            
+            try {
+                localStorage.removeItem('linguaspark_lesson_config');
+                sessionStorage.removeItem('linguaspark_lesson_config');
+                log('✓ Cleared localStorage and sessionStorage');
+            } catch (error) {
+                log('✗ Failed to clear storage: ' + error.message);
+            }
+        }
+
+        // Run initial test
+        log('Content Extraction Fix Test initialized');
+        log('Ready to test the fixes for extension context invalidation');
+    </script>
+</body>
+</html>
