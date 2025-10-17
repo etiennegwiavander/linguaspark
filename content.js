@@ -858,28 +858,148 @@
     // First, try to get content directly from body without cloning (more reliable)
     let text = '';
     
-    // Try multiple extraction strategies
+    // Try multiple extraction strategies - prioritize article content over full page
     const strategies = [
-      // Strategy 1: Direct body text extraction
+      // Strategy 1: Site-specific article content
       () => {
-        const bodyText = document.body.innerText || document.body.textContent || '';
-        console.log('[DEBUG] Strategy 1 - Direct body text length:', bodyText.length);
-        return bodyText;
+        // BBC-specific extraction
+        if (window.location.hostname.includes('bbc.com')) {
+          const selectors = [
+            '[data-component="text-block"]',
+            '.ssrcss-1q0x1qg-Paragraph',
+            '.ssrcss-uf6wea-RichTextComponentWrapper',
+            'article [data-component="text-block"] p',
+            'main article p'
+          ];
+          
+          let articleText = '';
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              elements.forEach(el => {
+                const text = el.innerText || el.textContent || '';
+                if (text.trim().length > 20) {
+                  articleText += text.trim() + '\n\n';
+                }
+              });
+              if (articleText.length > 500) {
+                console.log(`[DEBUG] Strategy 1 - BBC article content (${selector}):`, articleText.length);
+                return articleText;
+              }
+            }
+          }
+        }
+        
+        // Wikipedia-specific extraction
+        if (window.location.hostname.includes('wikipedia.org')) {
+          const contentDiv = document.querySelector('#mw-content-text .mw-parser-output');
+          if (contentDiv) {
+            const clonedContent = contentDiv.cloneNode(true);
+            
+            // Remove unwanted Wikipedia sections
+            const unwantedSections = [
+              // Navigation and metadata
+              '.navbox', '.infobox', '.metadata', '.ambox', '.tmbox', '.ombox',
+              '.navbox-wrapper', '.navbox-inner', '.navbox-group',
+              
+              // References and external links
+              '.reflist', '.references', '#References', '#External_links', '#See_also',
+              '#Further_reading', '#Bibliography', '#Notes', '#Citations',
+              
+              // Find sections by heading text
+              'h2:has(#References)', 'h2:has(#External_links)', 'h2:has(#See_also)',
+              'h2:has(#Further_reading)', 'h2:has(#Bibliography)', 'h2:has(#Notes)',
+              
+              // Other unwanted elements
+              '.hatnote', '.dablink', '.rellink', '.boilerplate',
+              '.sistersitebox', '.succession-box', '.geographic-box',
+              '.thumb', '.thumbinner', '.thumbcaption', // Images (keep text only)
+              'table', '.wikitable', '.sortable', // Tables
+              '.gallery', '.commons-file-link'
+            ];
+            
+            // Remove unwanted sections
+            unwantedSections.forEach(selector => {
+              const elements = clonedContent.querySelectorAll(selector);
+              elements.forEach(el => el.remove());
+            });
+            
+            // Remove sections after "References" heading
+            const headings = clonedContent.querySelectorAll('h2, h3');
+            let removeFromHere = false;
+            headings.forEach(heading => {
+              const headingText = heading.textContent.toLowerCase();
+              if (headingText.includes('references') || 
+                  headingText.includes('external links') || 
+                  headingText.includes('see also') ||
+                  headingText.includes('further reading') ||
+                  headingText.includes('bibliography') ||
+                  headingText.includes('notes')) {
+                removeFromHere = true;
+              }
+              
+              if (removeFromHere) {
+                // Remove this heading and all following siblings
+                let nextElement = heading;
+                while (nextElement) {
+                  const toRemove = nextElement;
+                  nextElement = nextElement.nextElementSibling;
+                  toRemove.remove();
+                }
+              }
+            });
+            
+            // Extract clean text from paragraphs only
+            const paragraphs = clonedContent.querySelectorAll('p');
+            let articleText = '';
+            paragraphs.forEach(p => {
+              const text = p.innerText || p.textContent || '';
+              if (text.trim().length > 20) {
+                articleText += text.trim() + '\n\n';
+              }
+            });
+            
+            if (articleText.length > 500) {
+              console.log('[DEBUG] Strategy 1 - Wikipedia article content:', articleText.length);
+              return articleText;
+            }
+          }
+        }
+        
+        return '';
       },
       
-      // Strategy 2: Main content selectors
+      // Strategy 2: Main content selectors (prioritized)
       () => {
         const contentSelectors = [
-          'main', 'article', '.post-content', '.entry-content', '.article-content',
+          'article', 'main article', '[role="main"]',
+          '.post-content', '.entry-content', '.article-content',
           '.content-body', '.post-body', '.article-body', '.main-content',
-          '#content', '.content', 'section'
+          'main', '#content', '.content'
         ];
         
         for (const selector of contentSelectors) {
           const element = document.querySelector(selector);
           if (element) {
-            const elementText = element.innerText || element.textContent || '';
-            console.log(`[DEBUG] Strategy 2 - ${selector} length:`, elementText.length);
+            // Remove unwanted sections from the element
+            const clonedElement = element.cloneNode(true);
+            
+            // Remove navigation, footer, sidebar, ads, related content
+            const unwantedSelectors = [
+              'nav', 'footer', 'aside', '.sidebar', '.related', '.comments',
+              '.advertisement', '.ad', '.social', '.share', '.tags',
+              '.author-bio', '.next-article', '.prev-article', '.pagination',
+              '[class*="related"]', '[class*="recommend"]', '[class*="more"]',
+              '[class*="footer"]', '[class*="nav"]', '[class*="sidebar"]'
+            ];
+            
+            unwantedSelectors.forEach(unwantedSelector => {
+              const unwantedElements = clonedElement.querySelectorAll(unwantedSelector);
+              unwantedElements.forEach(el => el.remove());
+            });
+            
+            const elementText = clonedElement.innerText || clonedElement.textContent || '';
+            console.log(`[DEBUG] Strategy 2 - ${selector} (cleaned) length:`, elementText.length);
             if (elementText.length > 500) { // Only use if substantial content
               return elementText;
             }
@@ -888,18 +1008,30 @@
         return '';
       },
       
-      // Strategy 3: Paragraph aggregation
+      // Strategy 3: Smart paragraph aggregation (exclude footer/nav content)
       () => {
         const paragraphs = document.querySelectorAll('p');
         let combinedText = '';
+        
         paragraphs.forEach(p => {
+          // Skip paragraphs in unwanted sections
+          const parentElement = p.closest('nav, footer, aside, .sidebar, .related, .comments, .advertisement, .ad');
+          if (parentElement) return;
+          
           const pText = p.innerText || p.textContent || '';
           if (pText.trim().length > 20) { // Only substantial paragraphs
             combinedText += pText.trim() + '\n\n';
           }
         });
-        console.log('[DEBUG] Strategy 3 - Paragraph aggregation length:', combinedText.length);
+        console.log('[DEBUG] Strategy 3 - Smart paragraph aggregation length:', combinedText.length);
         return combinedText;
+      },
+      
+      // Strategy 4: Fallback to body text (last resort)
+      () => {
+        const bodyText = document.body.innerText || document.body.textContent || '';
+        console.log('[DEBUG] Strategy 4 - Direct body text length:', bodyText.length);
+        return bodyText;
       }
     ];
     
