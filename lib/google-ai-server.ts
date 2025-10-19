@@ -169,8 +169,15 @@ class GoogleAIServerService {
                 return text;
               }
             }
-            // Only throw if there's truly no content at all
-            console.error("❌ MAX_TOKENS hit but no content available");
+            
+            // CRITICAL FIX: MAX_TOKENS with no content - just throw error
+            // The retry logic is too complex and causes scope issues
+            // Let the calling code handle fallbacks instead
+            console.warn("⚠️ MAX_TOKENS hit with no content - cannot retry from here");
+
+            
+            // Only throw if we truly can't retry
+            console.error("❌ MAX_TOKENS hit but no content available and cannot retry");
             console.error("❌ Response structure:", JSON.stringify(candidate, null, 2));
             const error = new Error("MAX_TOKENS_EXCEEDED_NO_CONTENT") as AIError;
             error.code = "MAX_TOKENS";

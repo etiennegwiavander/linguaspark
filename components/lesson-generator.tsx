@@ -179,7 +179,22 @@ export default function LessonGenerator({
   }
 
   const handleGenerateLesson = async () => {
+    console.log('[LessonGenerator] Generate lesson clicked:', {
+      selectedTextLength: selectedText.length,
+      lessonType,
+      studentLevel,
+      targetLanguage,
+      isExtractionSource,
+      hasExtractionConfig: !!extractionConfig
+    })
+    
     if (!lessonType || !studentLevel || !targetLanguage || !selectedText.trim()) {
+      console.error('[LessonGenerator] Validation failed:', {
+        hasLessonType: !!lessonType,
+        hasStudentLevel: !!studentLevel,
+        hasTargetLanguage: !!targetLanguage,
+        hasSelectedText: !!selectedText.trim()
+      })
       setError({
         type: "Validation Error",
         message: "Please fill in all fields and provide source content.",
@@ -228,11 +243,36 @@ export default function LessonGenerator({
 
       // Get enhanced content data if available
       let enhancedContent = null
-      if (typeof window !== "undefined" && window.chrome?.storage) {
-        const result = await new Promise((resolve) => {
-          window.chrome.storage.local.get(["enhancedContent"], resolve)
-        })
-        enhancedContent = result.enhancedContent
+      try {
+        if (typeof window !== "undefined" && window.chrome?.storage) {
+          const result = await new Promise((resolve, reject) => {
+            window.chrome.storage.local.get(["lessonConfiguration", "extractedContent"], (result) => {
+              if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError)
+              } else {
+                resolve(result)
+              }
+            })
+          })
+          
+          // Map lessonConfiguration to enhancedContent format (Phase 1 storage structure)
+          if (result.lessonConfiguration) {
+            console.log('[LessonGenerator] Found lessonConfiguration in storage')
+            enhancedContent = {
+              metadata: result.lessonConfiguration.metadata,
+              structuredContent: {}, // Not stored in lessonConfiguration
+              wordCount: result.lessonConfiguration.metadata?.wordCount,
+              readingTime: result.lessonConfiguration.metadata?.readingTime
+            }
+          } else if (result.extractedContent) {
+            // Fallback to extractedContent if available
+            console.log('[LessonGenerator] Found extractedContent in storage')
+            enhancedContent = result.extractedContent
+          }
+        }
+      } catch (error) {
+        console.warn('[LessonGenerator] Failed to load enhanced content from storage:', error)
+        // Continue without enhanced content - it's optional
       }
 
       // Prepare request body with enhanced content data
@@ -246,11 +286,27 @@ export default function LessonGenerator({
 
       // Add enhanced content data if available
       if (enhancedContent) {
+        console.log('[LessonGenerator] Adding enhanced content to request:', {
+          hasMetadata: !!enhancedContent.metadata,
+          hasStructuredContent: !!enhancedContent.structuredContent,
+          wordCount: enhancedContent.wordCount,
+          readingTime: enhancedContent.readingTime
+        })
         requestBody.contentMetadata = enhancedContent.metadata
         requestBody.structuredContent = enhancedContent.structuredContent
         requestBody.wordCount = enhancedContent.wordCount
         requestBody.readingTime = enhancedContent.readingTime
+      } else {
+        console.log('[LessonGenerator] No enhanced content available, sending basic request')
       }
+
+      console.log('[LessonGenerator] Sending request to API:', {
+        sourceTextLength: requestBody.sourceText.length,
+        lessonType: requestBody.lessonType,
+        studentLevel: requestBody.studentLevel,
+        targetLanguage: requestBody.targetLanguage,
+        hasMetadata: !!requestBody.contentMetadata
+      })
 
       // Call the AI generation API
       const response = await fetch("/api/generate-lesson", {
@@ -261,7 +317,13 @@ export default function LessonGenerator({
         body: JSON.stringify(requestBody),
       })
 
+      console.log('[LessonGenerator] API response status:', response.status)
       const result = await response.json()
+      console.log('[LessonGenerator] API response:', {
+        success: result.success,
+        hasLesson: !!result.lesson,
+        hasError: !!result.error
+      })
 
       if (!response.ok || !result.success) {
         // Handle structured error response from API

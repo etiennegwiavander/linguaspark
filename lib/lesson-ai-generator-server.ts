@@ -17,6 +17,14 @@ interface LessonGenerationParams {
     domain?: string
     language?: string
     keywords?: string[]
+    bannerImages?: Array<{
+      src: string
+      alt: string
+      type: 'meta' | 'content'
+      priority: number
+      width?: number | null
+      height?: number | null
+    }>
   }
   structuredContent?: {
     headings?: Array<{ level: number; text: string }>
@@ -245,7 +253,8 @@ Rewrite the content clearly and completely:`
       sourceText,
       lessonType,
       studentLevel as CEFRLevel,
-      targetLanguage
+      targetLanguage,
+      metadata // Pass metadata for title fallback
     )
 
     // Step 2: Define lesson sections with dependencies

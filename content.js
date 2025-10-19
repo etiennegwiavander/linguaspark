@@ -1068,6 +1068,10 @@
 
     // Extract metadata for context
     const metadata = extractContentMetadata(document);
+    
+    // Extract relevant images for banner
+    const bannerImages = extractBannerImages(document);
+    metadata.bannerImages = bannerImages;
 
     return {
       text: text,
@@ -1076,6 +1080,137 @@
       wordCount: text ? text.split(/\s+/).length : 0,
       readingTime: text ? Math.ceil(text.split(/\s+/).length / 200) : 0,
     }
+  }
+
+  // Extract relevant banner images from the article
+  function extractBannerImages(doc) {
+    console.log('[DEBUG] Extracting banner images...');
+    const images = [];
+    
+    // Priority order for image selection
+    const imageSelectors = [
+      // Open Graph and Twitter Card images (highest priority)
+      'meta[property="og:image"]',
+      'meta[name="twitter:image"]',
+      'meta[name="twitter:image:src"]',
+      
+      // Article/content images
+      'article img',
+      'main img',
+      '.article-content img',
+      '.post-content img',
+      '.entry-content img',
+      
+      // BBC-specific selectors
+      '.ssrcss-evoj7m-Image img',
+      '[data-component="image-block"] img',
+      '.gel-layout__item img',
+      
+      // Wikipedia main image
+      '.infobox img',
+      '.thumbimage',
+      
+      // General content images
+      '.content img',
+      '#content img',
+      'img[src*="content"]',
+      'img[src*="article"]',
+      
+      // Fallback to any large images
+      'img'
+    ];
+    
+    // Extract meta tag images first (highest quality)
+    const metaImages = [];
+    ['og:image', 'twitter:image', 'twitter:image:src'].forEach(property => {
+      const metaTag = doc.querySelector(`meta[property="${property}"], meta[name="${property}"]`);
+      if (metaTag && metaTag.content) {
+        metaImages.push({
+          src: metaTag.content,
+          alt: `Banner image from ${property}`,
+          type: 'meta',
+          priority: 10,
+          width: null,
+          height: null
+        });
+      }
+    });
+    
+    // Extract images from DOM
+    const domImages = [];
+    imageSelectors.forEach((selector, index) => {
+      const elements = doc.querySelectorAll(selector);
+      elements.forEach(img => {
+        if (img.tagName === 'IMG' || img.content) {
+          const src = img.src || img.content;
+          const alt = img.alt || img.getAttribute('aria-label') || '';
+          
+          // Skip if already added or invalid
+          if (!src || domImages.some(existing => existing.src === src)) return;
+          
+          // Skip small, decorative, or irrelevant images
+          if (isImageRelevant(img, src, alt)) {
+            domImages.push({
+              src: src,
+              alt: alt || 'Article image',
+              type: 'content',
+              priority: 10 - index, // Higher priority for earlier selectors
+              width: img.naturalWidth || img.width || null,
+              height: img.naturalHeight || img.height || null
+            });
+          }
+        }
+      });
+    });
+    
+    // Combine and sort by priority
+    const allImages = [...metaImages, ...domImages];
+    allImages.sort((a, b) => b.priority - a.priority);
+    
+    // Return top 3 most relevant images
+    const selectedImages = allImages.slice(0, 3);
+    console.log(`[DEBUG] Found ${allImages.length} images, selected ${selectedImages.length} for banner`);
+    
+    return selectedImages;
+  }
+  
+  // Helper function to determine if an image is relevant for banner use
+  function isImageRelevant(img, src, alt) {
+    // Skip if no source
+    if (!src) return false;
+    
+    // Skip data URLs and very small images
+    if (src.startsWith('data:') && src.length < 1000) return false;
+    
+    // Skip common irrelevant patterns
+    const irrelevantPatterns = [
+      'logo', 'icon', 'avatar', 'profile', 'thumbnail', 'button',
+      'arrow', 'bullet', 'decoration', 'border', 'background',
+      'social', 'share', 'comment', 'rating', 'star',
+      'ad', 'advertisement', 'banner', 'promo',
+      'pixel', 'tracking', 'analytics'
+    ];
+    
+    const srcLower = src.toLowerCase();
+    const altLower = alt.toLowerCase();
+    
+    if (irrelevantPatterns.some(pattern => 
+        srcLower.includes(pattern) || altLower.includes(pattern))) {
+      return false;
+    }
+    
+    // Skip very small images (likely icons/decorations)
+    if (img.width && img.height && (img.width < 200 || img.height < 100)) {
+      return false;
+    }
+    
+    // Skip images with very generic or empty alt text
+    if (alt.length < 3 || alt.toLowerCase().includes('image') && alt.length < 10) {
+      // Allow if it's a meta tag image (usually high quality)
+      return src.includes('og:') || src.includes('twitter:');
+    }
+    
+    return true;
   }
 
   // Extract content metadata for better context

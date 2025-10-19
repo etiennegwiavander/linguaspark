@@ -647,6 +647,9 @@
   .mb-1 {
     margin-bottom: calc(var(--spacing) * 1);
   }
+  .mb-1\.5 {
+    margin-bottom: calc(var(--spacing) * 1.5);
+  }
   .mb-2 {
     margin-bottom: calc(var(--spacing) * 2);
   }
@@ -840,6 +843,9 @@
   }
   .h-12 {
     height: calc(var(--spacing) * 12);
+  }
+  .h-48 {
+    height: calc(var(--spacing) * 48);
   }
   .h-\[1px\] {
     height: 1px;
@@ -4712,6 +4718,11 @@
   .lg\:h-7 {
     @media (width >= 64rem) {
       height: calc(var(--spacing) * 7);
+    }
+  }
+  .lg\:h-64 {
+    @media (width >= 64rem) {
+      height: calc(var(--spacing) * 64);
     }
   }
   .lg\:w-7 {

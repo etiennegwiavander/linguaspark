@@ -1,5 +1,4 @@
 {
-  "/api/get-extracted-content/route": "app/api/get-extracted-content/route.js",
-  "/api/generate-lesson/route": "app/api/generate-lesson/route.js",
-  "/popup/page": "app/popup/page.js"
+  "/popup/page": "app/popup/page.js",
+  "/api/get-extracted-content/route": "app/api/get-extracted-content/route.js"
 }

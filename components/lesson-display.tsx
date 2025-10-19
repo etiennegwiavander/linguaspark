@@ -34,6 +34,24 @@ interface LessonData {
   lessonType: string
   studentLevel: string
   targetLanguage: string
+  metadata?: {
+    title?: string
+    description?: string
+    author?: string
+    publishDate?: string
+    contentType?: string
+    domain?: string
+    language?: string
+    keywords?: string[]
+    bannerImages?: Array<{
+      src: string
+      alt: string
+      type: 'meta' | 'content'
+      priority: number
+      width?: number | null
+      height?: number | null
+    }>
+  }
   sections: {
     warmup: string[]
     vocabulary: Array<{ word: string; meaning: string; example?: string; examples?: string[] }>
@@ -289,13 +307,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: MessageCircle,
       enabled: sectionStates.warmup,
       content: (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {safeLesson.sections.warmup.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
               return (
-                <div key={index} className="mb-3">
-                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                <div key={index} className="mb-1.5">
+                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#EEF7DC' }} style={{ backgroundColor: "#EEF7DC" }}>
                     {question}
                   </p>
                 </div>
@@ -303,7 +321,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             }
             // Rest are actual questions
             return (
-              <div key={index} className="flex items-start gap-2">
+              <div key={index} className="flex items-start gap-1.5">
                 <span className="text-[15px] font-medium text-primary">{index}.</span>
                 <p className="text-base text-foreground">{question}</p>
               </div>
@@ -318,13 +336,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: BookOpen,
       enabled: sectionStates.vocabulary,
       content: (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {safeLesson.sections.vocabulary.map((item, index) => {
             // First item is the instruction
             if (index === 0 && item.word === "INSTRUCTION") {
               return (
-                <div key={index} className="mb-3">
-                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                <div key={index} className="mb-1.5">
+                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#F1FAFF' }} style={{ backgroundColor: "#F1FAFF" }}>
                     {item.meaning}
                   </p>
                 </div>
@@ -342,14 +360,14 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             }
 
             return (
-              <div key={index} className="border rounded-lg p-3 bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
+              <div key={index} className="border rounded-sm p-3 bg-muted/30">
+                <div className="flex items-center gap-1.5 mb-1.5">
                   <span className="font-semibold text-primary text-base">{item.word}</span>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                     <Volume2 className="h-3 w-3" />
                   </Button>
                 </div>
-                <p className="text-base text-muted-foreground mb-3 leading-relaxed">{item.meaning}</p>
+                <p className="text-base text-muted-foreground mb-1.5 leading-relaxed">{item.meaning}</p>
                 {examples.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -357,7 +375,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                     </p>
                     <ul className="space-y-1">
                       {examples.map((example, exIndex) => (
-                        <li key={exIndex} className="flex items-start gap-2">
+                        <li key={exIndex} className="flex items-start gap-1.5">
                           <span className="text-primary mt-1">•</span>
                           <span
                             className="text-base text-slate-700"
@@ -390,20 +408,20 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             // Check if first part is an instruction
             if (parts.length > 1 && parts[0].includes('Read the following text carefully')) {
               return (
-                <div className="space-y-3">
-                  <div className="mb-3">
-                    <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                <div className="space-y-1.5">
+                  <div className="mb-1.5">
+                    <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#EEF7DC' }} style={{ backgroundColor: "#EEF7DC" }}>
                       {parts[0]}
                     </p>
                   </div>
-                  <div className="bg-muted/30 rounded-lg p-4 border">
+                  <div className="bg-muted/30 rounded-sm p-4 border">
                     <div
-                      className="text-base leading-relaxed space-y-4"
+                      className="text-base leading-relaxed space-y-1.5"
                       dangerouslySetInnerHTML={{
                         __html: parts.slice(1).join('\n\n')
                           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                          .replace(/\n\n/g, '</p><p class="mb-4">')
-                          .replace(/^/, '<p class="mb-4">')
+                          .replace(/\n\n/g, '</p><p class="mb-1.5">')
+                          .replace(/^/, '<p class="mb-1.5">')
                           .replace(/$/, '</p>')
                       }}
                     />
@@ -413,14 +431,14 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             } else {
               // No instruction, display as before
               return (
-                <div className="bg-muted/30 rounded-lg p-4 border">
+                <div className="bg-muted/30 rounded-sm p-4 border">
                   <div
-                    className="text-base leading-relaxed space-y-4"
+                    className="text-base leading-relaxed space-y-1.5"
                     dangerouslySetInnerHTML={{
                       __html: readingContent
                         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/\n\n/g, '</p><p class="mb-4">')
-                        .replace(/^/, '<p class="mb-4">')
+                        .replace(/\n\n/g, '</p><p class="mb-1.5">')
+                        .replace(/^/, '<p class="mb-1.5">')
                         .replace(/$/, '</p>')
                     }}
                   />
@@ -437,13 +455,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: CheckCircle,
       enabled: sectionStates.comprehension,
       content: (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {safeLesson.sections.comprehension.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
               return (
-                <div key={index} className="mb-3">
-                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                <div key={index} className="mb-1.5">
+                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#F1FAFF' }} style={{ backgroundColor: "#F1FAFF" }}>
                     {question}
                   </p>
                 </div>
@@ -451,7 +469,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             }
             // Rest are actual questions
             return (
-              <div key={index} className="flex items-start gap-2">
+              <div key={index} className="flex items-start gap-1.5">
                 <span className="text-[15px] font-medium text-primary">{index}.</span>
                 <p className="text-base text-foreground">{question}</p>
               </div>
@@ -466,18 +484,18 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Users,
       enabled: sectionStates.dialoguePractice,
       content: (
-        <div className="space-y-4">
-          <div className="mb-3">
-            <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+        <div className="space-y-1.5">
+          <div className="mb-1.5">
+            <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#EEF7DC' }} style={{ backgroundColor: "#EEF7DC" }}>
               {safeLesson.sections.dialoguePractice.instruction}
             </p>
           </div>
-          <div className="bg-muted/30 rounded-lg p-4 border">
-            <div className="space-y-4">
+          <div className="bg-muted/30 rounded-sm p-4 border">
+            <div className="space-y-1.5">
               {(() => {
                 const enhancedDialogue = enhanceDialogueWithAvatars(safeLesson.sections.dialoguePractice.dialogue, lessonId, 'dialoguePractice')
                 return enhancedDialogue.map((line, index) => (
-                  <div key={index} className="flex items-start gap-4">
+                  <div key={index} className="flex items-start gap-1.5">
                     {line.avatar && <AvatarImage avatar={line.avatar} size="md" />}
                     <div className="flex-1">
                       <p className="text-base text-foreground leading-relaxed">{line.line}</p>
@@ -489,10 +507,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           </div>
           {safeLesson.sections.dialoguePractice.followUpQuestions.length > 0 && (
             <div className="mt-4">
-              <h4 className="font-medium text-sm mb-2">Follow-up Questions:</h4>
+              <h4 className="font-medium text-sm mb-1.5">Follow-up Questions:</h4>
               <div className="space-y-2">
                 {safeLesson.sections.dialoguePractice.followUpQuestions.map((question, index) => (
-                  <div key={index} className="flex items-start gap-2">
+                  <div key={index} className="flex items-start gap-1.5">
                     <span className="text-[15px] font-medium text-primary">{index + 1}.</span>
                     <p className="text-base text-foreground">{question}</p>
                   </div>
@@ -509,18 +527,18 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: MessageCircle,
       enabled: sectionStates.dialogueFillGap,
       content: (
-        <div className="space-y-4">
-          <div className="mb-3">
-            <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+        <div className="space-y-1.5">
+          <div className="mb-1.5">
+            <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#F1FAFF' }} style={{ backgroundColor: "#F1FAFF" }}>
               {safeLesson.sections.dialogueFillGap.instruction}
             </p>
           </div>
-          <div className="bg-muted/30 rounded-lg p-4 border">
-            <div className="space-y-4">
+          <div className="bg-muted/30 rounded-sm p-4 border">
+            <div className="space-y-1.5">
               {(() => {
                 const enhancedDialogue = enhanceDialogueWithAvatars(safeLesson.sections.dialogueFillGap.dialogue, lessonId, 'dialogueFillGap')
                 return enhancedDialogue.map((line, index) => (
-                  <div key={index} className="flex items-start gap-4">
+                  <div key={index} className="flex items-start gap-1.5">
                     {line.avatar && <AvatarImage avatar={line.avatar} size="md" />}
                     <div className="flex-1">
                       <div className="text-base text-foreground leading-relaxed">
@@ -542,7 +560,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           </div>
           {safeLesson.sections.dialogueFillGap.answers.length > 0 && (
             <div className="mt-4">
-              <h4 className="font-medium text-sm mb-2">Answer Key:</h4>
+              <h4 className="font-medium text-sm mb-1.5">Answer Key:</h4>
               <div className="text-sm text-muted-foreground">
                 {safeLesson.sections.dialogueFillGap.answers.join(', ')}
               </div>
@@ -557,13 +575,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Users,
       enabled: sectionStates.discussion,
       content: (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {safeLesson.sections.discussion.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
               return (
-                <div key={index} className="mb-3">
-                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                <div key={index} className="mb-1.5">
+                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#EEF7DC' }} style={{ backgroundColor: "#EEF7DC" }}>
                     {question}
                   </p>
                 </div>
@@ -571,7 +589,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             }
             // Rest are actual questions
             return (
-              <div key={index} className="flex items-start gap-2">
+              <div key={index} className="flex items-start gap-1.5">
                 <span className="text-[15px] font-medium text-primary">{index}.</span>
                 <p className="text-base text-foreground">{question}</p>
               </div>
@@ -586,13 +604,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: BookOpen,
       enabled: sectionStates.grammar,
       content: (
-        <div className="space-y-4">
+        <div className="space-y-1.5">
           <div>
-            <h4 className="font-semibold text-base mb-3">{safeLesson.sections.grammar.focus}</h4>
+            <h4 className="font-semibold text-base mb-1.5">{safeLesson.sections.grammar.focus}</h4>
 
             {/* Grammar Explanation */}
             {safeLesson.sections.grammar.explanation && (
-              <div className="space-y-3 mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="space-y-1.5 mb-1.5 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-sm border border-blue-200 dark:border-blue-800">
                 {safeLesson.sections.grammar.explanation.form && (
                   <div>
                     <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Form:</h5>
@@ -615,8 +633,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             )}
 
             {/* Examples */}
-            <div className="mb-4">
-              <h5 className="font-medium text-sm mb-2">Examples:</h5>
+            <div className="mb-1.5">
+              <h5 className="font-medium text-sm mb-1.5">Examples:</h5>
               <div className="space-y-1">
                 {safeLesson.sections.grammar.examples.map((example, index) => (
                   <p key={index} className="text-base bg-muted/30 rounded px-3 py-2 border-l-2 border-primary/50">
@@ -628,7 +646,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
             {/* Practice Exercises */}
             <div>
-              <h5 className="font-medium text-sm mb-2">Practice Exercises:</h5>
+              <h5 className="font-medium text-sm mb-1.5">Practice Exercises:</h5>
               <div className="space-y-2">
                 {safeLesson.sections.grammar.exercises ? (
                   // New format with structured exercises
@@ -667,10 +685,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Volume2,
       enabled: sectionStates.pronunciation,
       content: (
-        <div className="space-y-4">
+        <div className="space-y-1.5">
           {/* Instruction */}
           {safeLesson.sections.pronunciation?.instruction && (
-            <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+            <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#F1FAFF' }} style={{ backgroundColor: "#F1FAFF" }}>
               {safeLesson.sections.pronunciation.instruction}
             </p>
           )}
@@ -679,9 +697,9 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           {safeLesson.sections.pronunciation?.words && safeLesson.sections.pronunciation.words.length > 0 ? (
             <div className="space-y-6">
               {safeLesson.sections.pronunciation.words.map((wordItem, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-3">
+                <div key={index} className="border rounded-sm p-4 space-y-1.5">
                   {/* Word and IPA */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-lg">{wordItem.word}</span>
                     <span className="text-muted-foreground font-mono text-sm">{wordItem.ipa}</span>
                     <Button variant="outline" size="sm">
@@ -693,7 +711,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                   {wordItem.difficultSounds && wordItem.difficultSounds.length > 0 && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">Difficult Sounds:</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {wordItem.difficultSounds.map((sound, i) => (
                           <Badge key={i} variant="secondary" className="font-mono text-xs">
                             {sound}
@@ -706,10 +724,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                   {/* Tips */}
                   {wordItem.tips && wordItem.tips.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Pronunciation Tips:</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Pronunciation Tips:</p>
                       <ul className="space-y-1.5 text-sm">
                         {wordItem.tips.map((tip, i) => (
-                          <li key={i} className="flex items-start gap-2">
+                          <li key={i} className="flex items-start gap-1.5">
                             <span className="text-primary mt-0.5">•</span>
                             <span>{tip}</span>
                           </li>
@@ -720,7 +738,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
                   {/* Practice Sentence */}
                   {wordItem.practiceSentence && (
-                    <div className="bg-muted/30 rounded-lg p-3 mt-2">
+                    <div className="bg-muted/30 rounded-sm p-3 mt-2">
                       <p className="text-sm text-muted-foreground mb-1">Practice Sentence:</p>
                       <p className="text-base text-foreground font-medium">{wordItem.practiceSentence}</p>
                     </div>
@@ -731,8 +749,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           ) : (
             /* Old format: Single word */
             safeLesson.sections.pronunciation?.word && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-lg">{safeLesson.sections.pronunciation.word}</span>
                   <span className="text-muted-foreground font-mono">{safeLesson.sections.pronunciation.ipa}</span>
                   <Button variant="outline" size="sm">
@@ -740,7 +758,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                   </Button>
                 </div>
                 {safeLesson.sections.pronunciation.practice && (
-                  <div className="bg-muted/30 rounded-lg p-3">
+                  <div className="bg-muted/30 rounded-sm p-3">
                     <p className="text-sm text-muted-foreground">Practice sentence:</p>
                     <p className="text-base text-foreground font-medium mt-1">"{safeLesson.sections.pronunciation.practice}"</p>
                   </div>
@@ -752,10 +770,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           {/* Tongue Twisters */}
           {safeLesson.sections.pronunciation?.tongueTwisters && safeLesson.sections.pronunciation.tongueTwisters.length > 0 && (
             <div className="mt-6 pt-4 border-t">
-              <p className="text-base font-medium mb-3">Tongue Twisters:</p>
-              <div className="space-y-3">
+              <p className="text-base font-medium mb-1.5">Tongue Twisters:</p>
+              <div className="space-y-1.5">
                 {safeLesson.sections.pronunciation.tongueTwisters.map((twister, index) => (
-                  <div key={index} className="bg-primary/5 rounded-lg p-3">
+                  <div key={index} className="bg-primary/5 rounded-sm p-3">
                     <p className="text-base font-medium mb-1">{twister.text}</p>
                     {twister.targetSounds && twister.targetSounds.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
@@ -786,13 +804,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: CheckCircle,
       enabled: sectionStates.wrapup,
       content: (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           {safeLesson.sections.wrapup.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
               return (
-                <div key={index} className="mb-3">
-                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 bg-muted/30 rounded-r">
+                <div key={index} className="mb-1.5">
+                  <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#EEF7DC' }} style={{ backgroundColor: "#EEF7DC" }}>
                     {question}
                   </p>
                 </div>
@@ -800,7 +818,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             }
             // Rest are actual questions
             return (
-              <div key={index} className="flex items-start gap-2">
+              <div key={index} className="flex items-start gap-1.5">
                 <span className="text-[15px] font-medium text-primary">{index}.</span>
                 <p className="text-base text-foreground">{question}</p>
               </div>
@@ -823,20 +841,35 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
   }
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-1.5">
       {/* Header - Full Width */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5">
         <div className="flex-1">
           {/* AI-Generated Lesson Title */}
-          <h1 className="text-2xl lg:text-[32px] font-bold text-foreground leading-tight mb-2">
+          <h1 className="text-2xl lg:text-[32px] font-bold text-foreground leading-tight mb-1.5">
             {safeLesson.lessonTitle}
           </h1>
+          
+          {/* Banner Image */}
+          {safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0 && (
+            <div className="mb-6">
+              <img
+                src={safeLesson.metadata.bannerImages[0].src}
+                alt={safeLesson.metadata.bannerImages[0].alt}
+                className="w-full h-48 lg:h-64 object-cover rounded-sm shadow-md"
+                onError={(e) => {
+                  // Hide image if it fails to load
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
 
           {/* Lesson Metadata */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-sm text-muted-foreground">Generated Lesson</span>
             <span className="text-muted-foreground">•</span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               <Badge variant="default">{safeLesson.lessonType}</Badge>
               <Badge variant="outline">{safeLesson.studentLevel}</Badge>
               <Badge variant="secondary">{safeLesson.targetLanguage}</Badge>
@@ -858,11 +891,11 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       )}
 
       {/* Two Column Layout: Controls Left, Content Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5">
 
         {/* LEFT COLUMN - Controls & Debug (Sticky on large screens) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="lg:sticky lg:top-4 space-y-4">
+        <div className="lg:col-span-4 space-y-1.5">
+          <div className="lg:sticky lg:top-4 space-y-1.5">
 
             {/* Debug Info in Development */}
             {/* {process.env.NODE_ENV === 'development' && (
@@ -896,8 +929,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               <CardContent>
                 <div className="space-y-2">
                   {sections.map((section) => (
-                    <div key={section.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-2">
+                    <div key={section.id} className="flex items-center justify-between p-2 rounded-sm hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-1.5">
                         <section.icon className="h-4 w-4 text-muted-foreground" />
                         <span className="text-base text-foreground">{section.title}</span>
                       </div>
@@ -917,7 +950,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   <Button
                     variant="outline"
                     size="sm"
@@ -964,14 +997,14 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
         {/* RIGHT COLUMN - Lesson Content (Scrollable) */}
         <div className="lg:col-span-8">
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {sections
               .filter((section) => section.enabled)
               .map((section, index) => (
                 <Card key={section.id} className="scroll-mt-4">
                   <CardHeader className="pb-4">
                     <CardTitle asChild>
-                      <h2 className="text-[28px] font-semibold text-foreground flex items-center gap-3">
+                      <h2 className="text-[28px] font-semibold text-foreground flex items-center gap-1.5">
                         <section.icon className="h-6 w-6 lg:h-7 lg:w-7" />
                         {section.title}
                       </h2>
@@ -987,7 +1020,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             {sections.filter((s) => s.enabled).length === 0 && (
               <Card className="border-dashed">
                 <CardContent className="pt-6 pb-6 text-center">
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-1.5" />
                   <p className="text-sm text-muted-foreground">
                     No sections selected. Enable sections from the left panel to view lesson content.
                   </p>
@@ -1000,3 +1033,5 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     </div>
   )
 }
+
+

@@ -101,13 +101,14 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
     sourceText: string,
     lessonType: string,
     studentLevel: CEFRLevel,
-    targetLanguage: string
+    targetLanguage: string,
+    metadata?: any
   ): Promise<SharedContext> {
     console.log("🏗️ Building shared context for progressive generation...")
 
     try {
-      // Generate contextual lesson title
-      const lessonTitle = await this.generateLessonTitle(sourceText, lessonType, studentLevel)
+      // Generate contextual lesson title (with fallback to metadata)
+      const lessonTitle = await this.generateLessonTitle(sourceText, lessonType, studentLevel, metadata)
 
       // Extract key vocabulary using AI optimization
       const keyVocabulary = await this.extractKeyVocabulary(sourceText, studentLevel)
@@ -241,26 +242,73 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
 
   // Private helper methods for extracting shared context
 
-  private async generateLessonTitle(sourceText: string, lessonType: string, studentLevel: CEFRLevel): Promise<string> {
-    console.log("🎯 Generating AI-powered lesson title...")
+  private async generateLessonTitle(sourceText: string, lessonType: string, studentLevel: CEFRLevel, metadata?: any): Promise<string> {
+    console.log("🎯 Generating Engoo-style lesson title...")
     
-    // Use a shorter, more focused prompt to avoid token issues
-    const shortPrompt = `Create a lesson title for ${studentLevel} level ${lessonType} about: ${sourceText.substring(0, 150)}
+    try {
+      // Create Engoo-style title prompt with examples
+      const engooPrompt = `Create an engaging lesson title in Engoo style for ${studentLevel} level ${lessonType} lesson.
 
-Title (3-8 words):`
+Content: ${sourceText.substring(0, 200)}
 
-    const response = await this.getGoogleAI().prompt(shortPrompt, { maxTokens: 50 })
-    const title = response.trim().replace(/['"]/g, '').replace(/^Title:?\s*/i, '').substring(0, 80)
-    
-    console.log("🤖 AI generated title:", title)
-    
-    // Validate the title - if invalid, throw error (no fallbacks)
-    if (title.length > 5 && title.length < 80 && !title.toLowerCase().includes('lesson')) {
-      console.log("✅ Using AI-generated title:", title)
-      return title
+Engoo-style titles are:
+- Engaging and conversational (3-8 words)
+- Focus on the main topic or theme
+- Avoid generic words like "lesson", "article", "story"
+- Use active, interesting language
+- Examples: "Tech Giants Go Nuclear", "The Rise of Digital Nomads", "Climate Change Solutions"
+
+Generate title:`
+
+      const response = await this.getGoogleAI().prompt(engooPrompt, { maxTokens: 60 })
+      const title = response.trim()
+        .replace(/['"]/g, '')
+        .replace(/^(Title:?|Generate title:?)\s*/i, '')
+        .replace(/\.$/, '') // Remove trailing period
+        .substring(0, 80)
+      
+      console.log("🤖 AI generated Engoo-style title:", title)
+      
+      // Validate the title - should be engaging and appropriate length
+      if (title.length > 5 && title.length < 80 && 
+          !title.toLowerCase().includes('lesson') && 
+          !title.toLowerCase().includes('article') &&
+          title.split(' ').length >= 2 && title.split(' ').length <= 8) {
+        console.log("✅ Using AI-generated Engoo-style title:", title)
+        return title
+      }
+      
+      console.warn("⚠️ AI generated invalid title, using fallback")
+    } catch (error) {
+      console.warn("⚠️ AI title generation failed, using fallback:", error.message)
     }
     
-    throw new Error(`AI generated invalid title: "${title}". No fallbacks allowed per LinguaSpark vision.`)
+    // PRAGMATIC FALLBACK: Use metadata or generate simple title
+    // This ensures lesson generation NEVER fails due to title issues
+    
+    // Option 1: Use extracted metadata title
+    if (metadata?.title && metadata.title.length > 5) {
+      const cleanTitle = metadata.title
+        .replace(/\s*-\s*Wikipedia$/i, '')
+        .replace(/\s*\|\s*.+$/i, '')
+        .substring(0, 80)
+      console.log("✅ Using metadata title:", cleanTitle)
+      return cleanTitle
+    }
+    
+    // Option 2: Generate from first sentence
+    const firstSentence = sourceText.split(/[.!?]/)[0]?.trim()
+    if (firstSentence && firstSentence.length > 10 && firstSentence.length < 100) {
+      const simpleTitle = firstSentence.substring(0, 60) + (firstSentence.length > 60 ? '...' : '')
+      console.log("✅ Using content-based title:", simpleTitle)
+      return simpleTitle
+    }
+    
+    // Option 3: Generic but functional fallback
+    const lessonTypeLabel = lessonType.charAt(0).toUpperCase() + lessonType.slice(1)
+    const genericTitle = `${lessonTypeLabel} Lesson - ${studentLevel} Level`
+    console.log("✅ Using generic title:", genericTitle)
+    return genericTitle
   }
 
 
@@ -814,8 +862,15 @@ Return only questions, one per line:`
         .filter(line => line.endsWith('?') && line.length > 10)
         .slice(0, 5)
 
-      if (questions.length < 5) {
+      // PRAGMATIC: Accept 3+ questions instead of requiring exactly 5
+      // Better to have a lesson with 3 questions than no lesson at all
+      if (questions.length < 3) {
+        console.warn(`⚠️ Only generated ${questions.length} comprehension questions, need at least 3`)
         throw new Error("Insufficient comprehension questions generated")
+      }
+      
+      if (questions.length < 5) {
+        console.warn(`⚠️ Generated ${questions.length} comprehension questions (target was 5, but acceptable)`)
       }
 
       const instruction = "After reading the text, answer these comprehension questions:"

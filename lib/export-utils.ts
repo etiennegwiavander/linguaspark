@@ -1,11 +1,13 @@
 import jsPDF from "jspdf"
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, UnderlineType } from "docx"
+import { enhanceDialogueWithAvatars } from "./avatar-utils"
 
 interface LessonData {
   lessonTitle: string
   lessonType: string
   studentLevel: string
   targetLanguage: string
+  id?: string
   sections: {
     warmup: string[]
     vocabulary: Array<{ word: string; meaning: string; example?: string; examples?: string[] }>
@@ -153,7 +155,7 @@ export class LessonExporter {
       }
 
       // Helper function to add text with word wrapping
-      const addText = (text: string, fontSize = FONT_SIZES.MAIN_CONTENT, isBold = false, indent = 0) => {
+      const addText = (text: string, fontSize = FONT_SIZES.MAIN_CONTENT, isBold = false, isItalic = false, indent = 0) => {
         try {
           // Sanitize text to prevent PDF errors
           const sanitizedText = text
@@ -169,7 +171,16 @@ export class LessonExporter {
           console.log(`Adding text: "${sanitizedText.substring(0, 50)}${sanitizedText.length > 50 ? '...' : ''}"`)
 
           pdf.setFontSize(fontSize)
-          pdf.setFont("helvetica", isBold ? "bold" : "normal")
+          // Set font style based on bold and italic flags
+          let fontStyle = "normal"
+          if (isBold && isItalic) {
+            fontStyle = "bolditalic"
+          } else if (isBold) {
+            fontStyle = "bold"
+          } else if (isItalic) {
+            fontStyle = "italic"
+          }
+          pdf.setFont("helvetica", fontStyle)
 
           const maxWidth = pdf.internal.pageSize.width - margin * 2 - indent
           const lines = pdf.splitTextToSize(sanitizedText, maxWidth)
@@ -214,7 +225,29 @@ export class LessonExporter {
         addSection("Warm-up Questions", () => {
           const warmupQuestions = Array.isArray(lessonData.sections.warmup) ? lessonData.sections.warmup : []
           warmupQuestions.forEach((question, index) => {
-            addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
+            // First item is the instruction with light green background (italic) - manual rendering
+            if (index === 0) {
+              pdf.setFillColor(238, 247, 220) // #EEF7DC
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "italic")
+              
+              const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+              const instructionLines = pdf.splitTextToSize(question, instructionWidth)
+              const instructionHeight = instructionLines.length * lineHeight + 6
+              
+              // Draw background rectangle
+              pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+              
+              // Add instruction text
+              for (const line of instructionLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 8 // Extra spacing after instruction
+            } else {
+              // Rest are actual questions (renumber starting from 1)
+              addText(`${index}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+            }
           })
         })
       }
@@ -222,19 +255,43 @@ export class LessonExporter {
       if (enabledSections.vocabulary && lessonData.sections.vocabulary) {
         addSection("Key Vocabulary", () => {
           const vocabularyItems = Array.isArray(lessonData.sections.vocabulary) ? lessonData.sections.vocabulary : []
+          let vocabIndex = 0 // Track actual vocabulary item numbering
           vocabularyItems.forEach((item, index) => {
-            addText(`${index + 1}. ${item.word}`, FONT_SIZES.MAIN_CONTENT, true, 10)
-            addText(`   Meaning: ${item.meaning}`, FONT_SIZES.MAIN_CONTENT, false, 15)
+            // First item might be an instruction
+            if (index === 0 && item.word === "INSTRUCTION") {
+              pdf.setFillColor(241, 250, 255) // #F1FAFF
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "italic")
+              
+              const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+              const instructionLines = pdf.splitTextToSize(item.meaning, instructionWidth)
+              const instructionHeight = instructionLines.length * lineHeight + 6
+              
+              // Draw background rectangle
+              pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+              
+              // Add instruction text
+              for (const line of instructionLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 8 // Extra spacing after instruction
+              return
+            }
+
+            vocabIndex++
+            addText(`${vocabIndex}. ${item.word}`, FONT_SIZES.MAIN_CONTENT, true, false, 10)
+            addText(`   Meaning: ${item.meaning}`, FONT_SIZES.MAIN_CONTENT, false, false, 15)
 
             // Handle both old format (example) and new format (examples array)
             if (item.examples && Array.isArray(item.examples) && item.examples.length > 0) {
-              addText(`   Examples:`, FONT_SIZES.INSTRUCTIONS, true, 15)
+              addText(`   Examples:`, FONT_SIZES.INSTRUCTIONS, true, false, 15)
               const examples = Array.isArray(item.examples) ? item.examples : []
               examples.forEach((example, exIndex) => {
-                addText(`   ${exIndex + 1}. "${example}"`, FONT_SIZES.SUPPLEMENTARY, false, 20)
+                addText(`   ${exIndex + 1}. "${example}"`, FONT_SIZES.SUPPLEMENTARY, false, false, 20)
               })
             } else if (item.example) {
-              addText(`   Example: "${item.example}"`, FONT_SIZES.SUPPLEMENTARY, false, 15)
+              addText(`   Example: "${item.example}"`, FONT_SIZES.SUPPLEMENTARY, false, false, 15)
             }
             yPosition += 3
           })
@@ -243,7 +300,36 @@ export class LessonExporter {
 
       if (enabledSections.reading && lessonData.sections.reading) {
         addSection("Reading Passage", () => {
-          addText(lessonData.sections.reading, FONT_SIZES.MAIN_CONTENT, false, 10)
+          const readingContent = lessonData.sections.reading
+          const parts = readingContent.split('\n\n')
+
+          // Check if first part is an instruction
+          if (parts.length > 1 && parts[0].includes('Read the following text carefully')) {
+            // Add instruction with light green background (italic) - manual rendering
+            pdf.setFillColor(238, 247, 220) // #EEF7DC
+            pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+            pdf.setFont("helvetica", "italic")
+            
+            const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+            const instructionLines = pdf.splitTextToSize(parts[0], instructionWidth)
+            const instructionHeight = instructionLines.length * lineHeight + 6
+            
+            // Draw background rectangle
+            pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+            
+            // Add instruction text
+            for (const line of instructionLines) {
+              pdf.text(line, margin + 10, yPosition)
+              yPosition += lineHeight
+            }
+            yPosition += 8 // Extra spacing after instruction
+
+            // Add the rest of the reading passage
+            addText(parts.slice(1).join('\n\n'), FONT_SIZES.MAIN_CONTENT, false, false, 10)
+          } else {
+            // No instruction, display as before
+            addText(readingContent, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+          }
         })
       }
 
@@ -251,7 +337,29 @@ export class LessonExporter {
         addSection("Reading Comprehension", () => {
           const comprehensionQuestions = Array.isArray(lessonData.sections.comprehension) ? lessonData.sections.comprehension : []
           comprehensionQuestions.forEach((question, index) => {
-            addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
+            // First item is the instruction with light blue background (italic) - manual rendering
+            if (index === 0) {
+              pdf.setFillColor(241, 250, 255) // #F1FAFF
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "italic")
+              
+              const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+              const instructionLines = pdf.splitTextToSize(question, instructionWidth)
+              const instructionHeight = instructionLines.length * lineHeight + 6
+              
+              // Draw background rectangle
+              pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+              
+              // Add instruction text
+              for (const line of instructionLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 8 // Extra spacing after instruction
+            } else {
+              // Rest are actual questions (renumber starting from 1)
+              addText(`${index}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+            }
           })
         })
       }
@@ -260,7 +368,29 @@ export class LessonExporter {
         addSection("Discussion Questions", () => {
           const discussionQuestions = Array.isArray(lessonData.sections.discussion) ? lessonData.sections.discussion : []
           discussionQuestions.forEach((question, index) => {
-            addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
+            // First item is the instruction with light green background (italic) - manual rendering
+            if (index === 0) {
+              pdf.setFillColor(238, 247, 220) // #EEF7DC
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "italic")
+              
+              const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+              const instructionLines = pdf.splitTextToSize(question, instructionWidth)
+              const instructionHeight = instructionLines.length * lineHeight + 6
+              
+              // Draw background rectangle
+              pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+              
+              // Add instruction text
+              for (const line of instructionLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 8 // Extra spacing after instruction
+            } else {
+              // Rest are actual questions (renumber starting from 1)
+              addText(`${index}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+            }
           })
         })
       }
@@ -268,18 +398,70 @@ export class LessonExporter {
       if (enabledSections.dialoguePractice && lessonData.sections.dialoguePractice) {
         addSection("Dialogue Practice", () => {
           const dialogueSection = lessonData.sections.dialoguePractice!
-          addText(dialogueSection.instruction, FONT_SIZES.INSTRUCTIONS, false, 10)
-          yPosition += 3
-          const dialoguePracticeLines = Array.isArray(dialogueSection.dialogue) ? dialogueSection.dialogue : []
-          dialoguePracticeLines.forEach((line) => {
-            addText(`${line.character}: ${line.line}`, FONT_SIZES.MAIN_CONTENT, false, 10)
+          
+          // Add instruction with light green background color (italic) - manually without addText
+          pdf.setFillColor(238, 247, 220) // #EEF7DC
+          pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+          pdf.setFont("helvetica", "italic")
+          
+          const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+          const instructionLines = pdf.splitTextToSize(dialogueSection.instruction, instructionWidth)
+          const instructionHeight = instructionLines.length * lineHeight + 6
+          
+          // Draw background rectangle
+          pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+          
+          // Add instruction text
+          for (const line of instructionLines) {
+            pdf.text(line, margin + 10, yPosition)
+            yPosition += lineHeight
+          }
+          yPosition += 8 // Extra spacing after instruction before dialogue starts
+          
+          // Enhance dialogue with avatar names
+          const enhancedDialogue = enhanceDialogueWithAvatars(
+            dialogueSection.dialogue,
+            lessonData.id,
+            'dialoguePractice'
+          )
+          
+          // Add dialogue lines with character names and spacing
+          const dialoguePracticeLines = Array.isArray(enhancedDialogue) ? enhancedDialogue : []
+          dialoguePracticeLines.forEach((line, index) => {
+            // Add 3px gap between dialogue lines (except first)
+            if (index > 0) {
+              yPosition += 3
+            }
+            
+            // Character name in bold, then line
+            pdf.setFontSize(FONT_SIZES.MAIN_CONTENT)
+            pdf.setFont("helvetica", "bold")
+            const charWidth = pdf.getTextWidth(`${line.character}: `)
+            pdf.text(`${line.character}: `, margin + 10, yPosition)
+            
+            pdf.setFont("helvetica", "normal")
+            const maxWidth = pdf.internal.pageSize.width - margin * 2 - 10 - charWidth
+            const lineText = pdf.splitTextToSize(line.line, maxWidth)
+            pdf.text(lineText[0], margin + 10 + charWidth, yPosition)
+            yPosition += lineHeight
+            
+            // Handle wrapped lines
+            for (let i = 1; i < lineText.length; i++) {
+              if (yPosition > pageHeight - 30) {
+                pdf.addPage()
+                yPosition = 20
+              }
+              pdf.text(lineText[i], margin + 10 + charWidth, yPosition)
+              yPosition += lineHeight
+            }
           })
+          
           if (dialogueSection.followUpQuestions && dialogueSection.followUpQuestions.length > 0) {
             yPosition += 5
-            addText("Follow-up Questions:", FONT_SIZES.INSTRUCTIONS, true, 10)
+            addText("Follow-up Questions:", FONT_SIZES.INSTRUCTIONS, true, false, 10)
             const followUpQuestions = Array.isArray(dialogueSection.followUpQuestions) ? dialogueSection.followUpQuestions : []
             followUpQuestions.forEach((question, index) => {
-              addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 15)
+              addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, false, 15)
             })
           }
         })
@@ -288,16 +470,68 @@ export class LessonExporter {
       if (enabledSections.dialogueFillGap && lessonData.sections.dialogueFillGap) {
         addSection("Dialogue Fill-in-the-Gap", () => {
           const dialogueSection = lessonData.sections.dialogueFillGap!
-          addText(dialogueSection.instruction, FONT_SIZES.INSTRUCTIONS, false, 10)
-          yPosition += 3
-          const dialogueFillGapLines = Array.isArray(dialogueSection.dialogue) ? dialogueSection.dialogue : []
-          dialogueFillGapLines.forEach((line) => {
-            addText(`${line.character}: ${line.line}`, FONT_SIZES.MAIN_CONTENT, false, 10)
+          
+          // Add instruction with light blue background color (italic) - manually without addText
+          pdf.setFillColor(241, 250, 255) // #F1FAFF
+          pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+          pdf.setFont("helvetica", "italic")
+          
+          const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+          const instructionLines = pdf.splitTextToSize(dialogueSection.instruction, instructionWidth)
+          const instructionHeight = instructionLines.length * lineHeight + 6
+          
+          // Draw background rectangle
+          pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+          
+          // Add instruction text
+          for (const line of instructionLines) {
+            pdf.text(line, margin + 10, yPosition)
+            yPosition += lineHeight
+          }
+          yPosition += 8 // Extra spacing after instruction before dialogue starts
+          
+          // Enhance dialogue with avatar names
+          const enhancedDialogue = enhanceDialogueWithAvatars(
+            dialogueSection.dialogue,
+            lessonData.id,
+            'dialogueFillGap'
+          )
+          
+          // Add dialogue lines with character names and spacing
+          const dialogueFillGapLines = Array.isArray(enhancedDialogue) ? enhancedDialogue : []
+          dialogueFillGapLines.forEach((line, index) => {
+            // Add 3px gap between dialogue lines (except first)
+            if (index > 0) {
+              yPosition += 3
+            }
+            
+            // Character name in bold, then line
+            pdf.setFontSize(FONT_SIZES.MAIN_CONTENT)
+            pdf.setFont("helvetica", "bold")
+            const charWidth = pdf.getTextWidth(`${line.character}: `)
+            pdf.text(`${line.character}: `, margin + 10, yPosition)
+            
+            pdf.setFont("helvetica", "normal")
+            const maxWidth = pdf.internal.pageSize.width - margin * 2 - 10 - charWidth
+            const lineText = pdf.splitTextToSize(line.line, maxWidth)
+            pdf.text(lineText[0], margin + 10 + charWidth, yPosition)
+            yPosition += lineHeight
+            
+            // Handle wrapped lines
+            for (let i = 1; i < lineText.length; i++) {
+              if (yPosition > pageHeight - 30) {
+                pdf.addPage()
+                yPosition = 20
+              }
+              pdf.text(lineText[i], margin + 10 + charWidth, yPosition)
+              yPosition += lineHeight
+            }
           })
+          
           if (dialogueSection.answers && dialogueSection.answers.length > 0) {
             yPosition += 5
-            addText("Answer Key:", FONT_SIZES.INSTRUCTIONS, true, 10)
-            addText(dialogueSection.answers.join(', '), FONT_SIZES.SUPPLEMENTARY, false, 15)
+            addText("Answer Key:", FONT_SIZES.INSTRUCTIONS, true, false, 10)
+            addText(dialogueSection.answers.join(', '), FONT_SIZES.SUPPLEMENTARY, false, false, 15)
           }
         })
       }
@@ -332,7 +566,29 @@ export class LessonExporter {
         addSection("Lesson Wrap-up", () => {
           const wrapupQuestions = Array.isArray(lessonData.sections.wrapup) ? lessonData.sections.wrapup : []
           wrapupQuestions.forEach((question, index) => {
-            addText(`${index + 1}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, 10)
+            // First item is the instruction - manual rendering (no numbering)
+            if (index === 0) {
+              pdf.setFillColor(238, 247, 220) // #EEF7DC
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "italic")
+              
+              const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 10
+              const instructionLines = pdf.splitTextToSize(question, instructionWidth)
+              const instructionHeight = instructionLines.length * lineHeight + 6
+              
+              // Draw background rectangle
+              pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+              
+              // Add instruction text
+              for (const line of instructionLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 8 // Extra spacing after instruction
+            } else {
+              // Rest are actual questions (renumber starting from 1)
+              addText(`${index}. ${question}`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+            }
           })
         })
       }
@@ -454,18 +710,42 @@ export class LessonExporter {
       // Add sections based on enabled state
       if (enabledSections.warmup && lessonData.sections.warmup) {
         const warmupQuestions = Array.isArray(lessonData.sections.warmup) ? lessonData.sections.warmup : []
-        const warmupContent = warmupQuestions.map(
-          (question, index) =>
-            new Paragraph({
+        const warmupContent = warmupQuestions.map((question, index) => {
+          // First item is the instruction with light green background
+          if (index === 0) {
+            return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index + 1}. ${question}`,
+                  text: question,
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+              shading: {
+                fill: "EEF7DC", // Light green background
+              },
+              border: {
+                left: {
+                  color: "CCCCCC",
+                  size: 6,
+                  style: "single",
+                },
+              },
+            })
+          } else {
+            // Rest are actual questions (renumber starting from 1)
+            return new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${index}. ${question}`,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
               spacing: { after: 150 },
-            }),
-        )
+            })
+          }
+        })
         addSection("Warm-up Questions", warmupContent)
       }
 
@@ -473,6 +753,33 @@ export class LessonExporter {
         const vocabContent: any[] = []
         const vocabularyItems = Array.isArray(lessonData.sections.vocabulary) ? lessonData.sections.vocabulary : []
         vocabularyItems.forEach((item, index) => {
+          // First item might be an instruction
+          if (index === 0 && item.word === "INSTRUCTION") {
+            vocabContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: item.meaning,
+                    size: WORD_FONT_SIZES.INSTRUCTIONS,
+                    italics: true,
+                  }),
+                ],
+                spacing: { after: 200 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+            return
+          }
+
           vocabContent.push(
             new Paragraph({
               children: [
@@ -552,51 +859,145 @@ export class LessonExporter {
       }
 
       if (enabledSections.reading && lessonData.sections.reading) {
-        const readingContent = [
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: lessonData.sections.reading,
-                size: WORD_FONT_SIZES.MAIN_CONTENT,
-              }),
-            ],
-            spacing: { after: 200 },
-          }),
-        ]
+        const readingText = lessonData.sections.reading
+        const parts = readingText.split('\n\n')
+        const readingContent: any[] = []
+
+        // Check if first part is an instruction
+        if (parts.length > 1 && parts[0].includes('Read the following text carefully')) {
+          // Add instruction with light green background
+          readingContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: parts[0],
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+              shading: {
+                fill: "EEF7DC", // Light green background
+              },
+              border: {
+                left: {
+                  color: "CCCCCC",
+                  size: 6,
+                  style: "single",
+                },
+              },
+            }),
+          )
+
+          // Add the rest of the reading passage
+          readingContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: parts.slice(1).join('\n\n'),
+                  size: WORD_FONT_SIZES.MAIN_CONTENT,
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          )
+        } else {
+          // No instruction, display as before
+          readingContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: readingText,
+                  size: WORD_FONT_SIZES.MAIN_CONTENT,
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          )
+        }
+
         addSection("Reading Passage", readingContent)
       }
 
       if (enabledSections.comprehension && lessonData.sections.comprehension) {
         const comprehensionQuestions = Array.isArray(lessonData.sections.comprehension) ? lessonData.sections.comprehension : []
-        const comprehensionContent = comprehensionQuestions.map(
-          (question, index) =>
-            new Paragraph({
+        const comprehensionContent = comprehensionQuestions.map((question, index) => {
+          // First item is the instruction with light blue background
+          if (index === 0) {
+            return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index + 1}. ${question}`,
+                  text: question,
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+              shading: {
+                fill: "F1FAFF", // Light blue background
+              },
+              border: {
+                left: {
+                  color: "CCCCCC",
+                  size: 6,
+                  style: "single",
+                },
+              },
+            })
+          } else {
+            // Rest are actual questions (renumber starting from 1)
+            return new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${index}. ${question}`,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
               spacing: { after: 150 },
-            }),
-        )
+            })
+          }
+        })
         addSection("Reading Comprehension", comprehensionContent)
       }
 
       if (enabledSections.discussion && lessonData.sections.discussion) {
         const discussionQuestions = Array.isArray(lessonData.sections.discussion) ? lessonData.sections.discussion : []
-        const discussionContent = discussionQuestions.map(
-          (question, index) =>
-            new Paragraph({
+        const discussionContent = discussionQuestions.map((question, index) => {
+          // First item is the instruction with light green background
+          if (index === 0) {
+            return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index + 1}. ${question}`,
+                  text: question,
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+              shading: {
+                fill: "EEF7DC", // Light green background
+              },
+              border: {
+                left: {
+                  color: "CCCCCC",
+                  size: 6,
+                  style: "single",
+                },
+              },
+            })
+          } else {
+            // Rest are actual questions (renumber starting from 1)
+            return new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${index}. ${question}`,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
               spacing: { after: 150 },
-            }),
-        )
+            })
+          }
+        })
         addSection("Discussion Questions", discussionContent)
       }
 
@@ -604,7 +1005,7 @@ export class LessonExporter {
         const dialoguePracticeContent: any[] = []
         const dialogueSection = lessonData.sections.dialoguePractice
 
-        // Add instruction
+        // Add instruction with light green background (#EEF7DC)
         dialoguePracticeContent.push(
           new Paragraph({
             children: [
@@ -615,12 +1016,29 @@ export class LessonExporter {
               }),
             ],
             spacing: { after: 200 },
+            shading: {
+              fill: "EEF7DC", // Light green background
+            },
+            border: {
+              left: {
+                color: "CCCCCC",
+                size: 6,
+                style: "single",
+              },
+            },
           }),
         )
 
-        // Add dialogue lines
-        const dialogueLines = Array.isArray(dialogueSection.dialogue) ? dialogueSection.dialogue : []
-        dialogueLines.forEach((line) => {
+        // Enhance dialogue with avatar names
+        const enhancedDialogue = enhanceDialogueWithAvatars(
+          dialogueSection.dialogue,
+          lessonData.id,
+          'dialoguePractice'
+        )
+
+        // Add dialogue lines with character names in bold and 3px spacing between lines
+        const dialogueLines = Array.isArray(enhancedDialogue) ? enhancedDialogue : []
+        dialogueLines.forEach((line, index) => {
           dialoguePracticeContent.push(
             new Paragraph({
               children: [
@@ -634,7 +1052,10 @@ export class LessonExporter {
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
-              spacing: { after: 100 },
+              spacing: { 
+                before: index === 0 ? 0 : 60, // 3px gap between lines (60 = 3pt in Word units)
+                after: 0 
+              },
             }),
           )
         })
@@ -676,7 +1097,7 @@ export class LessonExporter {
         const dialogueFillGapContent: any[] = []
         const dialogueSection = lessonData.sections.dialogueFillGap
 
-        // Add instruction
+        // Add instruction with light blue background (#F1FAFF)
         dialogueFillGapContent.push(
           new Paragraph({
             children: [
@@ -687,12 +1108,29 @@ export class LessonExporter {
               }),
             ],
             spacing: { after: 200 },
+            shading: {
+              fill: "F1FAFF", // Light blue background
+            },
+            border: {
+              left: {
+                color: "CCCCCC",
+                size: 6,
+                style: "single",
+              },
+            },
           }),
         )
 
-        // Add dialogue lines
-        const dialogueFillGapLines = Array.isArray(dialogueSection.dialogue) ? dialogueSection.dialogue : []
-        dialogueFillGapLines.forEach((line) => {
+        // Enhance dialogue with avatar names
+        const enhancedDialogue = enhanceDialogueWithAvatars(
+          dialogueSection.dialogue,
+          lessonData.id,
+          'dialogueFillGap'
+        )
+
+        // Add dialogue lines with character names in bold and 3px spacing between lines
+        const dialogueFillGapLines = Array.isArray(enhancedDialogue) ? enhancedDialogue : []
+        dialogueFillGapLines.forEach((line, index) => {
           dialogueFillGapContent.push(
             new Paragraph({
               children: [
@@ -706,7 +1144,10 @@ export class LessonExporter {
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
-              spacing: { after: 100 },
+              spacing: { 
+                before: index === 0 ? 0 : 60, // 3px gap between lines (60 = 3pt in Word units)
+                after: 0 
+              },
             }),
           )
         })
@@ -847,18 +1288,42 @@ export class LessonExporter {
 
       if (enabledSections.wrapup && lessonData.sections.wrapup) {
         const wrapupQuestions = Array.isArray(lessonData.sections.wrapup) ? lessonData.sections.wrapup : []
-        const wrapupContent = wrapupQuestions.map(
-          (question, index) =>
-            new Paragraph({
+        const wrapupContent = wrapupQuestions.map((question, index) => {
+          // First item is the instruction with light green background
+          if (index === 0) {
+            return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index + 1}. ${question}`,
+                  text: question,
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+              shading: {
+                fill: "EEF7DC", // Light green background
+              },
+              border: {
+                left: {
+                  color: "CCCCCC",
+                  size: 6,
+                  style: "single",
+                },
+              },
+            })
+          } else {
+            // Rest are actual questions (renumber starting from 1)
+            return new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${index}. ${question}`,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
               spacing: { after: 150 },
-            }),
-        )
+            })
+          }
+        })
         addSection("Lesson Wrap-up", wrapupContent)
       }
 

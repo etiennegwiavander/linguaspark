@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
       lessonType: lesson.lessonType,
       studentLevel: lesson.studentLevel,
       targetLanguage: lesson.targetLanguage,
+      metadata: contentMetadata, // Include extracted metadata with banner images
       sections: lesson.sections
     };
 
