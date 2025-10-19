@@ -157,8 +157,12 @@ export class LessonExporter {
       // Helper function to add text with word wrapping
       const addText = (text: string, fontSize = FONT_SIZES.MAIN_CONTENT, isBold = false, isItalic = false, indent = 0) => {
         try {
-          // Sanitize text to prevent PDF errors
+          // Sanitize text to prevent PDF errors and strip markdown formatting
           const sanitizedText = text
+            .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown (**text**)
+            .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown (*text*)
+            .replace(/__(.*?)__/g, '$1') // Remove bold markdown (__text__)
+            .replace(/_(.*?)_/g, '$1') // Remove italic markdown (_text_)
             .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
             .replace(/[\u2000-\u206F\u2E00-\u2E7F\u3000-\u303F]/g, ' ') // Replace special spaces
             .trim()
@@ -556,9 +560,38 @@ export class LessonExporter {
 
       if (enabledSections.pronunciation && lessonData.sections.pronunciation) {
         addSection("Pronunciation Practice", () => {
-          addText(`Word: ${lessonData.sections.pronunciation.word}`, FONT_SIZES.MAIN_CONTENT, true, 10)
-          addText(`IPA: ${lessonData.sections.pronunciation.ipa}`, FONT_SIZES.SUPPLEMENTARY, false, 10)
-          addText(`Practice: "${lessonData.sections.pronunciation.practice}"`, FONT_SIZES.MAIN_CONTENT, false, 10)
+          const pronSection = lessonData.sections.pronunciation
+          
+          // Handle both old format (single word) and new format (words array)
+          if (pronSection.words && Array.isArray(pronSection.words) && pronSection.words.length > 0) {
+            // New format with multiple words
+            pronSection.words.forEach((wordItem, index) => {
+              if (index > 0) yPosition += 5 // Spacing between words
+              
+              addText(`Word: ${wordItem.word || 'N/A'}`, FONT_SIZES.MAIN_CONTENT, true, false, 10)
+              addText(`IPA: ${wordItem.ipa || 'N/A'}`, FONT_SIZES.SUPPLEMENTARY, false, false, 10)
+              
+              if (wordItem.practiceSentence) {
+                addText(`Practice: "${wordItem.practiceSentence}"`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+              }
+              
+              if (wordItem.tips && wordItem.tips.length > 0) {
+                addText(`Tips:`, FONT_SIZES.INSTRUCTIONS, true, false, 10)
+                wordItem.tips.forEach(tip => {
+                  addText(`• ${tip}`, FONT_SIZES.SUPPLEMENTARY, false, false, 15)
+                })
+              }
+            })
+          } else if (pronSection.word) {
+            // Old format with single word
+            addText(`Word: ${pronSection.word || 'N/A'}`, FONT_SIZES.MAIN_CONTENT, true, false, 10)
+            addText(`IPA: ${pronSection.ipa || 'N/A'}`, FONT_SIZES.SUPPLEMENTARY, false, false, 10)
+            if (pronSection.practice) {
+              addText(`Practice: "${pronSection.practice}"`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+            }
+          } else {
+            addText("No pronunciation data available", FONT_SIZES.MAIN_CONTENT, false, false, 10)
+          }
         })
       }
 
@@ -638,6 +671,15 @@ export class LessonExporter {
 
       const children: any[] = []
 
+      // Helper function to strip markdown formatting from text
+      const stripMarkdown = (text: string): string => {
+        return text
+          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown (**text**)
+          .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown (*text*)
+          .replace(/__(.*?)__/g, '$1') // Remove bold markdown (__text__)
+          .replace(/_(.*?)_/g, '$1') // Remove italic markdown (_text_)
+      }
+
       // Typography hierarchy constants (in half-points for Word - multiply by 2)
       // 32px = 24pt, 28px = 21pt, 16px = 12pt, 15px = 11.25pt, 14px = 10.5pt
       const WORD_FONT_SIZES = {
@@ -716,7 +758,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: question,
+                  text: stripMarkdown(question),
                   size: WORD_FONT_SIZES.INSTRUCTIONS,
                   italics: true,
                 }),
@@ -738,7 +780,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index}. ${question}`,
+                  text: stripMarkdown(`${index}. ${question}`),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -1252,37 +1294,147 @@ export class LessonExporter {
       }
 
       if (enabledSections.pronunciation && lessonData.sections.pronunciation) {
-        const pronunciationContent = [
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Word: ${lessonData.sections.pronunciation.word}`,
-                bold: true,
-                size: WORD_FONT_SIZES.MAIN_CONTENT,
+        const pronSection = lessonData.sections.pronunciation
+        const pronunciationContent: any[] = []
+        
+        // Handle both old format (single word) and new format (words array)
+        if (pronSection.words && Array.isArray(pronSection.words) && pronSection.words.length > 0) {
+          // New format with multiple words
+          pronSection.words.forEach((wordItem, index) => {
+            if (index > 0) {
+              // Add spacing between words
+              pronunciationContent.push(
+                new Paragraph({
+                  children: [new TextRun({ text: "" })],
+                  spacing: { before: 200 },
+                }),
+              )
+            }
+            
+            pronunciationContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `Word: ${wordItem.word || 'N/A'}`,
+                    bold: true,
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                  }),
+                ],
+                spacing: { after: 100 },
               }),
-            ],
-            spacing: { after: 150 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `IPA: ${lessonData.sections.pronunciation.ipa}`,
-                size: WORD_FONT_SIZES.SUPPLEMENTARY,
+            )
+            
+            pronunciationContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `IPA: ${wordItem.ipa || 'N/A'}`,
+                    size: WORD_FONT_SIZES.SUPPLEMENTARY,
+                  }),
+                ],
+                spacing: { after: 100 },
               }),
-            ],
-            spacing: { after: 150 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Practice: "${lessonData.sections.pronunciation.practice}"`,
-                size: WORD_FONT_SIZES.MAIN_CONTENT,
-                italics: true,
+            )
+            
+            if (wordItem.practiceSentence) {
+              pronunciationContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: `Practice: "${wordItem.practiceSentence}"`,
+                      size: WORD_FONT_SIZES.MAIN_CONTENT,
+                      italics: true,
+                    }),
+                  ],
+                  spacing: { after: 100 },
+                }),
+              )
+            }
+            
+            if (wordItem.tips && wordItem.tips.length > 0) {
+              pronunciationContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: "Tips:",
+                      bold: true,
+                      size: WORD_FONT_SIZES.INSTRUCTIONS,
+                    }),
+                  ],
+                  spacing: { after: 100 },
+                }),
+              )
+              
+              wordItem.tips.forEach(tip => {
+                pronunciationContent.push(
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: `• ${tip}`,
+                        size: WORD_FONT_SIZES.SUPPLEMENTARY,
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                )
+              })
+            }
+          })
+        } else if (pronSection.word) {
+          // Old format with single word
+          pronunciationContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Word: ${pronSection.word || 'N/A'}`,
+                  bold: true,
+                  size: WORD_FONT_SIZES.MAIN_CONTENT,
+                }),
+              ],
+              spacing: { after: 150 },
+            }),
+          )
+          
+          pronunciationContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `IPA: ${pronSection.ipa || 'N/A'}`,
+                  size: WORD_FONT_SIZES.SUPPLEMENTARY,
+                }),
+              ],
+              spacing: { after: 150 },
+            }),
+          )
+          
+          if (pronSection.practice) {
+            pronunciationContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `Practice: "${pronSection.practice}"`,
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                    italics: true,
+                  }),
+                ],
+                spacing: { after: 200 },
               }),
-            ],
-            spacing: { after: 200 },
-          }),
-        ]
+            )
+          }
+        } else {
+          pronunciationContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "No pronunciation data available",
+                  size: WORD_FONT_SIZES.MAIN_CONTENT,
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          )
+        }
+        
         addSection("Pronunciation Practice", pronunciationContent)
       }
 

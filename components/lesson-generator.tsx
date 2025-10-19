@@ -13,6 +13,7 @@ import { Loader2, BookOpen, Globe, Users, FileText, Mic, AlertCircle, Sparkles, 
 import { useAuth } from "./auth-wrapper"
 import { LessonInterfaceBridge, LessonInterfaceUtils } from "@/lib/lesson-interface-bridge"
 import type { LessonPreConfiguration } from "@/lib/lesson-interface-bridge"
+import result from "postcss/lib/result"
 
 const LESSON_TYPES = [
   { value: "discussion", label: "Discussion", icon: Users, description: "Conversation-focused lessons" },
@@ -224,23 +225,9 @@ export default function LessonGenerator({
     setError(null)
     setIsGenerating(true)
     setGenerationProgress(0)
+    setGenerationStep("Initializing...")
 
     try {
-      const steps = [
-        { step: "Analyzing content context and complexity...", progress: 15 },
-        { step: "Extracting key topics and vocabulary...", progress: 30 },
-        { step: "Creating contextual summary...", progress: 45 },
-        { step: "Generating lesson structure...", progress: 60 },
-        { step: "Creating detailed contextual exercises...", progress: 80 },
-        { step: "Proofreading and finalizing...", progress: 100 },
-      ]
-
-      for (const { step, progress } of steps) {
-        setGenerationStep(step)
-        setGenerationProgress(progress)
-        await new Promise((resolve) => setTimeout(resolve, 800))
-      }
-
       // Get enhanced content data if available
       let enhancedContent = null
       try {
@@ -300,7 +287,7 @@ export default function LessonGenerator({
         console.log('[LessonGenerator] No enhanced content available, sending basic request')
       }
 
-      console.log('[LessonGenerator] Sending request to API:', {
+      console.log('[LessonGenerator] Sending request to streaming API:', {
         sourceTextLength: requestBody.sourceText.length,
         lessonType: requestBody.lessonType,
         studentLevel: requestBody.studentLevel,
@@ -308,8 +295,8 @@ export default function LessonGenerator({
         hasMetadata: !!requestBody.contentMetadata
       })
 
-      // Call the AI generation API
-      const response = await fetch("/api/generate-lesson", {
+      // Call the streaming AI generation API
+      const response = await fetch("/api/generate-lesson-stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,43 +304,65 @@ export default function LessonGenerator({
         body: JSON.stringify(requestBody),
       })
 
-      console.log('[LessonGenerator] API response status:', response.status)
-      const result = await response.json()
-      console.log('[LessonGenerator] API response:', {
-        success: result.success,
-        hasLesson: !!result.lesson,
-        hasError: !!result.error
-      })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
-      if (!response.ok || !result.success) {
-        // Handle structured error response from API
-        if (result.error) {
-          setError({
-            type: result.error.type,
-            message: result.error.message,
-            actionableSteps: result.error.actionableSteps || [],
-            errorId: result.error.errorId,
-            supportContact: result.error.supportContact
-          })
-        } else {
-          // Fallback for unexpected error format
-          setError({
-            type: "Generation Failed",
-            message: "Failed to generate lesson. Please try again.",
-            actionableSteps: [
-              "Check your internet connection",
-              "Try again in a few moments",
-              "Contact support if the issue persists"
-            ],
-            errorId: `ERR_${Date.now()}`
-          })
+      // Read the stream
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalLesson = null
+
+      if (!reader) {
+        throw new Error('No response body reader available')
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.type === 'progress') {
+                setGenerationStep(data.step)
+                setGenerationProgress(data.progress)
+              } else if (data.type === 'complete') {
+                setGenerationStep(data.step)
+                setGenerationProgress(data.progress)
+                finalLesson = data.lesson
+              } else if (data.type === 'error') {
+                setError({
+                  type: data.error.type,
+                  message: data.error.message,
+                  actionableSteps: data.error.actionableSteps || [],
+                  errorId: data.error.errorId,
+                  supportContact: data.error.supportContact
+                })
+                setIsGenerating(false)
+                return
+              }
+            } catch (parseError) {
+              console.error('Error parsing SSE message:', parseError)
+            }
+          }
         }
-        setIsGenerating(false)
-        return
+      }
+
+      if (!finalLesson) {
+        throw new Error('No lesson data received from stream')
       }
 
       // Add extraction metadata to lesson if from extraction (Requirement 6.6)
-      let enhancedLesson = result.lesson
+      let enhancedLesson = finalLesson
       
       if (isExtractionSource && extractionConfig) {
         enhancedLesson = {
