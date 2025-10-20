@@ -1,11 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Only use export for production builds
-  ...(process.env.NODE_ENV === 'production' && {
-    output: 'export',
-    trailingSlash: true,
-    skipTrailingSlashRedirect: true,
-  }),
   distDir: 'dist',
   eslint: {
     ignoreDuringBuilds: true,

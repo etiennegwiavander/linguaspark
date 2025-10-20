@@ -14,6 +14,14 @@ export async function POST(request: NextRequest) {
   
   let userId: string | undefined
   let requestContext: any = {}
+  
+  // Track current progress state for error reporting
+  let currentProgressState = {
+    step: 'Not started',
+    progress: 0,
+    phase: 'initialization',
+    section: undefined as string | undefined
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -41,12 +49,16 @@ export async function POST(request: NextRequest) {
         }
 
         // Send initial progress
+        currentProgressState = {
+          step: 'Initializing lesson generation...',
+          progress: 5,
+          phase: 'initialization',
+          section: undefined
+        }
         controller.enqueue(
           encoder.encode(createSSEMessage({
             type: 'progress',
-            step: 'Initializing lesson generation...',
-            progress: 5,
-            phase: 'initialization'
+            ...currentProgressState
           }))
         )
 
@@ -59,7 +71,8 @@ export async function POST(request: NextRequest) {
                 type: 'CONTENT_ISSUE',
                 message: 'Missing required fields',
                 errorId: `REQ_${Date.now()}`
-              }
+              },
+              progressState: currentProgressState
             }))
           )
           controller.close()
@@ -67,12 +80,16 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate content
+        currentProgressState = {
+          step: 'Validating content...',
+          progress: 10,
+          phase: 'validation',
+          section: undefined
+        }
         controller.enqueue(
           encoder.encode(createSSEMessage({
             type: 'progress',
-            step: 'Validating content...',
-            progress: 10,
-            phase: 'validation'
+            ...currentProgressState
           }))
         )
 
@@ -91,7 +108,8 @@ export async function POST(request: NextRequest) {
                 type: userMessage.title,
                 message: userMessage.message,
                 errorId: userMessage.errorId
-              }
+              },
+              progressState: currentProgressState
             }))
           )
           controller.close()
@@ -99,12 +117,16 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate authentication
+        currentProgressState = {
+          step: 'Authenticating...',
+          progress: 15,
+          phase: 'authentication',
+          section: undefined
+        }
         controller.enqueue(
           encoder.encode(createSSEMessage({
             type: 'progress',
-            step: 'Authenticating...',
-            progress: 15,
-            phase: 'authentication'
+            ...currentProgressState
           }))
         )
 
@@ -119,7 +141,8 @@ export async function POST(request: NextRequest) {
                 type: 'AUTH_ERROR',
                 message: 'Authentication required',
                 errorId: `AUTH_${Date.now()}`
-              }
+              },
+              progressState: currentProgressState
             }))
           )
           controller.close()
@@ -128,162 +151,35 @@ export async function POST(request: NextRequest) {
 
         userId = user.id
 
-        // Start actual lesson generation with progress tracking
-        // We'll send progress updates as the generation happens
-        
-        // Phase 1: Generate core lesson structure
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Analyzing content and extracting key topics...',
-            progress: 25,
-            phase: 'phase1',
-            section: 'analysis'
-          }))
-        )
-
-        // Small delay to show progress
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Generating lesson title...',
-            progress: 30,
-            phase: 'phase1',
-            section: 'title'
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Creating warm-up questions...',
-            progress: 35,
-            phase: 'phase1',
-            section: 'warmup'
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Extracting key vocabulary...',
-            progress: 40,
-            phase: 'phase1',
-            section: 'vocabulary'
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Preparing reading passage...',
-            progress: 45,
-            phase: 'phase1',
-            section: 'reading'
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Creating comprehension questions...',
-            progress: 50,
-            phase: 'phase1',
-            section: 'comprehension'
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        // Phase 2: Generate lesson-type specific content
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: `Generating ${lessonType} lesson content...`,
-            progress: 60,
-            phase: 'phase2',
-            section: lessonType
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        if (lessonType === 'discussion') {
-          controller.enqueue(
-            encoder.encode(createSSEMessage({
-              type: 'progress',
-              step: 'Creating discussion questions...',
-              progress: 70,
-              phase: 'phase2',
-              section: 'discussion'
-            }))
-          )
-        } else if (lessonType === 'grammar') {
-          controller.enqueue(
-            encoder.encode(createSSEMessage({
-              type: 'progress',
-              step: 'Analyzing grammar patterns...',
-              progress: 70,
-              phase: 'phase2',
-              section: 'grammar'
-            }))
-          )
-        } else if (lessonType === 'pronunciation') {
-          controller.enqueue(
-            encoder.encode(createSSEMessage({
-              type: 'progress',
-              step: 'Identifying pronunciation challenges...',
-              progress: 70,
-              phase: 'phase2',
-              section: 'pronunciation'
-            }))
-          )
-        } else if (lessonType === 'travel' || lessonType === 'business') {
-          controller.enqueue(
-            encoder.encode(createSSEMessage({
-              type: 'progress',
-              step: 'Creating dialogue practice...',
-              progress: 70,
-              phase: 'phase2',
-              section: 'dialogue'
-            }))
-          )
+        // Create progress callback that streams real-time updates to frontend
+        const progressCallback = (update: {
+          step: string
+          progress: number
+          phase: string
+          section?: string
+        }) => {
+          try {
+            // Update current progress state for error reporting
+            currentProgressState = {
+              step: update.step,
+              progress: update.progress,
+              phase: update.phase,
+              section: update.section
+            }
+            
+            controller.enqueue(
+              encoder.encode(createSSEMessage({
+                type: 'progress',
+                ...currentProgressState
+              }))
+            )
+          } catch (error) {
+            // Log but don't throw - generation should continue even if streaming fails
+            console.error('Failed to stream progress update:', error)
+          }
         }
 
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Creating wrap-up activities...',
-            progress: 85,
-            phase: 'phase2',
-            section: 'wrapup'
-          }))
-        )
-
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        // Actually generate the lesson
-        controller.enqueue(
-          encoder.encode(createSSEMessage({
-            type: 'progress',
-            step: 'Finalizing lesson structure...',
-            progress: 90,
-            phase: 'finalization'
-          }))
-        )
-
+        // Generate the lesson with real-time progress callbacks
         const lesson = await lessonAIServerGenerator.generateLesson({
           sourceText,
           lessonType,
@@ -294,15 +190,20 @@ export async function POST(request: NextRequest) {
           structuredContent,
           wordCount,
           readingTime,
+          onProgress: progressCallback
         })
 
         // Save to database
+        currentProgressState = {
+          step: 'Saving lesson...',
+          progress: 95,
+          phase: 'saving',
+          section: undefined
+        }
         controller.enqueue(
           encoder.encode(createSSEMessage({
             type: 'progress',
-            step: 'Saving lesson...',
-            progress: 95,
-            phase: 'saving'
+            ...currentProgressState
           }))
         )
 
@@ -334,6 +235,7 @@ export async function POST(request: NextRequest) {
 
       } catch (error) {
         console.error("Streaming error:", error)
+        console.error("Progress state at error:", currentProgressState)
         
         const classifiedError = errorClassifier.classifyError(error as AIError, requestContext)
         const userMessage = errorClassifier.generateUserMessage(classifiedError)
@@ -345,7 +247,8 @@ export async function POST(request: NextRequest) {
               type: userMessage.title,
               message: userMessage.message,
               errorId: userMessage.errorId
-            }
+            },
+            progressState: currentProgressState
           }))
         )
         

@@ -1,5 +1,5 @@
 import { createGoogleAIServerService } from "./google-ai-server"
-import { ProgressiveGeneratorImpl, type CEFRLevel, type LessonSection } from "./progressive-generator"
+import { ProgressiveGeneratorImpl, type CEFRLevel, type LessonSection, type ProgressCallback } from "./progressive-generator"
 import { usageMonitor, type GenerationContext } from "./usage-monitor"
 
 interface LessonGenerationParams {
@@ -36,6 +36,7 @@ interface LessonGenerationParams {
   }
   wordCount?: number
   readingTime?: number
+  onProgress?: (update: { step: string; progress: number; phase: string; section?: string }) => void
 }
 
 interface GeneratedLesson {
@@ -139,7 +140,8 @@ Rewrite the content clearly and completely:`
       contentMetadata,
       structuredContent,
       wordCount,
-      readingTime
+      readingTime,
+      onProgress
     } = params
 
     // Create usage monitoring context
@@ -192,7 +194,8 @@ Rewrite the content clearly and completely:`
         lessonType,
         studentLevel,
         targetLanguage,
-        contentMetadata
+        contentMetadata,
+        onProgress
       )
       const lessonGenerationEndTime = Date.now();
       
@@ -241,11 +244,17 @@ Rewrite the content clearly and completely:`
     lessonType: string,
     studentLevel: string,
     targetLanguage: string,
-    metadata?: any
+    metadata?: any,
+    onProgress?: ProgressCallback
   ) {
     console.log("🎯 Using progressive generation with shared context...")
 
     const progressiveGen = this.getProgressiveGenerator()
+    
+    // Set progress callback if provided
+    if (onProgress) {
+      progressiveGen.setProgressCallback(onProgress, lessonType)
+    }
 
     // Step 1: Build shared context for all sections
     console.log("🏗️ Building shared context...")

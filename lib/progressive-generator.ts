@@ -9,6 +9,26 @@ import {
 } from "./section-validators"
 import { qualityMetricsTracker } from "./quality-metrics"
 
+// Progress tracking types
+export interface ProgressUpdate {
+  step: string           // Human-readable step name (e.g., "Generating vocabulary")
+  progress: number       // Percentage complete (0-100)
+  phase: string          // Phase identifier (e.g., "vocabulary", "reading")
+  section?: string       // Optional section identifier for multi-part phases
+}
+
+export type ProgressCallback = (update: ProgressUpdate) => void
+
+// Generation options interface
+export interface GenerateOptions {
+  content: string
+  level: CEFRLevel
+  lessonType: string
+  targetLanguage?: string
+  metadata?: any
+  onProgress?: ProgressCallback  // Optional callback for progress tracking
+}
+
 // Types for progressive generation
 export interface SharedContext {
   lessonTitle: string
@@ -36,6 +56,54 @@ export interface LessonSection {
 
 export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
 
+// Phase weight configuration for proportional progress calculation
+export interface PhaseWeights {
+  [phase: string]: number
+}
+
+export const DEFAULT_PHASE_WEIGHTS: PhaseWeights = {
+  warmup: 10,
+  vocabulary: 15,
+  reading: 20,
+  comprehension: 10,
+  discussion: 10,
+  dialogue: 15,
+  grammar: 15,
+  pronunciation: 15,
+  wrapup: 5
+}
+
+/**
+ * Safe wrapper for progress callbacks that isolates errors
+ * Ensures callback failures don't break the generation process
+ * 
+ * @param callback - Optional progress callback function
+ * @param update - Progress update data to send to callback
+ */
+export function safeProgressCallback(
+  callback: ProgressCallback | undefined,
+  update: ProgressUpdate
+): void {
+  // If no callback provided, do nothing
+  if (!callback) {
+    return
+  }
+
+  try {
+    // Invoke the callback with the progress update
+    callback(update)
+  } catch (error) {
+    // Log error but don't throw - generation should continue
+    console.error('Progress callback error:', error)
+    console.error('Progress update that caused error:', update)
+    
+    // Optionally log stack trace for debugging
+    if (error instanceof Error && error.stack) {
+      console.error('Stack trace:', error.stack)
+    }
+  }
+}
+
 // Progressive Generator Interface
 export interface ProgressiveGenerator {
   generateSection(
@@ -61,9 +129,23 @@ export interface ProgressiveGenerator {
 export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
   private googleAI: ReturnType<typeof createGoogleAIServerService> | null = null
   private warmupValidator: WarmupValidator
+  private progressCallback?: ProgressCallback
+  private completedSections: string[] = []
+  private currentLessonType: string = ''
+  private phaseWeights: PhaseWeights = DEFAULT_PHASE_WEIGHTS
 
   constructor() {
     this.warmupValidator = new WarmupValidator()
+  }
+
+  /**
+   * Set the progress callback for this generator instance
+   * Should be called before starting generation
+   */
+  setProgressCallback(callback: ProgressCallback | undefined, lessonType: string): void {
+    this.progressCallback = callback
+    this.currentLessonType = lessonType
+    this.completedSections = []
   }
 
   /**
@@ -92,6 +174,67 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
       this.googleAI = createGoogleAIServerService()
     }
     return this.googleAI
+  }
+
+  /**
+   * Calculate progress percentage based on phase weights and lesson type
+   * Handles different lesson types with varying section combinations
+   */
+  calculateProgress(
+    completedSections: string[],
+    currentSection: string,
+    lessonType: string,
+    phaseWeights: PhaseWeights = DEFAULT_PHASE_WEIGHTS
+  ): number {
+    // Determine which sections are included in this lesson type
+    const activeSections = this.getActiveSectionsForLessonType(lessonType)
+    
+    // Calculate total weight for active sections only
+    const totalWeight = activeSections.reduce((sum, section) => {
+      return sum + (phaseWeights[section] || 0)
+    }, 0)
+    
+    if (totalWeight === 0) {
+      return 0
+    }
+    
+    // Deduplicate completed sections to avoid counting the same section multiple times
+    const uniqueCompletedSections = Array.from(new Set(completedSections))
+    
+    // Calculate weight of completed sections
+    const completedWeight = uniqueCompletedSections.reduce((sum, section) => {
+      if (activeSections.includes(section)) {
+        return sum + (phaseWeights[section] || 0)
+      }
+      return sum
+    }, 0)
+    
+    // Calculate progress percentage
+    const progress = Math.round((completedWeight / totalWeight) * 100)
+    
+    return Math.min(progress, 100)
+  }
+
+  /**
+   * Get the list of active sections for a given lesson type
+   * Different lesson types include different sections
+   */
+  private getActiveSectionsForLessonType(lessonType: string): string[] {
+    // Base sections included in all lesson types
+    const baseSections = ['warmup', 'vocabulary', 'reading', 'comprehension', 'wrapup']
+    
+    // Additional sections based on lesson type
+    const lessonTypeMap: Record<string, string[]> = {
+      'discussion': [...baseSections, 'discussion'],
+      'grammar': [...baseSections, 'grammar'],
+      'pronunciation': [...baseSections, 'pronunciation'],
+      'travel': [...baseSections, 'dialogue'],
+      'business': [...baseSections, 'dialogue'],
+      'dialogue': [...baseSections, 'dialogue']
+    }
+    
+    // Return sections for the specific lesson type, or base sections if type not found
+    return lessonTypeMap[lessonType.toLowerCase()] || baseSections
   }
 
   /**
@@ -155,6 +298,21 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
   ): Promise<GeneratedSection> {
     console.log(`🎯 Generating section: ${section.name}`)
 
+    // Report progress at start of section generation
+    const startProgress = this.calculateProgress(
+      this.completedSections,
+      section.name,
+      this.currentLessonType || sharedContext.lessonType,
+      this.phaseWeights
+    )
+    
+    safeProgressCallback(this.progressCallback, {
+      step: `Generating ${section.name}`,
+      progress: startProgress,
+      phase: section.name,
+      section: section.name
+    })
+
     const startTime = Date.now()
     let content: any
     let tokensUsed = 0
@@ -192,6 +350,22 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
 
       const generationTime = Date.now() - startTime
       console.log(`✅ Section ${section.name} generated in ${generationTime}ms`)
+
+      // Mark section as completed and report progress
+      this.completedSections.push(section.name)
+      const completionProgress = this.calculateProgress(
+        this.completedSections,
+        section.name,
+        this.currentLessonType || sharedContext.lessonType,
+        this.phaseWeights
+      )
+      
+      safeProgressCallback(this.progressCallback, {
+        step: `Completed ${section.name}`,
+        progress: completionProgress,
+        phase: section.name,
+        section: section.name
+      })
 
       return {
         sectionName: section.name,
@@ -453,6 +627,14 @@ Return ONLY 3 questions, one per line, with no numbering or extra text:`
     const maxAttempts = 2
     let attempt = 0
     const sectionStartTime = Date.now()
+
+    // Report progress at start of warmup generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating warmup questions',
+      progress: this.calculateProgress(this.completedSections, 'warmup', context.lessonType, this.phaseWeights),
+      phase: 'warmup',
+      section: 'warmup'
+    })
 
     while (attempt < maxAttempts) {
       attempt++
@@ -720,6 +902,14 @@ Return ${exampleCount} sentences, one per line, no numbering:`
     const exampleCount = this.getExampleCountForLevel(context.difficultyLevel)
     const maxAttempts = 2
 
+    // Report progress at start of vocabulary generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating vocabulary items',
+      progress: this.calculateProgress(this.completedSections, 'vocabulary', context.lessonType, this.phaseWeights),
+      phase: 'vocabulary',
+      section: 'vocabulary'
+    })
+
     console.log(`📚 Generating vocabulary with ${exampleCount} examples per word for ${context.difficultyLevel} level`)
 
     for (const word of context.keyVocabulary.slice(0, 8)) {
@@ -824,6 +1014,14 @@ Return ${exampleCount} sentences, one per line, no numbering:`
     context: SharedContext,
     _previousSections: GeneratedSection[]
   ): Promise<string> {
+    // Report progress at start of reading generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating reading passage',
+      progress: this.calculateProgress(this.completedSections, 'reading', context.lessonType, this.phaseWeights),
+      phase: 'reading',
+      section: 'reading'
+    })
+
     // Use vocabulary from previous sections if available
     const vocabularySection = _previousSections.find((s: GeneratedSection) => s.sectionName === 'vocabulary')
     const vocabularyWords = vocabularySection ?
@@ -851,6 +1049,14 @@ ${context.sourceText}`
     context: SharedContext,
     _previousSections: GeneratedSection[]
   ): Promise<string[]> {
+    // Report progress at start of comprehension generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating comprehension questions',
+      progress: this.calculateProgress(this.completedSections, 'comprehension', context.lessonType, this.phaseWeights),
+      phase: 'comprehension',
+      section: 'comprehension'
+    })
+
     const prompt = `Create 5 ${context.difficultyLevel} comprehension questions about this content:
 ${context.contentSummary}
 Return only questions, one per line:`
@@ -1354,6 +1560,14 @@ Return ONLY 5 questions, one per line, with no numbering, bullets, or extra text
     let attempt = 0
     const sectionStartTime = Date.now()
 
+    // Report progress at start of discussion generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating discussion questions',
+      progress: this.calculateProgress(this.completedSections, 'discussion', context.lessonType, this.phaseWeights),
+      phase: 'discussion',
+      section: 'discussion'
+    })
+
     while (attempt < maxAttempts) {
       attempt++
       console.log(`🎯 Generating discussion questions (attempt ${attempt}/${maxAttempts})`)
@@ -1594,6 +1808,14 @@ Return CONCISE JSON (brief explanations, 3 examples, 3 exercises):
     const maxAttempts = 2
     let attempt = 0
     const sectionStartTime = Date.now()
+
+    // Report progress at start of grammar generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating grammar section',
+      progress: this.calculateProgress(this.completedSections, 'grammar', context.lessonType, this.phaseWeights),
+      phase: 'grammar',
+      section: 'grammar'
+    })
 
     while (attempt < maxAttempts) {
       attempt++
@@ -2277,6 +2499,14 @@ DIFFICULTY_2: moderate`
     let attempt = 0
     const sectionStartTime = Date.now()
 
+    // Report progress at start of pronunciation generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating pronunciation section',
+      progress: this.calculateProgress(this.completedSections, 'pronunciation', context.lessonType, this.phaseWeights),
+      phase: 'pronunciation',
+      section: 'pronunciation'
+    })
+
     console.log(`🗣️ Generating pronunciation section with ${minWords} words and ${minTongueTwisters} tongue twisters`)
 
     while (attempt < maxAttempts) {
@@ -2407,6 +2637,14 @@ DIFFICULTY_2: moderate`
     context: SharedContext,
     _previousSections: GeneratedSection[]
   ): Promise<string[]> {
+    // Report progress at start of wrapup generation
+    safeProgressCallback(this.progressCallback, {
+      step: 'Generating wrap-up questions',
+      progress: this.calculateProgress(this.completedSections, 'wrapup', context.lessonType, this.phaseWeights),
+      phase: 'wrapup',
+      section: 'wrapup'
+    })
+
     const prompt = `Create 3 ${context.difficultyLevel} wrap-up questions about this lesson:
 ${context.contentSummary}
 Return only questions, one per line:`

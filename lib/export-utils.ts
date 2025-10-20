@@ -2,6 +2,53 @@ import jsPDF from "jspdf"
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, UnderlineType } from "docx"
 import { enhanceDialogueWithAvatars } from "./avatar-utils"
 
+/**
+ * Strips markdown formatting from text while preserving content.
+ * Handles bold syntax (**text**, __text__) and italic syntax (*text*, _text_).
+ * Recursively processes nested markdown.
+ * 
+ * @param text - The text containing markdown syntax
+ * @returns The text with markdown syntax removed
+ */
+export function stripMarkdown(text: string): string {
+  if (!text || typeof text !== 'string') {
+    return text
+  }
+
+  let result = text
+
+  // Remove bold syntax: **text** and __text__
+  // Use non-greedy matching to handle nested markdown
+  result = result.replace(/\*\*(.+?)\*\*/g, '$1')
+  result = result.replace(/__(.+?)__/g, '$1')
+
+  // Remove italic syntax: *text* and _text_
+  // Use non-greedy matching to handle nested markdown
+  result = result.replace(/\*(.+?)\*/g, '$1')
+  result = result.replace(/_(.+?)_/g, '$1')
+
+  return result
+}
+
+/**
+ * Safely strips markdown formatting from text with error handling.
+ * If stripping fails, returns the original text and logs the error.
+ * This ensures export processes never break due to markdown stripping failures.
+ * 
+ * @param text - The text containing markdown syntax
+ * @returns The text with markdown syntax removed, or original text if stripping fails
+ */
+export function safeStripMarkdown(text: string): string {
+  try {
+    return stripMarkdown(text)
+  } catch (error) {
+    console.error('Markdown stripping error:', error)
+    console.error('Failed text:', text?.substring(0, 100))
+    // Return original text if stripping fails to ensure export continues
+    return text
+  }
+}
+
 interface LessonData {
   lessonTitle: string
   lessonType: string
@@ -26,13 +73,35 @@ interface LessonData {
     }
     grammar: {
       focus: string
+      explanation?: {
+        form?: string
+        usage?: string
+        levelNotes?: string
+      }
       examples: string[]
-      exercise: string[]
+      exercise?: string[]
+      exercises?: Array<{
+        prompt: string
+        answer?: string
+        explanation?: string
+      }>
     }
     pronunciation: {
-      word: string
-      ipa: string
-      practice: string
+      instruction?: string
+      word?: string
+      ipa?: string
+      practice?: string
+      words?: Array<{
+        word: string
+        ipa: string
+        difficultSounds?: string[]
+        tips?: string[]
+        practiceSentence?: string
+      }>
+      tongueTwisters?: Array<{
+        text: string
+        targetSounds?: string[]
+      }>
     }
     wrapup: string[]
   }
@@ -542,19 +611,150 @@ export class LessonExporter {
 
       if (enabledSections.grammar && lessonData.sections.grammar) {
         addSection("Grammar Focus", () => {
-          addText(`Focus: ${lessonData.sections.grammar.focus}`, FONT_SIZES.MAIN_CONTENT, true, 10)
-          yPosition += 3
-          addText("Examples:", FONT_SIZES.INSTRUCTIONS, true, 10)
+          addText(lessonData.sections.grammar.focus, FONT_SIZES.MAIN_CONTENT, true, false, 10)
+          yPosition += 5
+          
+          // Grammar Explanation (Form, Usage, Notes)
+          if (lessonData.sections.grammar.explanation) {
+            const explanation = lessonData.sections.grammar.explanation
+            
+            if (explanation.form) {
+              const formWidth = pdf.internal.pageSize.width - margin * 2 - 20
+              
+              // Calculate heights for background
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "bold")
+              const formTitleLines = pdf.splitTextToSize("Form:", formWidth)
+              const formTitleHeight = formTitleLines.length * lineHeight
+              
+              pdf.setFont("helvetica", "normal")
+              const formLines = pdf.splitTextToSize(explanation.form, formWidth)
+              const formContentHeight = formLines.length * lineHeight
+              
+              const totalFormHeight = formTitleHeight + formContentHeight + 8
+              
+              // Draw background rectangle
+              pdf.setFillColor(241, 250, 255) // #F1FAFF light blue
+              pdf.rect(margin + 10, yPosition - 4, formWidth, totalFormHeight, 'F')
+              
+              // Draw title text in black
+              pdf.setTextColor(0, 0, 0) // Black text
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "bold")
+              pdf.text("Form:", margin + 10, yPosition)
+              yPosition += lineHeight
+              
+              // Draw content text in black
+              pdf.setFont("helvetica", "normal")
+              for (const line of formLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 5
+            }
+            
+            if (explanation.usage) {
+              const usageWidth = pdf.internal.pageSize.width - margin * 2 - 20
+              
+              // Calculate heights for background
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "bold")
+              const usageTitleLines = pdf.splitTextToSize("Usage:", usageWidth)
+              const usageTitleHeight = usageTitleLines.length * lineHeight
+              
+              pdf.setFont("helvetica", "normal")
+              const usageLines = pdf.splitTextToSize(explanation.usage, usageWidth)
+              const usageContentHeight = usageLines.length * lineHeight
+              
+              const totalUsageHeight = usageTitleHeight + usageContentHeight + 8
+              
+              // Draw background rectangle
+              pdf.setFillColor(241, 250, 255) // #F1FAFF light blue
+              pdf.rect(margin + 10, yPosition - 4, usageWidth, totalUsageHeight, 'F')
+              
+              // Draw title text in black
+              pdf.setTextColor(0, 0, 0) // Black text
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "bold")
+              pdf.text("Usage:", margin + 10, yPosition)
+              yPosition += lineHeight
+              
+              // Draw content text in black
+              pdf.setFont("helvetica", "normal")
+              for (const line of usageLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 5
+            }
+            
+            if (explanation.levelNotes) {
+              const noteWidth = pdf.internal.pageSize.width - margin * 2 - 20
+              
+              // Calculate heights for background
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "bold")
+              const noteTitleLines = pdf.splitTextToSize("Note:", noteWidth)
+              const noteTitleHeight = noteTitleLines.length * lineHeight
+              
+              pdf.setFont("helvetica", "italic")
+              const noteLines = pdf.splitTextToSize(explanation.levelNotes, noteWidth)
+              const noteContentHeight = noteLines.length * lineHeight
+              
+              const totalNoteHeight = noteTitleHeight + noteContentHeight + 8
+              
+              // Draw background rectangle
+              pdf.setFillColor(241, 250, 255) // #F1FAFF light blue
+              pdf.rect(margin + 10, yPosition - 4, noteWidth, totalNoteHeight, 'F')
+              
+              // Draw title text in black
+              pdf.setTextColor(0, 0, 0) // Black text
+              pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+              pdf.setFont("helvetica", "bold")
+              pdf.text("Note:", margin + 10, yPosition)
+              yPosition += lineHeight
+              
+              // Draw content text in black (italic)
+              pdf.setFont("helvetica", "italic")
+              for (const line of noteLines) {
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              }
+              yPosition += 8
+            }
+          }
+          
+          // Examples
+          addText("Examples:", FONT_SIZES.INSTRUCTIONS, true, false, 10)
           const grammarExamples = Array.isArray(lessonData.sections.grammar.examples) ? lessonData.sections.grammar.examples : []
           grammarExamples.forEach((example, index) => {
-            addText(`• ${example}`, FONT_SIZES.SUPPLEMENTARY, false, 15)
+            addText(example, FONT_SIZES.MAIN_CONTENT, false, false, 15)
           })
-          yPosition += 3
-          addText("Practice Exercise:", FONT_SIZES.INSTRUCTIONS, true, 10)
-          const grammarExercises = Array.isArray(lessonData.sections.grammar.exercise) ? lessonData.sections.grammar.exercise : []
-          grammarExercises.forEach((exercise, index) => {
-            addText(`${index + 1}. ${exercise}`, FONT_SIZES.MAIN_CONTENT, false, 15)
-          })
+          yPosition += 5
+          
+          // Practice Exercises
+          addText("Practice Exercises:", FONT_SIZES.INSTRUCTIONS, true, false, 10)
+          
+          // Check for new format (exercises) or old format (exercise)
+          if (lessonData.sections.grammar.exercises && Array.isArray(lessonData.sections.grammar.exercises)) {
+            // New format with structured exercises
+            lessonData.sections.grammar.exercises.forEach((exercise, index) => {
+              addText(`${index + 1}. ${exercise.prompt}`, FONT_SIZES.MAIN_CONTENT, false, false, 15)
+              if (exercise.answer) {
+                addText(`Answer: ${exercise.answer}`, FONT_SIZES.SUPPLEMENTARY, false, false, 20)
+              }
+              if (exercise.explanation) {
+                addText(exercise.explanation, FONT_SIZES.SUPPLEMENTARY, false, true, 20)
+              }
+              yPosition += 3
+            })
+          } else if (lessonData.sections.grammar.exercise && Array.isArray(lessonData.sections.grammar.exercise)) {
+            // Old format
+            const grammarExercises = lessonData.sections.grammar.exercise
+            grammarExercises.forEach((exercise, index) => {
+              addText(`${index + 1}. ${exercise}`, FONT_SIZES.MAIN_CONTENT, false, false, 15)
+            })
+          }
         })
       }
 
@@ -562,24 +762,163 @@ export class LessonExporter {
         addSection("Pronunciation Practice", () => {
           const pronSection = lessonData.sections.pronunciation
           
+          // Add instruction if present
+          if (pronSection.instruction) {
+            const instructionWidth = pdf.internal.pageSize.width - margin * 2 - 20
+            
+            // Calculate height for background
+            pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+            pdf.setFont("helvetica", "italic")
+            const instructionLines = pdf.splitTextToSize(pronSection.instruction, instructionWidth)
+            const instructionHeight = instructionLines.length * lineHeight + 8
+            
+            // Draw background rectangle
+            pdf.setFillColor(241, 250, 255) // #F1FAFF light blue
+            pdf.rect(margin + 10, yPosition - 4, instructionWidth, instructionHeight, 'F')
+            
+            // Draw instruction text in black
+            pdf.setTextColor(0, 0, 0)
+            for (const line of instructionLines) {
+              pdf.text(line, margin + 10, yPosition)
+              yPosition += lineHeight
+            }
+            yPosition += 8
+          }
+          
           // Handle both old format (single word) and new format (words array)
           if (pronSection.words && Array.isArray(pronSection.words) && pronSection.words.length > 0) {
             // New format with multiple words
             pronSection.words.forEach((wordItem, index) => {
-              if (index > 0) yPosition += 5 // Spacing between words
+              if (index > 0) yPosition += 8 // Spacing between words
               
-              addText(`Word: ${wordItem.word || 'N/A'}`, FONT_SIZES.MAIN_CONTENT, true, false, 10)
-              addText(`IPA: ${wordItem.ipa || 'N/A'}`, FONT_SIZES.SUPPLEMENTARY, false, false, 10)
-              
-              if (wordItem.practiceSentence) {
-                addText(`Practice: "${wordItem.practiceSentence}"`, FONT_SIZES.MAIN_CONTENT, false, false, 10)
+              // Check for page break
+              if (yPosition > pageHeight - 30) {
+                pdf.addPage()
+                yPosition = 20
               }
               
-              if (wordItem.tips && wordItem.tips.length > 0) {
-                addText(`Tips:`, FONT_SIZES.INSTRUCTIONS, true, false, 10)
-                wordItem.tips.forEach(tip => {
-                  addText(`• ${tip}`, FONT_SIZES.SUPPLEMENTARY, false, false, 15)
+              // Word and IPA - use addText for proper wrapping and sanitization
+              pdf.setTextColor(0, 0, 0)
+              pdf.setFontSize(FONT_SIZES.MAIN_CONTENT)
+              pdf.setFont("helvetica", "bold")
+              
+              const wordText = wordItem.word || 'N/A'
+              const ipaText = wordItem.ipa || 'N/A'
+              
+              // Word on its own line (bold)
+              const maxWidth = pdf.internal.pageSize.width - margin * 2 - 20
+              const wordLines = pdf.splitTextToSize(wordText, maxWidth)
+              wordLines.forEach(line => {
+                if (yPosition > pageHeight - 30) {
+                  pdf.addPage()
+                  yPosition = 20
+                }
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              })
+              
+              // IPA on next line (normal font, in brackets)
+              pdf.setFont("helvetica", "normal")
+              pdf.setFontSize(FONT_SIZES.SUPPLEMENTARY)
+              const ipaLines = pdf.splitTextToSize(`IPA: [${ipaText}]`, maxWidth)
+              ipaLines.forEach(line => {
+                if (yPosition > pageHeight - 30) {
+                  pdf.addPage()
+                  yPosition = 20
+                }
+                pdf.text(line, margin + 10, yPosition)
+                yPosition += lineHeight
+              })
+              yPosition += 3
+              
+              // Difficult Sounds
+              if (wordItem.difficultSounds && wordItem.difficultSounds.length > 0) {
+                if (yPosition > pageHeight - 30) {
+                  pdf.addPage()
+                  yPosition = 20
+                }
+                
+                pdf.setTextColor(0, 0, 0)
+                pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+                pdf.setFont("helvetica", "normal")
+                pdf.text("Difficult Sounds:", margin + 10, yPosition)
+                yPosition += lineHeight
+                
+                pdf.setFontSize(FONT_SIZES.SUPPLEMENTARY)
+                const soundsText = wordItem.difficultSounds.map(s => `/${s}/`).join('  ')
+                const soundsMaxWidth = pdf.internal.pageSize.width - margin * 2 - 25
+                const soundsLines = pdf.splitTextToSize(soundsText, soundsMaxWidth)
+                
+                soundsLines.forEach(line => {
+                  if (yPosition > pageHeight - 30) {
+                    pdf.addPage()
+                    yPosition = 20
+                  }
+                  pdf.text(line, margin + 15, yPosition)
+                  yPosition += lineHeight
                 })
+                yPosition += 3
+              }
+              
+              // Pronunciation Tips
+              if (wordItem.tips && wordItem.tips.length > 0) {
+                if (yPosition > pageHeight - 30) {
+                  pdf.addPage()
+                  yPosition = 20
+                }
+                
+                pdf.setTextColor(0, 0, 0)
+                pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+                pdf.setFont("helvetica", "normal")
+                pdf.text("Pronunciation Tips:", margin + 10, yPosition)
+                yPosition += lineHeight
+                
+                pdf.setFontSize(FONT_SIZES.SUPPLEMENTARY)
+                pdf.setFont("helvetica", "normal")
+                
+                wordItem.tips.forEach(tip => {
+                  // Wrap long tips properly
+                  const tipMaxWidth = pdf.internal.pageSize.width - margin * 2 - 25
+                  const tipLines = pdf.splitTextToSize(`• ${tip}`, tipMaxWidth)
+                  
+                  tipLines.forEach((line) => {
+                    if (yPosition > pageHeight - 30) {
+                      pdf.addPage()
+                      yPosition = 20
+                    }
+                    pdf.text(line, margin + 15, yPosition)
+                    yPosition += lineHeight
+                  })
+                })
+                yPosition += 3
+              }
+              
+              // Practice Sentence
+              if (wordItem.practiceSentence) {
+                if (yPosition > pageHeight - 30) {
+                  pdf.addPage()
+                  yPosition = 20
+                }
+                
+                pdf.setTextColor(0, 0, 0)
+                pdf.setFontSize(FONT_SIZES.INSTRUCTIONS)
+                pdf.setFont("helvetica", "normal")
+                pdf.text("Practice Sentence:", margin + 10, yPosition)
+                yPosition += lineHeight
+                
+                pdf.setFontSize(FONT_SIZES.MAIN_CONTENT)
+                const sentenceMaxWidth = pdf.internal.pageSize.width - margin * 2 - 25
+                const sentenceLines = pdf.splitTextToSize(wordItem.practiceSentence, sentenceMaxWidth)
+                
+                sentenceLines.forEach(line => {
+                  if (yPosition > pageHeight - 30) {
+                    pdf.addPage()
+                    yPosition = 20
+                  }
+                  pdf.text(line, margin + 15, yPosition)
+                  yPosition += lineHeight
+                })
+                yPosition += 3
               }
             })
           } else if (pronSection.word) {
@@ -671,15 +1010,6 @@ export class LessonExporter {
 
       const children: any[] = []
 
-      // Helper function to strip markdown formatting from text
-      const stripMarkdown = (text: string): string => {
-        return text
-          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown (**text**)
-          .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown (*text*)
-          .replace(/__(.*?)__/g, '$1') // Remove bold markdown (__text__)
-          .replace(/_(.*?)_/g, '$1') // Remove italic markdown (_text_)
-      }
-
       // Typography hierarchy constants (in half-points for Word - multiply by 2)
       // 32px = 24pt, 28px = 21pt, 16px = 12pt, 15px = 11.25pt, 14px = 10.5pt
       const WORD_FONT_SIZES = {
@@ -695,7 +1025,7 @@ export class LessonExporter {
         new Paragraph({
           children: [
             new TextRun({
-              text: lessonData.lessonTitle,
+              text: safeStripMarkdown(lessonData.lessonTitle),
               bold: true,
               size: WORD_FONT_SIZES.LESSON_TITLE,
             }),
@@ -758,7 +1088,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: stripMarkdown(question),
+                  text: safeStripMarkdown(question),
                   size: WORD_FONT_SIZES.INSTRUCTIONS,
                   italics: true,
                 }),
@@ -780,7 +1110,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: stripMarkdown(`${index}. ${question}`),
+                  text: safeStripMarkdown(`${index}. ${question}`),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -801,7 +1131,7 @@ export class LessonExporter {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: item.meaning,
+                    text: safeStripMarkdown(item.meaning),
                     size: WORD_FONT_SIZES.INSTRUCTIONS,
                     italics: true,
                   }),
@@ -826,7 +1156,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index + 1}. ${item.word}`,
+                  text: `${index + 1}. ${safeStripMarkdown(item.word)}`,
                   bold: true,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
@@ -838,7 +1168,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `   Meaning: ${item.meaning}`,
+                  text: `   Meaning: ${safeStripMarkdown(item.meaning)}`,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -867,7 +1197,7 @@ export class LessonExporter {
                 new Paragraph({
                   children: [
                     new TextRun({
-                      text: `      ${exIndex + 1}. "${example}"`,
+                      text: `      ${exIndex + 1}. "${safeStripMarkdown(example)}"`,
                       size: WORD_FONT_SIZES.SUPPLEMENTARY,
                       italics: true,
                     }),
@@ -887,7 +1217,7 @@ export class LessonExporter {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `   Example: "${item.example}"`,
+                    text: `   Example: "${safeStripMarkdown(item.example)}"`,
                     size: WORD_FONT_SIZES.SUPPLEMENTARY,
                     italics: true,
                   }),
@@ -912,7 +1242,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: parts[0],
+                  text: safeStripMarkdown(parts[0]),
                   size: WORD_FONT_SIZES.INSTRUCTIONS,
                   italics: true,
                 }),
@@ -936,7 +1266,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: parts.slice(1).join('\n\n'),
+                  text: safeStripMarkdown(parts.slice(1).join('\n\n')),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -949,7 +1279,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: readingText,
+                  text: safeStripMarkdown(readingText),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -969,7 +1299,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: question,
+                  text: safeStripMarkdown(question),
                   size: WORD_FONT_SIZES.INSTRUCTIONS,
                   italics: true,
                 }),
@@ -991,7 +1321,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index}. ${question}`,
+                  text: safeStripMarkdown(`${index}. ${question}`),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -1010,7 +1340,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: question,
+                  text: safeStripMarkdown(question),
                   size: WORD_FONT_SIZES.INSTRUCTIONS,
                   italics: true,
                 }),
@@ -1032,7 +1362,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index}. ${question}`,
+                  text: safeStripMarkdown(`${index}. ${question}`),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -1052,7 +1382,7 @@ export class LessonExporter {
           new Paragraph({
             children: [
               new TextRun({
-                text: dialogueSection.instruction,
+                text: safeStripMarkdown(dialogueSection.instruction),
                 size: WORD_FONT_SIZES.INSTRUCTIONS,
                 italics: true,
               }),
@@ -1085,12 +1415,12 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `${line.character}: `,
+                  text: `${safeStripMarkdown(line.character)}: `,
                   bold: true,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
                 new TextRun({
-                  text: line.line,
+                  text: safeStripMarkdown(line.line),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -1122,7 +1452,7 @@ export class LessonExporter {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `${index + 1}. ${question}`,
+                    text: safeStripMarkdown(`${index + 1}. ${question}`),
                     size: WORD_FONT_SIZES.MAIN_CONTENT,
                   }),
                 ],
@@ -1144,7 +1474,7 @@ export class LessonExporter {
           new Paragraph({
             children: [
               new TextRun({
-                text: dialogueSection.instruction,
+                text: safeStripMarkdown(dialogueSection.instruction),
                 size: WORD_FONT_SIZES.INSTRUCTIONS,
                 italics: true,
               }),
@@ -1177,12 +1507,12 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `${line.character}: `,
+                  text: `${safeStripMarkdown(line.character)}: `,
                   bold: true,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
                 new TextRun({
-                  text: line.line,
+                  text: safeStripMarkdown(line.line),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -1212,7 +1542,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: dialogueSection.answers.join(', '),
+                  text: safeStripMarkdown(dialogueSection.answers.join(', ')),
                   size: WORD_FONT_SIZES.SUPPLEMENTARY,
                 }),
               ],
@@ -1226,11 +1556,13 @@ export class LessonExporter {
 
       if (enabledSections.grammar && lessonData.sections.grammar) {
         const grammarContent: any[] = []
+        
+        // Grammar topic/focus
         grammarContent.push(
           new Paragraph({
             children: [
               new TextRun({
-                text: `Focus: ${lessonData.sections.grammar.focus}`,
+                text: safeStripMarkdown(lessonData.sections.grammar.focus),
                 bold: true,
                 size: WORD_FONT_SIZES.MAIN_CONTENT,
               }),
@@ -1238,6 +1570,152 @@ export class LessonExporter {
             spacing: { after: 200 },
           }),
         )
+        
+        // Grammar Explanation (Form, Usage, Notes)
+        if (lessonData.sections.grammar.explanation) {
+          const explanation = lessonData.sections.grammar.explanation
+          
+          if (explanation.form) {
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Form:",
+                    bold: true,
+                    size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  }),
+                ],
+                spacing: { after: 100 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: safeStripMarkdown(explanation.form),
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                  }),
+                ],
+                spacing: { after: 150 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+          }
+          
+          if (explanation.usage) {
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Usage:",
+                    bold: true,
+                    size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  }),
+                ],
+                spacing: { after: 100 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: safeStripMarkdown(explanation.usage),
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                  }),
+                ],
+                spacing: { after: 150 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+          }
+          
+          if (explanation.levelNotes) {
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Note:",
+                    bold: true,
+                    size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  }),
+                ],
+                spacing: { after: 100 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: safeStripMarkdown(explanation.levelNotes),
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                    italics: true,
+                  }),
+                ],
+                spacing: { after: 200 },
+                shading: {
+                  fill: "F1FAFF", // Light blue background
+                },
+                border: {
+                  left: {
+                    color: "CCCCCC",
+                    size: 6,
+                    style: "single",
+                  },
+                },
+              }),
+            )
+          }
+        }
+        
+        // Examples
         grammarContent.push(
           new Paragraph({
             children: [
@@ -1256,33 +1734,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `• ${example}`,
-                  size: WORD_FONT_SIZES.SUPPLEMENTARY,
-                }),
-              ],
-              spacing: { after: 100 },
-            }),
-          )
-        })
-        grammarContent.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Practice Exercise:",
-                bold: true,
-                size: WORD_FONT_SIZES.INSTRUCTIONS,
-              }),
-            ],
-            spacing: { before: 200, after: 100 },
-          }),
-        )
-        const grammarExercises = Array.isArray(lessonData.sections.grammar.exercise) ? lessonData.sections.grammar.exercise : []
-        grammarExercises.forEach((exercise, index) => {
-          grammarContent.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `${index + 1}. ${exercise}`,
+                  text: safeStripMarkdown(example),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],
@@ -1290,12 +1742,114 @@ export class LessonExporter {
             }),
           )
         })
+        
+        // Practice Exercises
+        grammarContent.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Practice Exercises:",
+                bold: true,
+                size: WORD_FONT_SIZES.INSTRUCTIONS,
+              }),
+            ],
+            spacing: { before: 200, after: 100 },
+          }),
+        )
+        
+        // Check for new format (exercises) or old format (exercise)
+        if (lessonData.sections.grammar.exercises && Array.isArray(lessonData.sections.grammar.exercises)) {
+          // New format with structured exercises
+          lessonData.sections.grammar.exercises.forEach((exercise, index) => {
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: safeStripMarkdown(`${index + 1}. ${exercise.prompt}`),
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                  }),
+                ],
+                spacing: { after: 100 },
+              }),
+            )
+            if (exercise.answer) {
+              grammarContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: `Answer: ${safeStripMarkdown(exercise.answer)}`,
+                      size: WORD_FONT_SIZES.SUPPLEMENTARY,
+                    }),
+                  ],
+                  spacing: { after: 100 },
+                }),
+              )
+            }
+            if (exercise.explanation) {
+              grammarContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: safeStripMarkdown(exercise.explanation),
+                      size: WORD_FONT_SIZES.SUPPLEMENTARY,
+                      italics: true,
+                    }),
+                  ],
+                  spacing: { after: 150 },
+                }),
+              )
+            }
+          })
+        } else if (lessonData.sections.grammar.exercise && Array.isArray(lessonData.sections.grammar.exercise)) {
+          // Old format
+          const grammarExercises = lessonData.sections.grammar.exercise
+          grammarExercises.forEach((exercise, index) => {
+            grammarContent.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: safeStripMarkdown(`${index + 1}. ${exercise}`),
+                    size: WORD_FONT_SIZES.MAIN_CONTENT,
+                  }),
+                ],
+                spacing: { after: 100 },
+              }),
+            )
+          })
+        }
+        
         addSection("Grammar Focus", grammarContent)
       }
 
       if (enabledSections.pronunciation && lessonData.sections.pronunciation) {
         const pronSection = lessonData.sections.pronunciation
         const pronunciationContent: any[] = []
+        
+        // Add instruction if present
+        if (pronSection.instruction) {
+          pronunciationContent.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: safeStripMarkdown(pronSection.instruction),
+                  size: WORD_FONT_SIZES.INSTRUCTIONS,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 200 },
+              shading: {
+                fill: "F1FAFF", // Light blue background
+              },
+              border: {
+                left: {
+                  color: "CCCCCC",
+                  size: 6,
+                  style: "single",
+                },
+              },
+            }),
+          )
+        }
         
         // Handle both old format (single word) and new format (words array)
         if (pronSection.words && Array.isArray(pronSection.words) && pronSection.words.length > 0) {
@@ -1306,58 +1860,62 @@ export class LessonExporter {
               pronunciationContent.push(
                 new Paragraph({
                   children: [new TextRun({ text: "" })],
-                  spacing: { before: 200 },
+                  spacing: { before: 300 },
                 }),
               )
             }
             
+            // Word and IPA
             pronunciationContent.push(
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `Word: ${wordItem.word || 'N/A'}`,
+                    text: `${safeStripMarkdown(wordItem.word || 'N/A')} `,
                     bold: true,
                     size: WORD_FONT_SIZES.MAIN_CONTENT,
                   }),
-                ],
-                spacing: { after: 100 },
-              }),
-            )
-            
-            pronunciationContent.push(
-              new Paragraph({
-                children: [
                   new TextRun({
-                    text: `IPA: ${wordItem.ipa || 'N/A'}`,
+                    text: `[${safeStripMarkdown(wordItem.ipa || 'N/A')}]`,
                     size: WORD_FONT_SIZES.SUPPLEMENTARY,
                   }),
                 ],
-                spacing: { after: 100 },
+                spacing: { after: 150 },
               }),
             )
             
-            if (wordItem.practiceSentence) {
+            // Difficult Sounds
+            if (wordItem.difficultSounds && wordItem.difficultSounds.length > 0) {
               pronunciationContent.push(
                 new Paragraph({
                   children: [
                     new TextRun({
-                      text: `Practice: "${wordItem.practiceSentence}"`,
-                      size: WORD_FONT_SIZES.MAIN_CONTENT,
-                      italics: true,
+                      text: "Difficult Sounds:",
+                      size: WORD_FONT_SIZES.INSTRUCTIONS,
                     }),
                   ],
                   spacing: { after: 100 },
                 }),
               )
+              pronunciationContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: wordItem.difficultSounds.map(s => `/${s}/`).join('  '),
+                      size: WORD_FONT_SIZES.SUPPLEMENTARY,
+                    }),
+                  ],
+                  spacing: { after: 150 },
+                }),
+              )
             }
             
+            // Pronunciation Tips
             if (wordItem.tips && wordItem.tips.length > 0) {
               pronunciationContent.push(
                 new Paragraph({
                   children: [
                     new TextRun({
-                      text: "Tips:",
-                      bold: true,
+                      text: "Pronunciation Tips:",
                       size: WORD_FONT_SIZES.INSTRUCTIONS,
                     }),
                   ],
@@ -1370,7 +1928,7 @@ export class LessonExporter {
                   new Paragraph({
                     children: [
                       new TextRun({
-                        text: `• ${tip}`,
+                        text: `• ${safeStripMarkdown(tip)}`,
                         size: WORD_FONT_SIZES.SUPPLEMENTARY,
                       }),
                     ],
@@ -1379,6 +1937,32 @@ export class LessonExporter {
                 )
               })
             }
+            
+            // Practice Sentence
+            if (wordItem.practiceSentence) {
+              pronunciationContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: "Practice Sentence:",
+                      size: WORD_FONT_SIZES.INSTRUCTIONS,
+                    }),
+                  ],
+                  spacing: { before: 150, after: 100 },
+                }),
+              )
+              pronunciationContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: safeStripMarkdown(wordItem.practiceSentence),
+                      size: WORD_FONT_SIZES.MAIN_CONTENT,
+                    }),
+                  ],
+                  spacing: { after: 150 },
+                }),
+              )
+            }
           })
         } else if (pronSection.word) {
           // Old format with single word
@@ -1386,7 +1970,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `Word: ${pronSection.word || 'N/A'}`,
+                  text: `Word: ${safeStripMarkdown(pronSection.word || 'N/A')}`,
                   bold: true,
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
@@ -1399,7 +1983,7 @@ export class LessonExporter {
             new Paragraph({
               children: [
                 new TextRun({
-                  text: `IPA: ${pronSection.ipa || 'N/A'}`,
+                  text: `IPA: ${safeStripMarkdown(pronSection.ipa || 'N/A')}`,
                   size: WORD_FONT_SIZES.SUPPLEMENTARY,
                 }),
               ],
@@ -1412,7 +1996,7 @@ export class LessonExporter {
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `Practice: "${pronSection.practice}"`,
+                    text: `Practice: "${safeStripMarkdown(pronSection.practice)}"`,
                     size: WORD_FONT_SIZES.MAIN_CONTENT,
                     italics: true,
                   }),
@@ -1446,7 +2030,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: question,
+                  text: safeStripMarkdown(question),
                   size: WORD_FONT_SIZES.INSTRUCTIONS,
                   italics: true,
                 }),
@@ -1468,7 +2052,7 @@ export class LessonExporter {
             return new Paragraph({
               children: [
                 new TextRun({
-                  text: `${index}. ${question}`,
+                  text: safeStripMarkdown(`${index}. ${question}`),
                   size: WORD_FONT_SIZES.MAIN_CONTENT,
                 }),
               ],

@@ -83,6 +83,8 @@ export default function LessonGenerator({
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generationStep, setGenerationStep] = useState("")
+  const [generationPhase, setGenerationPhase] = useState("")
+  const [generationSection, setGenerationSection] = useState("")
   const [error, setError] = useState<ErrorState | null>(null)
   const { user } = useAuth()
 
@@ -226,6 +228,8 @@ export default function LessonGenerator({
     setIsGenerating(true)
     setGenerationProgress(0)
     setGenerationStep("Initializing...")
+    setGenerationPhase("")
+    setGenerationSection("")
 
     try {
       // Get enhanced content data if available
@@ -333,13 +337,17 @@ export default function LessonGenerator({
               const data = JSON.parse(line.slice(6))
               
               if (data.type === 'progress') {
-                setGenerationStep(data.step)
-                setGenerationProgress(data.progress)
+                // Update progress state from actual SSE events (Requirement 1.1, 1.2, 1.3)
+                setGenerationStep(data.data.step)
+                setGenerationProgress(data.data.progress)
+                setGenerationPhase(data.data.phase || "")
+                setGenerationSection(data.data.section || "")
               } else if (data.type === 'complete') {
                 setGenerationStep(data.step)
                 setGenerationProgress(data.progress)
                 finalLesson = data.lesson
               } else if (data.type === 'error') {
+                // Include progress state in error reporting (Requirement 1.6)
                 setError({
                   type: data.error.type,
                   message: data.error.message,
@@ -654,18 +662,56 @@ export default function LessonGenerator({
           </div>
 
           {isGenerating && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {/* Main progress header */}
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2">
-                  <Sparkles className="h-3 w-3 animate-pulse text-primary" />
-                  {generationStep}
+                  <Sparkles className="h-4 w-4 animate-pulse text-primary" />
+                  <span className="font-medium">Generating Lesson</span>
                 </span>
-                <span>{generationProgress}%</span>
+                <span className="font-semibold text-primary">{generationProgress}%</span>
               </div>
-              <Progress value={generationProgress} className="h-2" />
-              <p className="text-xs text-muted-foreground text-center">
-                AI is analyzing your content and creating a personalized lesson...
-              </p>
+              
+              {/* Progress bar */}
+              <Progress value={generationProgress} className="h-2.5" />
+              
+              {/* Detailed step information (Requirement 1.2, 1.3) */}
+              <div className="space-y-2 bg-muted/50 rounded-lg p-3 border border-muted">
+                {/* Current step display */}
+                <div className="flex items-start gap-2">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {generationStep || "Initializing..."}
+                    </p>
+                    
+                    {/* Phase-specific progress indicators */}
+                    {generationPhase && (
+                      <div className="mt-1 space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline" className="text-xs px-2 py-0 h-5">
+                            {generationPhase}
+                          </Badge>
+                          {generationSection && (
+                            <>
+                              <span className="text-muted-foreground/50">•</span>
+                              <span className="font-medium">{generationSection}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* AI processing indicator */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-muted">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>AI is analyzing your content and creating a personalized lesson...</span>
+                </div>
+              </div>
             </div>
           )}
 

@@ -33,7 +33,8 @@ Transform any webpage into interactive language lesson material with AI-powered 
 - **Chrome Extension**: Manifest v3 compatible
 - **Context Menu**: Right-click to generate lessons from selected text
 - **Popup Interface**: Clean, intuitive lesson generation UI
-- **Real-time Progress**: Visual feedback during AI generation
+- **Real-time Progress**: Accurate progress tracking with callback-based updates
+- **Professional Exports**: Clean Word and PDF exports with automatic markdown stripping
 
 ## Installation
 
@@ -147,6 +148,8 @@ Transform any webpage into interactive language lesson material with AI-powered 
 - **jsPDF**: Client-side PDF generation
 - **docx**: Professional Word document creation
 - **Custom Formatting**: Engoo-style lesson layouts
+- **Markdown Stripping**: Automatic removal of markdown syntax for clean exports
+- **Format Consistency**: Identical output quality across PDF and Word formats
 
 ## Development
 
@@ -154,8 +157,12 @@ Transform any webpage into interactive language lesson material with AI-powered 
 
 \`\`\`
 ├── app/ # Next.js app directory
+│   └── api/ # API routes
 ├── components/ # React components
 ├── lib/ # Utility libraries
+│   ├── progressive-generator.ts # AI generation with progress callbacks
+│   └── export-utils.ts # Export utilities with markdown stripping
+├── .kiro/specs/ # Feature specifications and documentation
 ├── scripts/ # Database scripts
 ├── public/ # Static assets
 ├── manifest.json # Chrome extension manifest
@@ -173,7 +180,17 @@ Transform any webpage into interactive language lesson material with AI-powered 
 ### API Routes
 
 - `/api/generate-lesson`: AI lesson generation endpoint
+- `/api/generate-lesson-stream`: Streaming generation with real-time progress
 - `/api/export-lesson`: Export tracking and preparation
+
+### Feature Documentation
+
+Detailed documentation for major features is available in `.kiro/specs/`:
+
+- [Progress and Export Improvements](.kiro/specs/progress-and-export-improvements/README.md) - Real-time progress tracking and markdown stripping
+- [AI-Only Lesson Generation](.kiro/specs/ai-only-lesson-generation/) - Pure AI generation without fallbacks
+- [Extract From Page Button](.kiro/specs/extract-from-page-button/) - Content extraction UI
+- [Lesson Typography Enhancement](.kiro/specs/lesson-typography-enhancement/) - Typography and styling improvements
 
 ## Contributing
 
