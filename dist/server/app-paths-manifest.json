@@ -1,3 +1,4 @@
 {
+  "/api/get-extracted-content/route": "app/api/get-extracted-content/route.js",
   "/popup/page": "app/popup/page.js"
 }

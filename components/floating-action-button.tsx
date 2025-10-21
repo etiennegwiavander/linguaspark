@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { SparkyMascot, type SparkyAnimationType } from '@/components/sparky-mascot';
+import { AnimatedMascot, type MascotAnimationType as AnimatedMascotType } from '@/components/animated-mascot-demo';
 import { getBrowserCompatibility, type BrowserCompatibility } from '@/lib/browser-compatibility';
 import { ButtonConfigurationManager, type ButtonConfiguration as ConfigManagerButtonConfiguration } from '@/lib/button-configuration-manager';
 
@@ -42,7 +42,7 @@ interface ButtonState {
 
 type ExtractionPhase = 'analyzing' | 'extracting' | 'cleaning' | 'preparing';
 
-type MascotAnimationType = 'idle' | 'hover' | 'click' | 'loading' | 'success' | 'error' | 'dragging';
+type MascotAnimationType = 'idle' | 'reading' | 'thinking' | 'success' | 'error';
 
 interface FloatingActionButtonProps {
   onExtract?: () => void | Promise<void>;
@@ -97,6 +97,31 @@ const defaultConfig: ButtonConfiguration = {
   keyboardShortcut: 'Alt+E',
   mascotEnabled: true,
   animationSpeed: 'normal'
+};
+
+// Map extraction phases and old animation states to new mascot animations
+const mapToMascotAnimation = (state: string | null): AnimatedMascotType => {
+  switch (state) {
+    case 'analyzing':
+    case 'thinking':
+      return 'thinking';
+    case 'extracting':
+    case 'cleaning':
+    case 'preparing':
+    case 'loading':
+    case 'reading':
+      return 'reading';
+    case 'success':
+      return 'success';
+    case 'error':
+      return 'error';
+    case 'hover':
+    case 'click':
+    case 'dragging':
+    case 'idle':
+    default:
+      return 'idle';
+  }
 };
 
 const defaultAccessibility: AccessibilityFeatures = {
@@ -713,19 +738,19 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     switch (phase) {
       case 'analyzing':
         phaseProgress = Math.max(0, Math.min(20, progress * 0.2));
-        message = 'Sparky is analyzing the page...';
+        message = 'Analyzing the page...';
         break;
       case 'extracting':
         phaseProgress = 20 + Math.max(0, Math.min(40, progress * 0.4));
-        message = 'Sparky is extracting content...';
+        message = 'Extracting content...';
         break;
       case 'cleaning':
         phaseProgress = 60 + Math.max(0, Math.min(20, progress * 0.2));
-        message = 'Sparky is cleaning the content...';
+        message = 'Cleaning the content...';
         break;
       case 'preparing':
         phaseProgress = 80 + Math.max(0, Math.min(20, progress * 0.2));
-        message = 'Sparky is preparing your lesson...';
+        message = 'Preparing your lesson...';
         break;
     }
     
@@ -745,8 +770,8 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
       loading: true, 
       progress: 0,
       extractionPhase: 'analyzing',
-      progressMessage: 'Sparky is starting extraction...',
-      currentAnimation: 'loading'
+      progressMessage: 'Starting extraction...',
+      currentAnimation: 'reading'
     }));
   }, []);
 
@@ -974,16 +999,10 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
         data-keyboard-mode={accessibilityState.keyboardMode}
         data-drag-mode={accessibilityState.dragMode}
       >
-        <SparkyMascot
-          animation={state.extractionPhase || state.currentAnimation || 'idle'}
-          size={buttonSize * 0.7}
-          extractionProgress={state.progress}
-          onAnimationComplete={() => {
-            // Handle animation completion if needed
-            if (state.currentAnimation === 'click') {
-              setState(prev => ({ ...prev, currentAnimation: 'idle' }));
-            }
-          }}
+        <AnimatedMascot
+          animation={mapToMascotAnimation(state.extractionPhase || state.currentAnimation || 'idle')}
+          size={60}
+          imagePath="/mascot.png"
         />
       </Button>
       
