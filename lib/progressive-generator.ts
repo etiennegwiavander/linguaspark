@@ -417,7 +417,18 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
   // Private helper methods for extracting shared context
 
   private async generateLessonTitle(sourceText: string, lessonType: string, studentLevel: CEFRLevel, metadata?: any): Promise<string> {
-    console.log("🎯 Generating Engoo-style lesson title...")
+    console.log("🎯 Generating lesson title with format: 'Original Title - AI Generated Title'...")
+    
+    // Extract original article title from metadata
+    const originalTitle = metadata?.title 
+      ? metadata.title
+          .replace(/\s*-\s*Wikipedia$/i, '')
+          .replace(/\s*\|\s*.+$/i, '')
+          .trim()
+          .substring(0, 60)
+      : null
+    
+    console.log("📰 Original article title:", originalTitle || "Not available")
     
     try {
       // Create Engoo-style title prompt with examples
@@ -435,21 +446,29 @@ Engoo-style titles are:
 Generate title:`
 
       const response = await this.getGoogleAI().prompt(engooPrompt, { maxTokens: 60 })
-      const title = response.trim()
+      const aiTitle = response.trim()
         .replace(/['"]/g, '')
         .replace(/^(Title:?|Generate title:?)\s*/i, '')
         .replace(/\.$/, '') // Remove trailing period
-        .substring(0, 80)
+        .substring(0, 60)
       
-      console.log("🤖 AI generated Engoo-style title:", title)
+      console.log("🤖 AI generated Engoo-style title:", aiTitle)
       
-      // Validate the title - should be engaging and appropriate length
-      if (title.length > 5 && title.length < 80 && 
-          !title.toLowerCase().includes('lesson') && 
-          !title.toLowerCase().includes('article') &&
-          title.split(' ').length >= 2 && title.split(' ').length <= 8) {
-        console.log("✅ Using AI-generated Engoo-style title:", title)
-        return title
+      // Validate the AI title - should be engaging and appropriate length
+      if (aiTitle.length > 5 && aiTitle.length < 80 && 
+          !aiTitle.toLowerCase().includes('lesson') && 
+          !aiTitle.toLowerCase().includes('article') &&
+          aiTitle.split(' ').length >= 2 && aiTitle.split(' ').length <= 8) {
+        
+        // Format: "Original Title - AI Generated Title"
+        if (originalTitle) {
+          const fullTitle = `${originalTitle} - ${aiTitle}`
+          console.log("✅ Using combined title:", fullTitle)
+          return fullTitle
+        } else {
+          console.log("✅ Using AI-generated title only:", aiTitle)
+          return aiTitle
+        }
       }
       
       console.warn("⚠️ AI generated invalid title, using fallback")
@@ -460,14 +479,12 @@ Generate title:`
     // PRAGMATIC FALLBACK: Use metadata or generate simple title
     // This ensures lesson generation NEVER fails due to title issues
     
-    // Option 1: Use extracted metadata title
-    if (metadata?.title && metadata.title.length > 5) {
-      const cleanTitle = metadata.title
-        .replace(/\s*-\s*Wikipedia$/i, '')
-        .replace(/\s*\|\s*.+$/i, '')
-        .substring(0, 80)
-      console.log("✅ Using metadata title:", cleanTitle)
-      return cleanTitle
+    // Option 1: Use original title with lesson type
+    if (originalTitle) {
+      const lessonTypeLabel = lessonType.charAt(0).toUpperCase() + lessonType.slice(1)
+      const fallbackTitle = `${originalTitle} - ${lessonTypeLabel} Lesson`
+      console.log("✅ Using original title with lesson type:", fallbackTitle)
+      return fallbackTitle
     }
     
     // Option 2: Generate from first sentence

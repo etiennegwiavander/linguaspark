@@ -1,3 +1,4 @@
+import { metadata } from "@/app/layout"
 import { createGoogleAIServerService } from "./google-ai-server"
 import { ProgressiveGeneratorImpl, type CEFRLevel, type LessonSection, type ProgressCallback } from "./progressive-generator"
 import { usageMonitor, type GenerationContext } from "./usage-monitor"
@@ -72,6 +73,7 @@ interface GeneratedLesson {
     }
     wrapup: string[]
   }
+  metadata?: any // Include metadata for banner images, source info, etc.
 }
 
 export class LessonAIServerGenerator {
@@ -104,7 +106,7 @@ export class LessonAIServerGenerator {
       }
 
       const guidance = levelGuidance[studentLevel] || levelGuidance['B1']
-      
+
       const prompt = `Summarize and rewrite this content for ${studentLevel} level ${targetLanguage} students:
 
 ${sourceText.substring(0, 1000)}
@@ -122,7 +124,7 @@ Rewrite the content clearly and completely:`
 
       console.log("📝 Content adaptation prompt:", prompt.length, "chars")
       const response = await this.getGoogleAI().prompt(prompt)
-      
+
       return response.trim() || sourceText.substring(0, 400)
     } catch (error) {
       console.log("⚠️ Content adaptation failed, using original text")
@@ -175,7 +177,7 @@ Rewrite the content clearly and completely:`
       const adaptationStartTime = Date.now();
       const adaptedContent = await this.summarizeAndAdaptContent(sourceText, studentLevel, targetLanguage)
       const adaptationEndTime = Date.now();
-      
+
       // Log content adaptation usage
       usageMonitor.logTokenUsage(
         'content-adaptation',
@@ -183,7 +185,7 @@ Rewrite the content clearly and completely:`
         'content-summarization',
         generationContext
       );
-      
+
       console.log("✅ Content adapted:", adaptedContent.length, "chars")
 
       // Step 2: Generate lesson with adapted content
@@ -198,7 +200,7 @@ Rewrite the content clearly and completely:`
         onProgress
       )
       const lessonGenerationEndTime = Date.now();
-      
+
       // Log lesson generation usage
       usageMonitor.logTokenUsage(
         'lesson-structure-generation',
@@ -206,16 +208,17 @@ Rewrite the content clearly and completely:`
         'structured-generation',
         generationContext
       );
-      
+
       console.log("✅ Minimal AI lesson generated:", Object.keys(lessonStructure))
 
-      // Return properly structured GeneratedLesson object
+      // Return properly structured GeneratedLesson object with metadata
       const finalLesson: GeneratedLesson = {
         lessonTitle: lessonStructure.lessonTitle,
         lessonType,
         studentLevel,
         targetLanguage,
-        sections: lessonStructure
+        sections: lessonStructure,
+        metadata: metadata || undefined // Include metadata for banner images, etc.
       }
 
       console.log("🎯 Returning AI-generated lesson:", {
@@ -224,15 +227,21 @@ Rewrite the content clearly and completely:`
         targetLanguage: finalLesson.targetLanguage,
         sectionsCount: Object.keys(finalLesson.sections).length,
         warmupCount: finalLesson.sections.warmup?.length || 0,
-        vocabularyCount: finalLesson.sections.vocabulary?.length || 0
+        vocabularyCount: finalLesson.sections.vocabulary?.length || 0,
+        hasMetadata: !!metadata,
+        hasBannerImages: !!metadata?.bannerImages,
+        metadataKeys: metadata ? Object.keys(metadata) : [],
+        bannerImagesCount: metadata?.bannerImages?.length || 0
       })
+
+      console.log("📦 Full metadata received:", JSON.stringify(metadata, null, 2))
 
       console.log("🎉 Optimized AI lesson generation complete!")
       return finalLesson
     } catch (error) {
       // Log error to usage monitor
       usageMonitor.logError(error as Error, 'LESSON_GENERATION_FAILED', generationContext);
-      
+
       console.error("❌ Error in AI lesson generation:", error)
       throw error
     }
@@ -250,7 +259,7 @@ Rewrite the content clearly and completely:`
     console.log("🎯 Using progressive generation with shared context...")
 
     const progressiveGen = this.getProgressiveGenerator()
-    
+
     // Set progress callback if provided
     if (onProgress) {
       progressiveGen.setProgressCallback(onProgress, lessonType)
@@ -284,15 +293,15 @@ Rewrite the content clearly and completely:`
 
     for (const section of lessonSections) {
       console.log(`🔄 Generating section: ${section.name}`)
-      
+
       const generatedSection = await progressiveGen.generateSection(
         section,
         currentContext,
         generatedSections
       )
-      
+
       generatedSections.push(generatedSection)
-      
+
       // Update context with new section information
       currentContext = progressiveGen.updateContext(currentContext, generatedSection)
     }
@@ -310,14 +319,14 @@ Rewrite the content clearly and completely:`
 
     // Step 5: Assemble final lesson structure
     const lessonStructure: any = {}
-    
+
     for (const section of generatedSections) {
       lessonStructure[section.sectionName] = section.content
     }
 
     lessonStructure.dialoguePractice = dialoguePractice
     lessonStructure.dialogueFillGap = dialogueFillGap
-    
+
     // Include lesson title from shared context
     lessonStructure.lessonTitle = sharedContext.lessonTitle
 
@@ -508,7 +517,7 @@ Rewrite the content clearly and completely:`
   // Minimal AI-only reading passage generation
   private async generateMinimalReading(sourceText: string, studentLevel: string): Promise<string> {
     const prompt = `Rewrite this text for ${studentLevel} level students. Keep it 200-400 words: ${sourceText.substring(0, 500)}`
-    
+
     try {
       const response = await this.getGoogleAI().prompt(prompt)
       return response.trim()
@@ -520,7 +529,7 @@ Rewrite the content clearly and completely:`
   // Minimal AI-only discussion questions generation
   private async generateMinimalDiscussion(sourceText: string, studentLevel: string): Promise<string[]> {
     const prompt = `Write 3 ${studentLevel} discussion questions about this text. Only return questions: ${sourceText.substring(0, 200)}`
-    
+
     try {
       const response = await this.getGoogleAI().prompt(prompt)
       const questions = response.split('\n')
@@ -541,7 +550,7 @@ Rewrite the content clearly and completely:`
   // Minimal AI-only grammar section generation
   private async generateMinimalGrammar(sourceText: string, studentLevel: string): Promise<any> {
     const prompt = `Create a grammar lesson for ${studentLevel} level based on this text. Return JSON with focus, examples, exercise: ${sourceText.substring(0, 200)}`
-    
+
     try {
       const response = await this.getGoogleAI().prompt(prompt)
       return JSON.parse(response)
@@ -554,7 +563,7 @@ Rewrite the content clearly and completely:`
   private async generateMinimalPronunciation(vocabularyWords: string[], studentLevel: string): Promise<any> {
     const word = vocabularyWords[0] || 'communication'
     const prompt = `Create pronunciation practice for "${word}". Return JSON with word, ipa, practice:`
-    
+
     try {
       const response = await this.getGoogleAI().prompt(prompt)
       return JSON.parse(response)
@@ -566,7 +575,7 @@ Rewrite the content clearly and completely:`
   // Minimal AI-only wrapup questions generation
   private async generateMinimalWrapup(sourceText: string, studentLevel: string): Promise<string[]> {
     const prompt = `Write 3 ${studentLevel} wrap-up questions about this lesson. Only return questions: ${sourceText.substring(0, 200)}`
-    
+
     try {
       const response = await this.getGoogleAI().prompt(prompt)
       const questions = response.split('\n')
@@ -1396,34 +1405,34 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     // Score words based on educational and contextual value
     const scoredWords = meaningfulWords.map(word => {
       let score = 0
-      
+
       // High-value content-specific vocabulary (political, business, academic terms)
       if (/^(announcement|opposition|recognition|leadership|management|government|political|parliament|democracy|election|policy|legislation|constitution|rights|freedom|justice|equality|development|economic|social|cultural|environmental|international|national|regional|community|organization|institution|administration|authority|responsibility|accountability|transparency|governance|regulation|compliance|strategy|implementation|evaluation|assessment|analysis|research|investigation|examination|consideration|discussion|negotiation|agreement|cooperation|collaboration|partnership|relationship|communication|information|education|training|knowledge|understanding|awareness|consciousness|perspective|opinion|belief|attitude|approach|method|technique|process|system|structure|framework|principle|concept|theory|practice|experience|skill|expertise|professional|academic|scientific|technical|technological|digital|innovation|creativity|development|improvement|enhancement|transformation|change|progress|advancement|achievement|success|performance|quality|efficiency|effectiveness|productivity|sustainability|responsibility|commitment|dedication|motivation|inspiration|leadership|management|coordination|supervision|direction|guidance|support|assistance|service|provision|delivery|implementation|execution|operation|function|activity|action|behavior|conduct|practice|procedure|protocol|standard|guideline|requirement|condition|situation|circumstance|context|environment|setting|background|history|tradition|culture|society|community|population|group|team|organization|institution|establishment|authority|government|administration|policy|regulation|law|rule|standard|guideline|procedure|protocol|framework|model|pattern|template|example|instance|case|scenario)/.test(word)) {
         score += 6 // Highest priority for meaningful content vocabulary
       }
-      
+
       // Business and professional terms
       if (/^(manage|leader|team|company|business|strategy|develop|create|innovat|technolog|digital|global|professional|experience|skill|expert|analysis|research|project|solution|challenge|opportunity|growth|success|achievement|performance|quality|efficiency|productivity|collaboration|communication|decision|responsibility|objective|goal|target|result|outcome|impact|benefit|advantage|value|profit|revenue|investment|market|customer|client|service|product|brand|reputation|competitive|industry|sector|economy|economic|financial|budget|cost|price|sales|marketing|advertising|promotion|campaign|strategy|planning|implementation|execution|evaluation|assessment|improvement|optimization|transformation|change|adaptation|flexibility|agility|resilience|sustainability|environmental|social|ethical|governance|compliance|regulation|policy|procedure|standard|guideline|framework|methodology|approach|technique|method|process|system|structure|organization|hierarchy|department|division|function|role|position|title|career|development|training|education|learning|knowledge|information|data|insight|intelligence)/.test(word)) {
         score += 4
       }
-      
+
       // Academic and formal vocabulary
       if (/^(research|study|analysis|theory|concept|principle|method|approach|technique|process|system|structure|function|relationship|connection|interaction|influence|effect|impact|cause|result|consequence|factor|element|component|aspect|feature|characteristic|property|quality|attribute|dimension|level|degree|extent|scope|range|scale|measure|measurement|evaluation|assessment|comparison|contrast|similarity|difference|variation|change|development|evolution|progress|advancement|improvement|enhancement|modification|adjustment|adaptation|transformation|revolution|innovation|discovery|invention|creation|production|construction|design|planning|organization|management|administration|operation|implementation|execution|performance|achievement|accomplishment)/.test(word)) {
         score += 3
       }
-      
+
       // Action words and processes (often good for learning)
       if (/^(announce|reorganize|manage|develop|implement|achieve|improve|transform|communicate|collaborate|investigate|explore|examine|evaluate|assess|consider|discuss|negotiate|present|demonstrate|explain|describe|illustrate|interpret|translate|adapt|modify|optimize|organize|coordinate|administer|supervise|operate|execute|perform|accomplish|establish|maintain|preserve|conserve|protect|prevent|promote|advance|enhance|enrich|empower|engage|involve|participate|contribute|dedicate|commit|invest|allocate|distribute|circulate|transmit|transport|deliver|provide|supply|support|assist|guide|direct|instruct|educate|train|prepare|plan|schedule|arrange|coordinate|synchronize|integrate|combine|connect|associate|relate|partner|collaborate|cooperate|compete|compare|contrast|differentiate|distinguish|identify|recognize|acknowledge|appreciate|understand|comprehend|realize|aware|conscious|perceive|observe|monitor|track|measure|calculate|estimate|predict|forecast|project|anticipate|expect|assume|hypothesize|speculate|investigate|explore|research|analyze|synthesize|evaluate|assess|judge|decide|choose|select|prefer|recommend|suggest|propose|offer|request|demand|require|specify|instruct|direct|guide|advise|consult|discuss|negotiate|agree|contract|deal|transaction|exchange|trade|purchase|sale|investment|funding|financing|sponsorship|support|assistance|service|provision|delivery|distribution|allocation|assignment|delegation|authorization|approval|permission|consent|acceptance|rejection|refusal|denial|prohibition|restriction|limitation|constraint|regulation|control|management|administration|governance|leadership|supervision|oversight|monitoring|evaluation|assessment|review|audit|inspection|examination|investigation|inquiry)/.test(word)) {
         score += 3
       }
-      
+
       // Frequency bonus (words that appear multiple times are likely important)
       const frequency = (text.toLowerCase().match(new RegExp(`\\b${word}\\b`, 'g')) || []).length
       if (frequency > 1) score += frequency * 2
-      
+
       // Length bonus for substantial words
       if (word.length >= 6 && word.length <= 12) score += 1
-      
+
       return { word, score }
     })
 
@@ -1458,47 +1467,47 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     const meaningfulWords = uniqueWords.filter(word => {
       // Skip excluded words
       if (excludeWords.has(word)) return false
-      
+
       // Skip pure numbers or dates
       if (/^\d+$/.test(word) || /^\d{4}$/.test(word)) return false
-      
+
       // Skip very short words (less than 4 letters) unless they're important
       if (word.length < 4) return false
-      
+
       // Skip very long words that might be too complex
       if (word.length > 15) return false
-      
+
       return true
     })
 
     // Score words based on educational value
     const scoredWords = meaningfulWords.map(word => {
       let score = 0
-      
+
       // Business/professional vocabulary
       if (/^(manage|leader|team|company|business|strategy|develop|create|innovat|technolog|digital|global|international|professional|experience|skill|expert|analysis|research|project|solution|challenge|opportunity|growth|success|achievement|performance|quality|efficiency|productivity|collaboration|communication|decision|responsibility|objective|goal|target|result|outcome|impact|benefit|advantage|value|profit|revenue|investment|market|customer|client|service|product|brand|reputation|competitive|industry|sector|economy|economic|financial|budget|cost|price|sales|marketing|advertising|promotion|campaign|strategy|planning|implementation|execution|evaluation|assessment|improvement|optimization|transformation|change|adaptation|flexibility|agility|resilience|sustainability|environmental|social|ethical|governance|compliance|regulation|policy|procedure|standard|guideline|framework|methodology|approach|technique|method|process|system|structure|organization|hierarchy|department|division|function|role|position|title|career|development|training|education|learning|knowledge|information|data|insight|intelligence|wisdom|understanding|comprehension|awareness|consciousness|perception|perspective|viewpoint|opinion|belief|attitude|mindset|culture|values|principles|ethics|integrity|honesty|transparency|accountability|responsibility|commitment|dedication|passion|motivation|inspiration|creativity|innovation|imagination|vision|mission|purpose|meaning|significance|importance|relevance|priority|urgency|critical|essential|fundamental|basic|advanced|complex|sophisticated|comprehensive|detailed|specific|particular|general|overall|total|complete|full|entire|whole|partial|limited|restricted|exclusive|inclusive|diverse|varied|different|similar|comparable|equivalent|equal|fair|just|reasonable|logical|rational|practical|realistic|achievable|feasible|possible|probable|likely|unlikely|impossible|certain|uncertain|confident|doubtful|optimistic|pessimistic|positive|negative|neutral|objective|subjective|personal|individual|collective|social|public|private|internal|external|local|regional|national|international|global|worldwide|universal)/.test(word)) {
         score += 3
       }
-      
+
       // Academic/educational vocabulary
       if (/^(research|study|analysis|theory|concept|principle|method|approach|technique|process|system|structure|function|relationship|connection|interaction|influence|effect|impact|cause|result|consequence|factor|element|component|aspect|feature|characteristic|property|quality|attribute|dimension|level|degree|extent|scope|range|scale|measure|measurement|evaluation|assessment|comparison|contrast|similarity|difference|variation|change|development|evolution|progress|advancement|improvement|enhancement|modification|adjustment|adaptation|transformation|revolution|innovation|discovery|invention|creation|production|construction|design|planning|organization|management|administration|operation|implementation|execution|performance|achievement|accomplishment|success|failure|challenge|problem|issue|difficulty|obstacle|barrier|limitation|constraint|restriction|requirement|condition|situation|circumstance|context|environment|setting|background|history|tradition|culture|society|community|population|group|team|organization|institution|establishment|authority|government|administration|policy|regulation|law|rule|standard|guideline|procedure|protocol|framework|model|pattern|template|example|instance|case|scenario|situation|condition|state|status|position|location|place|area|region|zone|territory|domain|field|sector|industry|market|economy|business|commerce|trade|exchange|transaction|deal|agreement|contract|partnership|collaboration|cooperation|coordination|communication|interaction|relationship|connection|network|system|structure|organization|hierarchy|level|rank|grade|class|category|type|kind|sort|variety|diversity|range|spectrum)/.test(word)) {
         score += 2
       }
-      
+
       // Technical/specialized vocabulary
       if (/^(technolog|digital|computer|software|hardware|internet|online|website|platform|application|program|code|data|information|network|system|security|privacy|encryption|algorithm|artificial|intelligence|machine|learning|automation|robot|innovation|development|engineering|science|scientific|medical|health|treatment|diagnosis|research|experiment|laboratory|equipment|instrument|device|tool|machine|mechanism|process|procedure|technique|method|approach|strategy|solution|problem|challenge|opportunity|advantage|benefit|risk|threat|danger|safety|protection|prevention|control|management|monitoring|supervision|oversight|governance|regulation|compliance|standard|quality|performance|efficiency|effectiveness|productivity|optimization|improvement|enhancement|upgrade|update|modification|customization|personalization|adaptation|flexibility|scalability|sustainability|reliability|durability|stability|consistency|accuracy|precision|validity|credibility|authenticity|transparency|accountability|responsibility|integrity|ethics|morality|values|principles|beliefs|attitudes|perspectives|opinions|views|thoughts|ideas|concepts|theories|models|frameworks|paradigms|approaches|methodologies|strategies|tactics|techniques|procedures|protocols)/.test(word)) {
         score += 2
       }
-      
+
       // Action/process words (verbs in noun form or gerunds)
       if (/^(announcement|leadership|management|development|implementation|achievement|improvement|transformation|communication|collaboration|investigation|exploration|examination|evaluation|assessment|consideration|discussion|negotiation|presentation|demonstration|explanation|description|illustration|interpretation|translation|adaptation|modification|optimization|organization|coordination|administration|supervision|operation|execution|performance|accomplishment|establishment|maintenance|preservation|conservation|protection|prevention|promotion|advancement|enhancement|enrichment|empowerment|engagement|involvement|participation|contribution|dedication|commitment|investment|allocation|distribution|circulation|transmission|transportation|delivery|provision|supply|support|assistance|guidance|direction|instruction|education|training|preparation|planning|scheduling|arrangement|coordination|synchronization|integration|combination|connection|association|relationship|partnership|collaboration|cooperation|competition|comparison|contrast|differentiation|distinction|identification|recognition|acknowledgment|appreciation|understanding|comprehension|realization|awareness|consciousness|perception|observation|monitoring|tracking|measurement|calculation|estimation|prediction|forecasting|projection|anticipation|expectation|assumption|hypothesis|speculation|investigation|exploration|research|analysis|synthesis|evaluation|assessment|judgment|decision|choice|selection|preference|recommendation|suggestion|proposal|offer|request|demand|requirement|specification|instruction|direction|guidance|advice|consultation|discussion|negotiation|agreement|contract|deal|transaction|exchange|trade|purchase|sale|investment|funding|financing|sponsorship|support|assistance|service|provision|delivery|distribution|allocation|assignment|delegation|authorization|approval|permission|consent|acceptance|rejection|refusal|denial|prohibition|restriction|limitation|constraint|regulation|control|management|administration|governance|leadership|supervision|oversight|monitoring|evaluation|assessment|review|audit|inspection|examination|investigation|inquiry|research|study|analysis|interpretation|explanation|clarification|specification|definition|description|illustration|demonstration|presentation|exhibition|display|show|performance|execution|implementation|application|utilization|employment|usage|operation|function|activity|action|behavior|conduct|practice|procedure|process|method|technique|approach|strategy|plan|scheme|program|project|initiative|campaign|movement|effort|attempt|trial|experiment|test|examination|evaluation|assessment|measurement|calculation|estimation|determination|identification|recognition|discovery|invention|creation|production|construction|building|development|growth|expansion|extension|enlargement|increase|improvement|enhancement|upgrade|advancement|progress|evolution|transformation|change|modification|adjustment|adaptation|customization|personalization|optimization|refinement|perfection|completion|achievement|accomplishment|success|victory|triumph|conquest|defeat|failure|loss|mistake|error|problem|issue|difficulty|challenge|obstacle|barrier|limitation|constraint|restriction|requirement|condition|situation|circumstance|context|environment|setting|atmosphere|climate|culture|tradition|custom|habit|routine|pattern|trend|tendency|inclination|preference|choice|option|alternative|possibility|opportunity|chance|probability|likelihood|certainty|uncertainty|doubt|confidence|trust|faith|belief|conviction|opinion|view|perspective|standpoint|position|stance|attitude|approach|mindset|mentality|psychology|philosophy|ideology|theory|concept|idea|notion|thought|consideration|reflection|contemplation|meditation|concentration|focus|attention|interest|curiosity|wonder|amazement|surprise|shock|astonishment|bewilderment|confusion|uncertainty|clarity|understanding|comprehension|knowledge|information|data|facts|details|specifics|particulars|characteristics|features|attributes|properties|qualities|aspects|elements|components|parts|sections|segments|divisions|categories|types|kinds|varieties|forms|shapes|sizes|dimensions|measurements|quantities|amounts|numbers|figures|statistics|percentages|proportions|ratios|rates|speeds|frequencies|intervals|periods|durations|times|moments|instances|occasions|events|incidents|occurrences|happenings|developments|changes|modifications|alterations|adjustments|improvements|enhancements|upgrades|updates|revisions|corrections|fixes|repairs|maintenance|preservation|conservation|protection|security|safety|defense|prevention|precaution|preparation|readiness|availability|accessibility|convenience|comfort|ease|simplicity|complexity|difficulty|challenge|complication|sophistication|advancement|progress|development|growth|expansion|extension|increase|rise|improvement|enhancement|betterment|amelioration|optimization|perfection|excellence|quality|standard|level|grade|rank|status|position|location|place|site|spot|point|area|region|zone|territory|domain|field|sector|industry|market|economy|business|enterprise|organization|institution|establishment|company|corporation|firm|agency|department|division|section|unit|team|group|committee|board|council|assembly|association|society|community|population|public|audience|customers|clients|users|consumers|buyers|purchasers|investors|stakeholders|shareholders|partners|collaborators|colleagues|associates|members|participants|contributors|supporters|advocates|representatives|delegates|ambassadors|spokespersons|leaders|managers|directors|executives|administrators|supervisors|coordinators|organizers|planners|designers|developers|creators|producers|manufacturers|suppliers|providers|distributors|retailers|sellers|vendors|contractors|consultants|advisors|experts|specialists|professionals|practitioners|technicians|operators|workers|employees|staff|personnel|workforce|labor|human|resources|capital|assets|investments|funds|finances|budget|costs|expenses|revenues|income|profits|earnings|returns|benefits|advantages|gains|losses|risks|threats|dangers|hazards|challenges|problems|issues|difficulties|obstacles|barriers|limitations|constraints|restrictions|requirements|conditions|terms|specifications|standards|criteria|guidelines|rules|regulations|policies|procedures|protocols|processes|methods|techniques|approaches|strategies|plans|programs|projects|initiatives|campaigns|efforts|activities|actions|operations|functions|services|products|goods|items|articles|objects|things|materials|substances|elements|components|ingredients|contents)$/.test(word)) {
         score += 3
       }
-      
+
       // Bonus for words that appear multiple times (indicating importance)
       const frequency = (text.toLowerCase().match(new RegExp(`\\b${word}\\b`, 'g')) || []).length
       if (frequency > 1) score += frequency
-      
+
       return { word, score }
     })
 

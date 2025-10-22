@@ -513,6 +513,8 @@
         extractedContent = {
           text: cleanContent.text,
           wordCount: cleanContent.wordCount,
+          bannerImage: cleanContent.bannerImage || null,
+          images: cleanContent.images || [],
           metadata: {
             title: cleanContent.metadata.title || document.title,
             author: cleanContent.metadata.author,
@@ -535,6 +537,8 @@
           wordCount: extractedContent.wordCount || 0,
           suggestedType: extractedContent.suggestedLessonType,
           suggestedLevel: extractedContent.suggestedCEFRLevel,
+          bannerImage: extractedContent.bannerImage || "None",
+          imagesCount: extractedContent.images?.length || 0,
         });
       } catch (error) {
         console.error(
@@ -607,6 +611,8 @@
           readingTime: Math.ceil(extractedContent.wordCount / 200), // 200 words per minute
           complexity: determineComplexity(extractedContent.wordCount),
           suitabilityScore: extractedContent.validation.isValid ? 0.8 : 0.4,
+          bannerImage: extractedContent.bannerImage || null, // ADD BANNER IMAGE
+          images: extractedContent.images || [], // ADD IMAGES ARRAY
         },
         extractionSource: "webpage",
         allowContentEditing: true,
@@ -1319,12 +1325,20 @@
     const bannerImages = extractBannerImages(document);
     metadata.bannerImages = bannerImages;
 
+    // Extract banner image from the images array
+    const bannerImage =
+      metadata.bannerImages && metadata.bannerImages.length > 0
+        ? metadata.bannerImages[0].url
+        : null;
+
     return {
       text: text,
       structuredContent: {},
       metadata: metadata,
       wordCount: text ? text.split(/\s+/).length : 0,
       readingTime: text ? Math.ceil(text.split(/\s+/).length / 200) : 0,
+      bannerImage: bannerImage,
+      images: metadata.bannerImages || [],
     };
   }
 

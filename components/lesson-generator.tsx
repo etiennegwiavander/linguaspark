@@ -54,6 +54,7 @@ interface ErrorState {
 interface LessonGeneratorProps {
   initialText?: string
   sourceUrl?: string
+  extractedMetadata?: any
   onLessonGenerated: (lesson: any) => void
   onExtractFromPage: () => void
 }
@@ -73,6 +74,7 @@ interface ExtractionMetadata {
 export default function LessonGenerator({
   initialText = "",
   sourceUrl = "",
+  extractedMetadata,
   onLessonGenerated,
   onExtractFromPage,
 }: LessonGeneratorProps) {
@@ -100,22 +102,22 @@ export default function LessonGenerator({
     if (initialText && initialText !== selectedText) {
       console.log('[LessonGenerator] Updating selectedText from initialText:', initialText.substring(0, 100) + '...')
       setSelectedText(initialText)
-      
+
       // CRITICAL FIX: Also set lesson type and level from URL parameters
       const urlParams = new URLSearchParams(window.location.search)
       const urlType = urlParams.get('type')
       const urlLevel = urlParams.get('level')
-      
+
       if (urlType && !lessonType) {
         console.log('[LessonGenerator] Setting lesson type from URL:', urlType)
         setLessonType(urlType)
       }
-      
+
       if (urlLevel && !studentLevel) {
         console.log('[LessonGenerator] Setting student level from URL:', urlLevel)
         setStudentLevel(urlLevel)
       }
-      
+
       if (!targetLanguage) {
         console.log('[LessonGenerator] Setting default target language: english')
         setTargetLanguage("english")
@@ -136,17 +138,17 @@ export default function LessonGenerator({
       try {
         // Check if this is from extraction
         const isExtraction = await LessonInterfaceBridge.isExtractionSource()
-        
+
         if (isExtraction) {
           setIsExtractionSource(true)
-          
+
           // Load extraction configuration
           const config = await LessonInterfaceBridge.loadExtractionConfiguration()
-          
+
           if (config) {
             setExtractionConfig(config)
             setShowExtractionInfo(true)
-            
+
             // Auto-populate fields if not already done (Requirement 4.2, 4.3)
             if (!hasAppliedInitialValues) {
               setSelectedText(config.sourceContent)
@@ -190,7 +192,7 @@ export default function LessonGenerator({
       isExtractionSource,
       hasExtractionConfig: !!extractionConfig
     })
-    
+
     if (!lessonType || !studentLevel || !targetLanguage || !selectedText.trim()) {
       console.error('[LessonGenerator] Validation failed:', {
         hasLessonType: !!lessonType,
@@ -245,7 +247,7 @@ export default function LessonGenerator({
               }
             })
           })
-          
+
           // Map lessonConfiguration to enhancedContent format (Phase 1 storage structure)
           if (result.lessonConfiguration) {
             console.log('[LessonGenerator] Found lessonConfiguration in storage')
@@ -287,8 +289,18 @@ export default function LessonGenerator({
         requestBody.structuredContent = enhancedContent.structuredContent
         requestBody.wordCount = enhancedContent.wordCount
         requestBody.readingTime = enhancedContent.readingTime
+      } else if (extractedMetadata) {
+        // Use extracted metadata from page.tsx if no enhanced content
+        console.log('[LessonGenerator] Using extracted metadata from props:', {
+          hasTitle: !!extractedMetadata.title,
+          hasBannerImages: !!extractedMetadata.bannerImages,
+          bannerImagesCount: extractedMetadata.bannerImages?.length || 0,
+          hasImages: !!extractedMetadata.images,
+          imagesCount: extractedMetadata.images?.length || 0
+        })
+        requestBody.contentMetadata = extractedMetadata
       } else {
-        console.log('[LessonGenerator] No enhanced content available, sending basic request')
+        console.log('[LessonGenerator] No enhanced content or extracted metadata available, sending basic request')
       }
 
       console.log('[LessonGenerator] Sending request to streaming API:', {
@@ -324,7 +336,7 @@ export default function LessonGenerator({
 
       while (true) {
         const { done, value } = await reader.read()
-        
+
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
@@ -335,7 +347,7 @@ export default function LessonGenerator({
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
-              
+
               if (data.type === 'progress') {
                 // Update progress state from actual SSE events (Requirement 1.1, 1.2, 1.3)
                 setGenerationStep(data.data.step)
@@ -371,10 +383,10 @@ export default function LessonGenerator({
 
       // Add extraction metadata to lesson if from extraction (Requirement 6.6)
       let enhancedLesson = finalLesson
-      
+
       if (isExtractionSource && extractionConfig) {
         enhancedLesson = {
-          ...result.lesson,
+          ...finalLesson,
           extractionSource: {
             url: extractionConfig.metadata.sourceUrl,
             domain: extractionConfig.metadata.domain,
@@ -388,7 +400,9 @@ export default function LessonGenerator({
             readingTime: extractionConfig.metadata.readingTime,
             complexity: extractionConfig.metadata.complexity,
             suitabilityScore: extractionConfig.metadata.suitabilityScore
-          }
+          },
+          bannerImage: (extractionConfig.metadata as any).bannerImage || null,
+          images: (extractionConfig.metadata as any).images || []
         }
       }
 
@@ -446,11 +460,11 @@ export default function LessonGenerator({
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
-              
+
               <div className="text-xs text-gray-600">
                 {LessonInterfaceUtils.createMetadataDisplay(extractionConfig.metadata)}
               </div>
-              
+
               {extractionConfig.metadata.title && (
                 <div className="text-sm font-medium text-gray-900">
                   "{extractionConfig.metadata.title}"
@@ -502,7 +516,7 @@ export default function LessonGenerator({
                 <Info className="h-3 w-3 mr-1" />
                 Hide Details
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -636,7 +650,7 @@ export default function LessonGenerator({
                 </Button>
               )}
             </div>
-            
+
             {/* Content editing capability (Requirement 4.5) */}
             {isExtractionSource && extractionConfig?.allowContentEditing && (
               <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border">
@@ -644,7 +658,7 @@ export default function LessonGenerator({
                 You can edit the extracted content below before generating your lesson
               </div>
             )}
-            
+
             <Textarea
               value={selectedText}
               onChange={(e) => { setSelectedText(e.target.value); clearError(); }}
@@ -671,10 +685,10 @@ export default function LessonGenerator({
                 </span>
                 <span className="font-semibold text-primary">{generationProgress}%</span>
               </div>
-              
+
               {/* Progress bar */}
               <Progress value={generationProgress} className="h-2.5" />
-              
+
               {/* Detailed step information (Requirement 1.2, 1.3) */}
               <div className="space-y-2 bg-muted/50 rounded-lg p-3 border border-muted">
                 {/* Current step display */}
@@ -686,7 +700,7 @@ export default function LessonGenerator({
                     <p className="text-sm font-medium text-foreground">
                       {generationStep || "Initializing..."}
                     </p>
-                    
+
                     {/* Phase-specific progress indicators */}
                     {generationPhase && (
                       <div className="mt-1 space-y-1">
@@ -705,7 +719,7 @@ export default function LessonGenerator({
                     )}
                   </div>
                 </div>
-                
+
                 {/* AI processing indicator */}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-muted">
                   <Loader2 className="h-3 w-3 animate-spin" />

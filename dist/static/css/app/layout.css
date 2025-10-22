@@ -119,6 +119,8 @@
     --text-2xl--line-height: calc(2 / 1.5);
     --text-3xl: 1.875rem;
     --text-3xl--line-height: calc(2.25 / 1.875);
+    --text-4xl: 2.25rem;
+    --text-4xl--line-height: calc(2.5 / 2.25);
     --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
@@ -841,6 +843,9 @@
   }
   .max-h-64 {
     max-height: calc(var(--spacing) * 64);
+  }
+  .max-h-96 {
+    max-height: calc(var(--spacing) * 96);
   }
   .max-h-\[90vh\] {
     max-height: 90vh;
@@ -2588,6 +2593,9 @@
     :where(& > :not(:last-child)) {
       --tw-divide-x-reverse: 1;
     }
+  }
+  .fade-in {
+    --tw-enter-opacity: 0;
   }
   .paused {
     animation-play-state: paused;
@@ -4820,6 +4828,12 @@
     @media (width >= 64rem) {
       font-size: var(--text-3xl);
       line-height: var(--tw-leading, var(--text-3xl--line-height));
+    }
+  }
+  .lg\:text-4xl {
+    @media (width >= 64rem) {
+      font-size: var(--text-4xl);
+      line-height: var(--tw-leading, var(--text-4xl--line-height));
     }
   }
   .lg\:text-\[32px\] {

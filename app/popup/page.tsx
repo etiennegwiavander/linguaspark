@@ -15,6 +15,7 @@ declare global {
 export default function PopupPage() {
   const [selectedText, setSelectedText] = useState("")
   const [sourceUrl, setSourceUrl] = useState("")
+  const [extractedMetadata, setExtractedMetadata] = useState<any>(null)
   const [generatedLesson, setGeneratedLesson] = useState(null)
 
   useEffect(() => {
@@ -55,9 +56,17 @@ export default function PopupPage() {
               const apiResult = await response.json();
               if (apiResult.success && apiResult.data.lessonConfiguration) {
                 const content = apiResult.data.lessonConfiguration.sourceContent;
+                const metadata = apiResult.data.lessonConfiguration.metadata;
                 console.log('[LinguaSpark Popup] ✅ Retrieved content from API, length:', content.length);
+                console.log('[LinguaSpark Popup] 📸 Banner image:', metadata.bannerImage || 'None');
+                console.log('[LinguaSpark Popup] 🖼️ Images count:', metadata.images?.length || 0);
+                if (metadata.images && metadata.images.length > 0) {
+                  console.log('[LinguaSpark Popup] First image:', metadata.images[0]);
+                }
                 setSelectedText(content);
-                setSourceUrl(apiResult.data.lessonConfiguration.metadata.sourceUrl || '');
+                setSourceUrl(metadata.sourceUrl || '');
+                setExtractedMetadata(metadata); // ← STORE METADATA
+                console.log('[LinguaSpark Popup] ✅ Metadata stored in state');
                 return;
               } else {
                 console.error('[LinguaSpark Popup] Failed to retrieve content from API:', apiResult.error);
@@ -245,6 +254,7 @@ export default function PopupPage() {
             <LessonGenerator
               initialText={selectedText}
               sourceUrl={sourceUrl}
+              extractedMetadata={extractedMetadata}
               onLessonGenerated={handleLessonGenerated}
               onExtractFromPage={handleExtractFromPage}
             />

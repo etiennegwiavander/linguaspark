@@ -36,6 +36,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             
             console.log('[LinguaSpark Background] Content stored in API for session:', sessionId);
             console.log('[LinguaSpark Background] Content length:', result.lessonConfiguration.sourceContent.length, 'characters');
+            console.log('[LinguaSpark Background] 📸 Banner image:', result.lessonConfiguration.metadata.bannerImage || 'None');
+            console.log('[LinguaSpark Background] 🖼️ Images count:', result.lessonConfiguration.metadata.images?.length || 0);
             
             chrome.tabs.create({ url }).then((tab) => {
               console.log('[LinguaSpark Background] Opened lesson interface tab:', tab.id);

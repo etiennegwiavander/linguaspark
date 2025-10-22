@@ -31,6 +31,16 @@ export interface ExtractedContentMetadata {
   readingTime: number;
   complexity: 'beginner' | 'intermediate' | 'advanced';
   suitabilityScore: number;
+  bannerImages?: Array<{
+    url: string;
+    alt: string;
+    type: 'meta' | 'content';
+    priority: number;
+    width?: number | null;
+    height?: number | null;
+  }>;
+  bannerImage?: string; // URL of the primary banner image
+  images?: Array<any>; // All extracted images
 }
 
 export interface InterfaceState {
@@ -377,7 +387,10 @@ export class LessonInterfaceBridge {
         wordCount: content.quality.wordCount,
         readingTime: content.quality.readingTime,
         complexity: content.quality.complexity,
-        suitabilityScore: content.quality.suitabilityScore
+        suitabilityScore: content.quality.suitabilityScore,
+        bannerImages: (content as any).bannerImages || (content.metadata as any)?.bannerImages || [],
+        bannerImage: (content as any).bannerImage || (content.metadata as any)?.bannerImage || null,
+        images: (content as any).images || (content.metadata as any)?.images || []
       },
       extractionSource: 'webpage',
       allowContentEditing: true,

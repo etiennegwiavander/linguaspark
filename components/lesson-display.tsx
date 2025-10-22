@@ -52,6 +52,12 @@ interface LessonData {
       height?: number | null
     }>
   }
+  extractionSource?: {
+    url: string
+    domain: string
+    title?: string
+    author?: string
+  }
   sections: {
     warmup: string[]
     vocabulary: Array<{ word: string; meaning: string; example?: string; examples?: string[] }>
@@ -846,35 +852,38 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5">
         <div className="flex-1">
           {/* AI-Generated Lesson Title */}
-          <h1 className="text-2xl lg:text-[32px] font-bold text-foreground leading-tight mb-1.5">
+          <h1 className="text-3xl lg:text-4xl font-bold text-foreground leading-tight mb-3">
             {safeLesson.lessonTitle}
           </h1>
           
+          {/* Date and Level Badge */}
+          <div className="flex items-center gap-3 mb-6 text-muted-foreground">
+            <span className="text-base">
+              {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+            <Badge variant="default" className="text-sm px-3 py-1">
+              {safeLesson.studentLevel}
+            </Badge>
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              {safeLesson.lessonType}
+            </Badge>
+          </div>
+          
           {/* Banner Image */}
-          {safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0 && (
-            <div className="mb-6">
+          {((safeLesson as any).bannerImage || (safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0)) && (
+            <div className="mb-8 rounded-lg overflow-hidden shadow-lg">
               <img
-                src={safeLesson.metadata.bannerImages[0].src}
-                alt={safeLesson.metadata.bannerImages[0].alt}
-                className="w-full h-48 lg:h-64 object-cover rounded-sm shadow-md"
+                src={(safeLesson as any).bannerImage || safeLesson.metadata.bannerImages[0].src}
+                alt={safeLesson.lessonTitle}
+                className="w-full h-auto max-h-96 object-cover"
                 onError={(e) => {
-                  // Hide image if it fails to load
+                  console.log('❌ Banner image failed to load');
                   e.currentTarget.style.display = 'none';
                 }}
+                onLoad={() => console.log('✅ Banner image loaded successfully')}
               />
             </div>
           )}
-
-          {/* Lesson Metadata */}
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-sm text-muted-foreground">Generated Lesson</span>
-            <span className="text-muted-foreground">•</span>
-            <div className="flex flex-wrap gap-1.5">
-              <Badge variant="default">{safeLesson.lessonType}</Badge>
-              <Badge variant="outline">{safeLesson.studentLevel}</Badge>
-              <Badge variant="secondary">{safeLesson.targetLanguage}</Badge>
-            </div>
-          </div>
         </div>
 
         <Button variant="outline" size="sm" onClick={onNewLesson} className="w-full sm:w-auto shrink-0">
@@ -1026,6 +1035,37 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                   </p>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Source Attribution */}
+            {lesson.extractionSource && (
+              <div className="mt-8 pt-6 border-t border-border text-center">
+                <a
+                  href={lesson.extractionSource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 hover:underline"
+                >
+                  <span>Article from</span>
+                  <span className="font-medium capitalize">
+                    {lesson.extractionSource.domain?.replace('www.', '').split('.')[0] || 'Unknown Source'}
+                  </span>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
+              </div>
             )}
           </div>
         </div>
