@@ -871,7 +871,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                 <CardDescription className="text-xs">Toggle sections to customize your lesson</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {sections.map((section) => (
                     <div key={section.id} className="flex items-center justify-between p-2 rounded-sm hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-1.5">
@@ -956,7 +956,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                   {/* Left Side: Title and Metadata */}
                   <div className="flex-1 min-w-0">
                     {/* Lesson Title */}
-                    <h1 className="text-3xl lg:text-4xl font-bold text-foreground leading-tight mb-4">
+                    <h1 className="text-3xl lg:text-4xl font-medium text-foreground leading-tight mb-4">
                       {safeLesson.lessonTitle}
                     </h1>
 
