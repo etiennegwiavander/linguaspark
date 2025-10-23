@@ -848,49 +848,6 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
   return (
     <div className="w-full space-y-1.5">
-      {/* Header - Full Width */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5">
-        <div className="flex-1">
-          {/* AI-Generated Lesson Title */}
-          <h1 className="text-3xl lg:text-4xl font-bold text-foreground leading-tight mb-3">
-            {safeLesson.lessonTitle}
-          </h1>
-          
-          {/* Date and Level Badge */}
-          <div className="flex items-center gap-3 mb-6 text-muted-foreground">
-            <span className="text-base">
-              {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </span>
-            <Badge variant="default" className="text-sm px-3 py-1">
-              {safeLesson.studentLevel}
-            </Badge>
-            <Badge variant="outline" className="text-sm px-3 py-1">
-              {safeLesson.lessonType}
-            </Badge>
-          </div>
-          
-          {/* Banner Image */}
-          {((safeLesson as any).bannerImage || (safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0)) && (
-            <div className="mb-8 rounded-lg overflow-hidden shadow-lg">
-              <img
-                src={(safeLesson as any).bannerImage || safeLesson.metadata.bannerImages[0].src}
-                alt={safeLesson.lessonTitle}
-                className="w-full h-auto max-h-96 object-cover"
-                onError={(e) => {
-                  console.log('❌ Banner image failed to load');
-                  e.currentTarget.style.display = 'none';
-                }}
-                onLoad={() => console.log('✅ Banner image loaded successfully')}
-              />
-            </div>
-          )}
-        </div>
-
-        <Button variant="outline" size="sm" onClick={onNewLesson} className="w-full sm:w-auto shrink-0">
-          New Lesson
-        </Button>
-      </div>
-
       {/* Export Error Alert - Full Width */}
       {exportError && (
         <Alert variant="destructive">
@@ -906,28 +863,6 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         <div className="lg:col-span-4 space-y-1.5">
           <div className="lg:sticky lg:top-4 space-y-1.5">
 
-            {/* Debug Info in Development */}
-            {/* {process.env.NODE_ENV === 'development' && (
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-[28px] font-semibold text-yellow-800">Debug Info</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-xs text-yellow-700 space-y-1">
-                    <div><strong>Type:</strong> {safeLesson.lessonType}</div>
-                    <div><strong>Level:</strong> {safeLesson.studentLevel}</div>
-                    <div><strong>Language:</strong> {safeLesson.targetLanguage}</div>
-                    <div><strong>Warmup:</strong> {safeLesson.sections.warmup.length} items</div>
-                    <div><strong>Vocabulary:</strong> {safeLesson.sections.vocabulary.length} words</div>
-                    <div><strong>Dialogue Practice:</strong> {safeLesson.sections.dialoguePractice?.dialogue?.length || 0} lines</div>
-                    <div><strong>Dialogue Fill Gap:</strong> {safeLesson.sections.dialogueFillGap?.dialogue?.length || 0} lines</div>
-                    <div className="pt-2 border-t border-yellow-300 mt-2">
-                      <strong>Enabled:</strong> {sections.filter(s => s.enabled).length}/{sections.length} sections
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )} */}
 
             {/* Section Controls */}
             <Card>
@@ -947,6 +882,13 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                     </div>
                   ))}
                 </div>
+                {/* New Lesson Button - Top Right */}
+                <div className="mt-2 ">
+                  <Button variant="outline" size="lg" className="w-full" onClick={onNewLesson} >
+                    New Lesson
+                  </Button>
+                </div>
+
               </CardContent>
             </Card>
 
@@ -1007,6 +949,53 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         {/* RIGHT COLUMN - Lesson Content (Scrollable) */}
         <div className="lg:col-span-8">
           <div className="space-y-1.5">
+            {/* Header Card - Title and Banner Image */}
+            <Card className="scroll-mt-4">
+              <CardContent className="pt-6">
+                <div className="flex flex-col lg:flex-row gap-6 items-start">
+                  {/* Left Side: Title and Metadata */}
+                  <div className="flex-1 min-w-0">
+                    {/* Lesson Title */}
+                    <h1 className="text-3xl lg:text-4xl font-bold text-foreground leading-tight mb-4">
+                      {safeLesson.lessonTitle}
+                    </h1>
+
+                    {/* Date and Level Badges */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-sm text-muted-foreground">
+                        {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </span>
+                      <Badge variant="default" className="text-sm px-3 py-1">
+                        {safeLesson.studentLevel}
+                      </Badge>
+                      <Badge variant="outline" className="text-sm px-3 py-1 capitalize">
+                        {safeLesson.lessonType}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Banner Image */}
+                  {((safeLesson as any).bannerImage || (safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0)) && (
+                    <div className="w-full lg:w-96 flex-shrink-0">
+                      <div className="rounded-lg overflow-hidden shadow-lg">
+                        <img
+                          src={(safeLesson as any).bannerImage || safeLesson.metadata.bannerImages[0].src}
+                          alt={safeLesson.lessonTitle}
+                          className="w-full h-48 object-cover"
+                          onError={(e) => {
+                            console.log('❌ Banner image failed to load');
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          onLoad={() => console.log('✅ Banner image loaded successfully')}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lesson Sections */}
             {sections
               .filter((section) => section.enabled)
               .map((section, index) => (

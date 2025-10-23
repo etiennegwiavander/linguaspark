@@ -384,26 +384,42 @@ export default function LessonGenerator({
       // Add extraction metadata to lesson if from extraction (Requirement 6.6)
       let enhancedLesson = finalLesson
 
-      if (isExtractionSource && extractionConfig) {
+      // Use extractedMetadata (from props) or extractionConfig (from bridge)
+      const metadataSource = extractedMetadata || extractionConfig?.metadata
+      const hasExtractionData = isExtractionSource && (extractionConfig || extractedMetadata)
+
+      if (hasExtractionData && metadataSource) {
+        console.log('[LessonGenerator] Enhancing lesson with extraction data:', {
+          hasExtractionConfig: !!extractionConfig,
+          hasExtractedMetadata: !!extractedMetadata,
+          hasBannerImages: !!(metadataSource.bannerImages || metadataSource.images),
+          bannerImagesCount: (metadataSource.bannerImages?.length || metadataSource.images?.length || 0)
+        })
+
         enhancedLesson = {
           ...finalLesson,
           extractionSource: {
-            url: extractionConfig.metadata.sourceUrl,
-            domain: extractionConfig.metadata.domain,
-            title: extractionConfig.metadata.title,
-            author: extractionConfig.metadata.author,
-            extractedAt: extractionConfig.metadata.extractedAt,
-            attribution: extractionConfig.attribution
+            url: metadataSource.sourceUrl || sourceUrl,
+            domain: metadataSource.domain || '',
+            title: metadataSource.title || '',
+            author: metadataSource.author || '',
+            extractedAt: metadataSource.extractedAt || new Date(),
+            attribution: extractionConfig?.attribution || `Article from ${metadataSource.domain}`
           },
-          contentMetadata: {
-            wordCount: extractionConfig.metadata.wordCount,
-            readingTime: extractionConfig.metadata.readingTime,
-            complexity: extractionConfig.metadata.complexity,
-            suitabilityScore: extractionConfig.metadata.suitabilityScore
+          metadata: {
+            ...metadataSource,
+            bannerImages: metadataSource.bannerImages || metadataSource.images || []
           },
-          bannerImage: (extractionConfig.metadata as any).bannerImage || null,
-          images: (extractionConfig.metadata as any).images || []
+          bannerImage: metadataSource.bannerImage || metadataSource.bannerImages?.[0]?.src || metadataSource.images?.[0]?.src || null,
+          images: metadataSource.images || metadataSource.bannerImages || []
         }
+
+        console.log('[LessonGenerator] Enhanced lesson with banner:', {
+          hasBannerImage: !!enhancedLesson.bannerImage,
+          bannerImageUrl: enhancedLesson.bannerImage,
+          hasExtractionSource: !!enhancedLesson.extractionSource,
+          extractionSourceUrl: enhancedLesson.extractionSource?.url
+        })
       }
 
       onLessonGenerated(enhancedLesson)

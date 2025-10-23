@@ -18,6 +18,23 @@ export default function PopupPage() {
   const [extractedMetadata, setExtractedMetadata] = useState<any>(null)
   const [generatedLesson, setGeneratedLesson] = useState(null)
 
+  // Load persisted lesson on mount
+  useEffect(() => {
+    const loadPersistedLesson = () => {
+      try {
+        const savedLesson = localStorage.getItem('linguaspark_current_lesson')
+        if (savedLesson) {
+          const lesson = JSON.parse(savedLesson)
+          console.log('[LinguaSpark Popup] ✅ Loaded persisted lesson from localStorage')
+          setGeneratedLesson(lesson)
+        }
+      } catch (error) {
+        console.error('[LinguaSpark Popup] Failed to load persisted lesson:', error)
+      }
+    }
+    loadPersistedLesson()
+  }, [])
+
   useEffect(() => {
     const loadContent = async () => {
       try {
@@ -37,12 +54,12 @@ export default function PopupPage() {
         if (isExtractionSource) {
           console.log('[LinguaSpark Popup] Extraction source detected - checking for session ID');
           console.log('[LinguaSpark Popup] URL params:', Object.fromEntries(urlParams));
-          
+
           // NEW: Check for session ID and retrieve content from API
           const sessionId = urlParams.get('sessionId');
           if (sessionId) {
             console.log('[LinguaSpark Popup] Found session ID, retrieving content from API:', sessionId);
-            
+
             try {
               const response = await fetch('/api/get-extracted-content', {
                 method: 'POST',
@@ -52,7 +69,7 @@ export default function PopupPage() {
                   sessionId: sessionId
                 })
               });
-              
+
               const apiResult = await response.json();
               if (apiResult.success && apiResult.data.lessonConfiguration) {
                 const content = apiResult.data.lessonConfiguration.sourceContent;
@@ -75,7 +92,7 @@ export default function PopupPage() {
               console.error('[LinguaSpark Popup] API request failed:', error);
             }
           }
-          
+
           // Fallback: Check for content in URL parameters (legacy support)
           if (contentParam && sourceParam) {
             const decodedContent = decodeURIComponent(contentParam);
@@ -84,7 +101,7 @@ export default function PopupPage() {
             setSourceUrl(decodeURIComponent(sourceParam));
             return;
           }
-          
+
           // For extraction sources, check storage as final fallback
         } else if (contentParam && sourceParam) {
           // Only use URL parameters for non-extraction sources (manual URLs, etc.)
@@ -99,7 +116,7 @@ export default function PopupPage() {
         const result = await LessonInterfaceUtils.safeStorageGet(['lessonConfiguration', 'extractedContent', 'selectedText', 'sourceUrl'])
         console.log('[LinguaSpark Popup] Storage result:', result)
         console.log('[LinguaSpark Popup] Storage result keys:', Object.keys(result || {}))
-        
+
         // Also check localStorage directly for debugging
         try {
           const directCheck = localStorage.getItem('linguaspark_lesson_config');
@@ -109,7 +126,7 @@ export default function PopupPage() {
             console.log('[LinguaSpark Popup] Direct localStorage keys:', Object.keys(parsed));
             console.log('[LinguaSpark Popup] Direct localStorage lessonConfiguration:', !!parsed.lessonConfiguration);
             console.log('[LinguaSpark Popup] Direct localStorage content length:', parsed.lessonConfiguration?.sourceContent?.length || 0);
-            
+
             // If we found data in localStorage but not in the result, use it directly
             if (parsed.lessonConfiguration && !result.lessonConfiguration) {
               console.log('[LinguaSpark Popup] Using localStorage data directly');
@@ -216,11 +233,29 @@ export default function PopupPage() {
   }
 
   const handleLessonGenerated = (lesson: any) => {
+    console.log('[LinguaSpark Popup] Lesson generated, saving to localStorage')
     setGeneratedLesson(lesson)
+
+    // Persist lesson to localStorage
+    try {
+      localStorage.setItem('linguaspark_current_lesson', JSON.stringify(lesson))
+      console.log('[LinguaSpark Popup] ✅ Lesson saved to localStorage')
+    } catch (error) {
+      console.error('[LinguaSpark Popup] Failed to save lesson to localStorage:', error)
+    }
   }
 
   const handleNewLesson = () => {
+    console.log('[LinguaSpark Popup] Creating new lesson, clearing persisted data')
     setGeneratedLesson(null)
+
+    // Clear persisted lesson from localStorage
+    try {
+      localStorage.removeItem('linguaspark_current_lesson')
+      console.log('[LinguaSpark Popup] ✅ Cleared persisted lesson from localStorage')
+    } catch (error) {
+      console.error('[LinguaSpark Popup] Failed to clear persisted lesson:', error)
+    }
   }
 
   const handleExportPDF = () => {
