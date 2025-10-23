@@ -865,7 +865,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
 
             {/* Section Controls */}
-            <Card>
+            <Card className="rounded-none">
               <CardHeader className="pb-3">
                 <CardTitle className="text-[28px] font-semibold">Lesson Sections</CardTitle>
                 <CardDescription className="text-xs">Toggle sections to customize your lesson</CardDescription>
@@ -893,7 +893,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             </Card>
 
             {/* Export Actions */}
-            <Card>
+            <Card className="rounded-none">
               <CardHeader className="pb-3">
                 <CardTitle className="text-[28px] font-semibold">Export Lesson</CardTitle>
                 <CardDescription className="text-xs">
@@ -950,7 +950,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         <div className="lg:col-span-8">
           <div className="space-y-1.5">
             {/* Header Card - Title and Banner Image */}
-            <Card className="scroll-mt-4">
+            <Card className="scroll-mt-4 rounded-none">
               <CardContent className="pt-6">
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
                   {/* Left Side: Title and Metadata */}
@@ -999,7 +999,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             {sections
               .filter((section) => section.enabled)
               .map((section, index) => (
-                <Card key={section.id} className="scroll-mt-4">
+                <Card key={section.id} className="scroll-mt-4 rounded-none">
                   <CardHeader className="pb-4">
                     <CardTitle asChild>
                       <h2 className="text-[28px] font-semibold text-foreground flex items-center gap-1.5">
