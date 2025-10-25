@@ -404,7 +404,7 @@ export default function PopupPage() {
     <div className="w-full min-h-screen bg-vintage-cream">
       <div className="w-full space-y-4">
         {/* Header with user menu - Vintage Style */}
-        <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b-3 border-vintage-brown bg-vintage-cream-dark">
+        <div className="sticky top-0 z-50 flex items-center justify-between px-6 pt-4 pb-3 border-b-3 border-vintage-brown bg-vintage-cream-dark shadow-sm">
           <div className="text-center flex-1">
             <h1 className="text-2xl font-serif font-bold text-vintage-brown">LinguaSpark</h1>
             <p className="text-sm text-vintage-brown/70">Transform content into professional lessons</p>

@@ -224,7 +224,7 @@ export default function LessonLibrary() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
@@ -378,9 +378,23 @@ export default function LessonLibrary() {
             {filteredLessons.map((lesson) => (
               <Card
                 key={lesson.id}
-                className="hover:shadow-lg transition-shadow cursor-pointer"
+                className="hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
                 onClick={() => handleViewLesson(lesson)}
               >
+                {/* Banner Image */}
+                {lesson.lesson_data.metadata?.bannerImages?.[0]?.src && (
+                  <div className="w-full h-48 overflow-hidden bg-muted">
+                    <img
+                      src={lesson.lesson_data.metadata.bannerImages[0].src}
+                      alt={lesson.lesson_data.metadata.bannerImages[0].alt || lesson.lesson_data.lessonTitle}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Hide image if it fails to load
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  </div>
+                )}
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg line-clamp-2">

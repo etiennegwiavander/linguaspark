@@ -17,6 +17,8 @@ import {
   Download,
   Loader2,
   AlertCircle,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react"
 import { lessonExporter } from "@/lib/export-utils"
 import { exportToHTML } from "@/lib/export-html-pptx"
@@ -967,15 +969,45 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         </Alert>
       )}
 
+      {/* Mobile Menu Toggle - Follows sidebar at top left */}
+      <Button
+        className={`
+          lg:hidden fixed top-20 z-50 h-10 w-10 rounded-md shadow-lg
+          transition-all duration-300
+          ${isSidebarCollapsed ? 'left-4' : 'left-[18rem]'}
+        `}
+        size="icon"
+        variant="default"
+        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+      >
+        {isSidebarCollapsed ? (
+          <ChevronRight className="h-5 w-5" />
+        ) : (
+          <ChevronLeft className="h-5 w-5" />
+        )}
+      </Button>
+
+      {/* Mobile Sidebar Overlay */}
+      {!isSidebarCollapsed && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/80 z-40"
+          onClick={() => setIsSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Two Column Layout: Workspace Sidebar Left, Content Right */}
       <div className="flex gap-0 h-screen lg:h-auto ml-0">
 
-        {/* LEFT COLUMN - Workspace Sidebar (Auto-collapse on hover) */}
+        {/* LEFT COLUMN - Workspace Sidebar */}
         <div
-          className={`${isSidebarCollapsed ? 'lg:w-16' : 'lg:w-80'} transition-all duration-300 flex-shrink-0 hidden lg:block`}
+          className={`
+            ${isSidebarCollapsed ? 'lg:w-16 -translate-x-full lg:translate-x-0' : 'lg:w-72 translate-x-0'} 
+            fixed lg:relative inset-y-0 left-0 z-40 w-72
+            transition-all duration-300 flex-shrink-0
+          `}
           onMouseEnter={() => setIsSidebarCollapsed(false)}
         >
-          <div className="lg:sticky lg:top-0 h-screen">
+          <div className="lg:sticky lg:top-20 h-screen lg:h-[calc(100vh-5rem)] overflow-y-auto">
             <WorkspaceSidebar
               sections={sections}
               onToggleSection={toggleSection}
@@ -1001,38 +1033,38 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         >
           <div className="space-y-1.5 px-2 ">
             {/* Header Card - Title and Banner Image */}
-            <Card className="scroll-mt-4 rounded-none mx-28">
+            <Card className="scroll-mt-4 rounded-none mx-4 sm:mx-8 md:mx-16 lg:mx-28">
               <CardContent className="pt-6">
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
                   {/* Left Side: Title and Metadata */}
                   <div className="flex-1 min-w-0">
-                    {/* Lesson Title */}
-                    <h1 className="text-3xl lg:text-4xl font-medium text-foreground leading-tight mb-4">
+                    {/* Lesson Title - Responsive font sizes that adapt to container width */}
+                    <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-medium text-foreground leading-tight mb-4 break-words">
                       {safeLesson.lessonTitle}
                     </h1>
 
                     {/* Date and Level Badges */}
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-xs sm:text-sm text-muted-foreground">
                         {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                       </span>
-                      <Badge variant="default" className="text-sm px-3 py-1">
+                      <Badge variant="default" className="text-xs sm:text-sm px-2 sm:px-3 py-1">
                         {safeLesson.studentLevel}
                       </Badge>
-                      <Badge variant="outline" className="text-sm px-3 py-1 capitalize">
+                      <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1 capitalize">
                         {safeLesson.lessonType}
                       </Badge>
                     </div>
                   </div>
 
-                  {/* Right Side: Banner Image */}
+                  {/* Right Side: Banner Image - Flexible sizing that responds to available space */}
                   {((safeLesson as any).bannerImage || (safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0)) && (
-                    <div className="w-full lg:w-82 flex-shrink-0 ">
+                    <div className="w-full lg:w-[40%] lg:max-w-md flex-shrink-0">
                       <div className="rounded-lg overflow-hidden shadow-lg">
                         <img
                           src={(safeLesson as any).bannerImage || safeLesson.metadata.bannerImages[0].src}
                           alt={safeLesson.lessonTitle}
-                          className="w-full h-48 object-cover"
+                          className="w-full h-40 sm:h-48 lg:h-56 object-cover"
                           onError={(e) => {
                             console.log('❌ Banner image failed to load');
                             e.currentTarget.style.display = 'none';

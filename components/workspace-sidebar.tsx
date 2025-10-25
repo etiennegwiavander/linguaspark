@@ -123,13 +123,13 @@ export default function WorkspaceSidebar({
   return (
     <div className="h-full bg-muted/30 border-r border-border flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border flex-shrink-0">
         <h2 className="text-lg font-semibold text-foreground">Workspace</h2>
         <p className="text-xs text-muted-foreground mt-1">Manage your lesson</p>
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {/* Lesson Sections */}
         <div className="border-b border-border">
           <button
