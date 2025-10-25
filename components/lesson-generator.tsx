@@ -311,11 +311,24 @@ export default function LessonGenerator({
         hasMetadata: !!requestBody.contentMetadata
       })
 
+      // Get auth token from localStorage
+      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+      let authToken = ''
+      if (sessionData) {
+        try {
+          const session = JSON.parse(sessionData)
+          authToken = session.access_token
+        } catch (e) {
+          console.error('[LessonGenerator] Failed to parse session data:', e)
+        }
+      }
+
       // Call the streaming AI generation API
       const response = await fetch("/api/generate-lesson-stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify(requestBody),
       })

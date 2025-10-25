@@ -393,6 +393,37 @@ eval("// Exports\nmodule.exports = {\n\t\"style\": {\"fontFamily\":\"'__JetBrain
 
 /***/ }),
 
+/***/ "(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app\\\\layout.tsx\",\"import\":\"Lora\",\"arguments\":[{\"variable\":\"--font-serif-alt\",\"subsets\":[\"latin\"],\"weight\":[\"400\",\"500\",\"600\",\"700\"]}],\"variableName\":\"lora\"}":
+/*!************************************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/next/font/google/target.css?{"path":"app\\layout.tsx","import":"Lora","arguments":[{"variable":"--font-serif-alt","subsets":["latin"],"weight":["400","500","600","700"]}],"variableName":"lora"} ***!
+  \************************************************************************************************************************************************************************************************************************/
+/***/ ((module) => {
+
+eval("// Exports\nmodule.exports = {\n\t\"style\": {\"fontFamily\":\"'__Lora_2c6ac3', '__Lora_Fallback_2c6ac3'\",\"fontStyle\":\"normal\"},\n\t\"className\": \"__className_2c6ac3\",\n\t\"variable\": \"__variable_2c6ac3\"\n};\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvbmV4dC9mb250L2dvb2dsZS90YXJnZXQuY3NzP3tcInBhdGhcIjpcImFwcFxcXFxsYXlvdXQudHN4XCIsXCJpbXBvcnRcIjpcIkxvcmFcIixcImFyZ3VtZW50c1wiOlt7XCJ2YXJpYWJsZVwiOlwiLS1mb250LXNlcmlmLWFsdFwiLFwic3Vic2V0c1wiOltcImxhdGluXCJdLFwid2VpZ2h0XCI6W1wiNDAwXCIsXCI1MDBcIixcIjYwMFwiLFwiNzAwXCJdfV0sXCJ2YXJpYWJsZU5hbWVcIjpcImxvcmFcIn0iLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBLFdBQVcsOEVBQThFO0FBQ3pGO0FBQ0E7QUFDQSIsInNvdXJjZXMiOlsid2VicGFjazovL215LXYwLXByb2plY3QvLi9ub2RlX21vZHVsZXMvbmV4dC9mb250L2dvb2dsZS90YXJnZXQuY3NzP2JlY2UiXSwic291cmNlc0NvbnRlbnQiOlsiLy8gRXhwb3J0c1xubW9kdWxlLmV4cG9ydHMgPSB7XG5cdFwic3R5bGVcIjoge1wiZm9udEZhbWlseVwiOlwiJ19fTG9yYV8yYzZhYzMnLCAnX19Mb3JhX0ZhbGxiYWNrXzJjNmFjMydcIixcImZvbnRTdHlsZVwiOlwibm9ybWFsXCJ9LFxuXHRcImNsYXNzTmFtZVwiOiBcIl9fY2xhc3NOYW1lXzJjNmFjM1wiLFxuXHRcInZhcmlhYmxlXCI6IFwiX192YXJpYWJsZV8yYzZhYzNcIlxufTtcbiJdLCJuYW1lcyI6W10sInNvdXJjZVJvb3QiOiIifQ==\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app\\\\layout.tsx\",\"import\":\"Lora\",\"arguments\":[{\"variable\":\"--font-serif-alt\",\"subsets\":[\"latin\"],\"weight\":[\"400\",\"500\",\"600\",\"700\"]}],\"variableName\":\"lora\"}\n");
+
+/***/ }),
+
+/***/ "(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app\\\\layout.tsx\",\"import\":\"Merriweather\",\"arguments\":[{\"variable\":\"--font-serif\",\"subsets\":[\"latin\"],\"weight\":[\"300\",\"400\",\"700\",\"900\"]}],\"variableName\":\"merriweather\"}":
+/*!************************************************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/next/font/google/target.css?{"path":"app\\layout.tsx","import":"Merriweather","arguments":[{"variable":"--font-serif","subsets":["latin"],"weight":["300","400","700","900"]}],"variableName":"merriweather"} ***!
+  \************************************************************************************************************************************************************************************************************************************/
+/***/ ((module) => {
+
+eval("// Exports\nmodule.exports = {\n\t\"style\": {\"fontFamily\":\"'__Merriweather_c59aa5', '__Merriweather_Fallback_c59aa5'\",\"fontStyle\":\"normal\"},\n\t\"className\": \"__className_c59aa5\",\n\t\"variable\": \"__variable_c59aa5\"\n};\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvbmV4dC9mb250L2dvb2dsZS90YXJnZXQuY3NzP3tcInBhdGhcIjpcImFwcFxcXFxsYXlvdXQudHN4XCIsXCJpbXBvcnRcIjpcIk1lcnJpd2VhdGhlclwiLFwiYXJndW1lbnRzXCI6W3tcInZhcmlhYmxlXCI6XCItLWZvbnQtc2VyaWZcIixcInN1YnNldHNcIjpbXCJsYXRpblwiXSxcIndlaWdodFwiOltcIjMwMFwiLFwiNDAwXCIsXCI3MDBcIixcIjkwMFwiXX1dLFwidmFyaWFibGVOYW1lXCI6XCJtZXJyaXdlYXRoZXJcIn0iLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBLFdBQVcsOEZBQThGO0FBQ3pHO0FBQ0E7QUFDQSIsInNvdXJjZXMiOlsid2VicGFjazovL215LXYwLXByb2plY3QvLi9ub2RlX21vZHVsZXMvbmV4dC9mb250L2dvb2dsZS90YXJnZXQuY3NzPzRjNWIiXSwic291cmNlc0NvbnRlbnQiOlsiLy8gRXhwb3J0c1xubW9kdWxlLmV4cG9ydHMgPSB7XG5cdFwic3R5bGVcIjoge1wiZm9udEZhbWlseVwiOlwiJ19fTWVycml3ZWF0aGVyX2M1OWFhNScsICdfX01lcnJpd2VhdGhlcl9GYWxsYmFja19jNTlhYTUnXCIsXCJmb250U3R5bGVcIjpcIm5vcm1hbFwifSxcblx0XCJjbGFzc05hbWVcIjogXCJfX2NsYXNzTmFtZV9jNTlhYTVcIixcblx0XCJ2YXJpYWJsZVwiOiBcIl9fdmFyaWFibGVfYzU5YWE1XCJcbn07XG4iXSwibmFtZXMiOltdLCJzb3VyY2VSb290IjoiIn0=\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app\\\\layout.tsx\",\"import\":\"Merriweather\",\"arguments\":[{\"variable\":\"--font-serif\",\"subsets\":[\"latin\"],\"weight\":[\"300\",\"400\",\"700\",\"900\"]}],\"variableName\":\"merriweather\"}\n");
+
+/***/ }),
+
+/***/ "(ssr)/./node_modules/next/dist/api/navigation.js":
+/*!**************************************************!*\
+  !*** ./node_modules/next/dist/api/navigation.js ***!
+  \**************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _client_components_navigation__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../client/components/navigation */ \"(ssr)/./node_modules/next/dist/client/components/navigation.js\");\n/* harmony import */ var _client_components_navigation__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_client_components_navigation__WEBPACK_IMPORTED_MODULE_0__);\n/* harmony reexport (unknown) */ var __WEBPACK_REEXPORT_OBJECT__ = {};\n/* harmony reexport (unknown) */ for(const __WEBPACK_IMPORT_KEY__ in _client_components_navigation__WEBPACK_IMPORTED_MODULE_0__) if(__WEBPACK_IMPORT_KEY__ !== \"default\") __WEBPACK_REEXPORT_OBJECT__[__WEBPACK_IMPORT_KEY__] = () => _client_components_navigation__WEBPACK_IMPORTED_MODULE_0__[__WEBPACK_IMPORT_KEY__]\n/* harmony reexport (unknown) */ __webpack_require__.d(__webpack_exports__, __WEBPACK_REEXPORT_OBJECT__);\n\n\n//# sourceMappingURL=navigation.js.map//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHNzcikvLi9ub2RlX21vZHVsZXMvbmV4dC9kaXN0L2FwaS9uYXZpZ2F0aW9uLmpzIiwibWFwcGluZ3MiOiI7Ozs7OztBQUFnRDs7QUFFaEQiLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly9teS12MC1wcm9qZWN0Ly4vbm9kZV9tb2R1bGVzL25leHQvZGlzdC9hcGkvbmF2aWdhdGlvbi5qcz81MTI4Il0sInNvdXJjZXNDb250ZW50IjpbImV4cG9ydCAqIGZyb20gXCIuLi9jbGllbnQvY29tcG9uZW50cy9uYXZpZ2F0aW9uXCI7XG5cbi8vIyBzb3VyY2VNYXBwaW5nVVJMPW5hdmlnYXRpb24uanMubWFwIl0sIm5hbWVzIjpbXSwic291cmNlUm9vdCI6IiJ9\n//# sourceURL=webpack-internal:///(ssr)/./node_modules/next/dist/api/navigation.js\n");
+
+/***/ }),
+
 /***/ "(ssr)/./node_modules/next/dist/client/add-base-path.js":
 /*!********************************************************!*\
   !*** ./node_modules/next/dist/client/add-base-path.js ***!

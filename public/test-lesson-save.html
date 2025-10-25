@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Lesson Save - LinguaSpark</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        h2 {
+            color: #666;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0051cc;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-entry {
+            margin-bottom: 4px;
+        }
+        .log-success { color: #4ade80; }
+        .log-error { color: #f87171; }
+        .log-info { color: #60a5fa; }
+        .log-warning { color: #fbbf24; }
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .status-success { background: #dcfce7; color: #166534; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .status-info { background: #dbeafe; color: #1e40af; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🧪 Lesson Save Test</h1>
+        <p>This page helps diagnose lesson saving issues.</p>
+    </div>
+
+    <div class="card">
+        <h2>Step 1: Check Authentication & Database</h2>
+        <button onclick="checkDebugEndpoint()">Run Diagnostics</button>
+        <div id="debug-status"></div>
+    </div>
+
+    <div class="card">
+        <h2>Step 2: Test Lesson Save</h2>
+        <button onclick="testLessonSave()">Save Test Lesson</button>
+        <div id="save-status"></div>
+    </div>
+
+    <div class="card">
+        <h2>Step 3: View Library</h2>
+        <button onclick="window.location.href='/library'">Open Lesson Library</button>
+    </div>
+
+    <div class="card">
+        <h2>Console Log</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+        }
+
+        async function checkDebugEndpoint() {
+            const statusDiv = document.getElementById('debug-status');
+            statusDiv.innerHTML = '<div class="status status-info">Running diagnostics...</div>';
+            log('🔍 Checking debug endpoint...', 'info');
+
+            try {
+                const response = await fetch('/api/debug-lessons');
+                const data = await response.json();
+
+                log('✅ Debug endpoint response received', 'success');
+                log(JSON.stringify(data, null, 2), 'info');
+
+                if (data.success) {
+                    const userEmail = data.user?.email || 'Unknown';
+                    const lessonCount = data.userLessons?.count || 0;
+                    const allLessonsCount = data.allLessons?.data?.length || 0;
+
+                    statusDiv.innerHTML = `
+                        <div class="status status-success">✅ Diagnostics Complete</div>
+                        <p><strong>User:</strong> ${userEmail}</p>
+                        <p><strong>Your Lessons:</strong> ${lessonCount}</p>
+                        <p><strong>All Lessons in DB:</strong> ${allLessonsCount}</p>
+                    `;
+
+                    log(`User: ${userEmail}`, 'success');
+                    log(`Your lessons: ${lessonCount}`, 'success');
+                    log(`All lessons in DB: ${allLessonsCount}`, 'info');
+
+                    if (lessonCount === 0 && allLessonsCount > 0) {
+                        log('⚠️ WARNING: Lessons exist but not associated with your user', 'warning');
+                        statusDiv.innerHTML += '<p style="color: #f59e0b;">⚠️ Lessons exist but not associated with your user. This may be an RLS or tutor profile issue.</p>';
+                    }
+                } else {
+                    statusDiv.innerHTML = `<div class="status status-error">❌ ${data.error}</div>`;
+                    log(`❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Failed to check debug endpoint: ${error.message}`, 'error');
+                statusDiv.innerHTML = `<div class="status status-error">❌ ${error.message}</div>`;
+            }
+        }
+
+        async function testLessonSave() {
+            const statusDiv = document.getElementById('save-status');
+            statusDiv.innerHTML = '<div class="status status-info">Saving test lesson...</div>';
+            log('💾 Attempting to save test lesson...', 'info');
+
+            const testLesson = {
+                lessonTitle: 'Test Lesson - ' + new Date().toISOString(),
+                lessonType: 'discussion',
+                studentLevel: 'B1',
+                targetLanguage: 'english',
+                sections: {
+                    warmup: ['Test warmup question 1', 'Test warmup question 2'],
+                    vocabulary: [
+                        { word: 'test', meaning: 'a procedure to check something', example: 'This is a test.' }
+                    ],
+                    reading: 'This is a test reading passage.',
+                    comprehension: ['Test comprehension question 1'],
+                    discussion: ['Test discussion question 1'],
+                    grammar: {
+                        focus: 'Test grammar focus',
+                        examples: ['Test example 1'],
+                        exercise: ['Test exercise 1']
+                    },
+                    pronunciation: {
+                        word: 'test',
+                        ipa: '/test/',
+                        practice: 'Practice saying: test'
+                    },
+                    wrapup: ['Test wrapup activity']
+                }
+            };
+
+            try {
+                // Simulate the save process
+                log('Creating lesson data object...', 'info');
+                
+                const saveData = {
+                    title: testLesson.lessonTitle,
+                    lesson_type: testLesson.lessonType,
+                    student_level: testLesson.studentLevel,
+                    target_language: testLesson.targetLanguage,
+                    source_url: window.location.href,
+                    lesson_data: testLesson,
+                };
+
+                log('Lesson data prepared:', 'info');
+                log(JSON.stringify(saveData, null, 2), 'info');
+
+                // Note: We can't directly call lessonService from here
+                // This would need to be done through an API endpoint
+                log('⚠️ Direct save not possible from test page', 'warning');
+                log('Please use the main app to generate and save a lesson', 'info');
+                log('Then check /library to see if it appears', 'info');
+
+                statusDiv.innerHTML = `
+                    <div class="status status-info">ℹ️ Test Data Prepared</div>
+                    <p>To complete the test:</p>
+                    <ol>
+                        <li>Go to the main page</li>
+                        <li>Generate a real lesson</li>
+                        <li>Check browser console for save logs</li>
+                        <li>Visit /library to verify it appears</li>
+                    </ol>
+                `;
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                statusDiv.innerHTML = `<div class="status status-error">❌ ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run diagnostics on page load
+        window.addEventListener('load', () => {
+            log('🚀 Test page loaded', 'success');
+            log('Click "Run Diagnostics" to check your setup', 'info');
+        });
+    </script>
+</body>
+</html>

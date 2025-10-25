@@ -29,6 +29,14 @@
 }
 
 :root {
+  /* Vintage Color Palette */
+  --vintage-cream: 45 35% 95%;
+  --vintage-cream-dark: 45 30% 90%;
+  --vintage-brown: 30 25% 25%;
+  --vintage-burgundy: 0 45% 35%;
+  --vintage-gold: 45 80% 55%;
+  --vintage-sage: 120 15% 45%;
+  
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -100,7 +108,11 @@
 }
 
 @theme inline {
-  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
+  /* Font families */
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-jetbrains-mono);
+  
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -371,4 +383,144 @@ body {
 
 .animate-sparkle-3 {
   animation: sparkle-3 1s ease-out 0.4s;
+}
+
+/* Vintage Design System */
+.bg-vintage-cream {
+  background-color: hsl(var(--vintage-cream));
+}
+
+.bg-vintage-cream-dark {
+  background-color: hsl(var(--vintage-cream-dark));
+}
+
+.bg-vintage-brown {
+  background-color: hsl(var(--vintage-brown));
+}
+
+.bg-vintage-burgundy {
+  background-color: hsl(var(--vintage-burgundy));
+}
+
+.bg-vintage-gold {
+  background-color: hsl(var(--vintage-gold));
+}
+
+.text-vintage-cream {
+  color: hsl(var(--vintage-cream));
+}
+
+.text-vintage-brown {
+  color: hsl(var(--vintage-brown));
+}
+
+.text-vintage-burgundy {
+  color: hsl(var(--vintage-burgundy));
+}
+
+.text-vintage-gold {
+  color: hsl(var(--vintage-gold));
+}
+
+.border-vintage-brown {
+  border-color: hsl(var(--vintage-brown));
+}
+
+.border-vintage-gold {
+  border-color: hsl(var(--vintage-gold));
+}
+
+.border-vintage-burgundy {
+  border-color: hsl(var(--vintage-burgundy));
+}
+
+/* Vintage Pattern Background */
+.bg-vintage-pattern {
+  background-image: 
+    repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,.03) 10px, rgba(0,0,0,.03) 20px),
+    repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(0,0,0,.03) 10px, rgba(0,0,0,.03) 20px);
+}
+
+/* Vintage Card */
+.vintage-card {
+  background-color: hsl(var(--vintage-cream));
+  border: 3px solid hsl(var(--vintage-brown));
+  border-radius: 0.5rem;
+  padding: 2rem;
+  box-shadow: 4px 4px 0px hsl(var(--vintage-brown) / 0.2);
+  transition: all 0.3s ease;
+}
+
+.vintage-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0px hsl(var(--vintage-brown) / 0.3);
+}
+
+/* Vintage Buttons */
+.vintage-button-primary {
+  background-color: hsl(var(--vintage-burgundy));
+  color: hsl(var(--vintage-cream));
+  border: 3px solid hsl(var(--vintage-brown));
+  border-radius: 0.5rem;
+  font-family: serif;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  box-shadow: 3px 3px 0px hsl(var(--vintage-brown));
+  transition: all 0.2s ease;
+}
+
+.vintage-button-primary:hover {
+  background-color: hsl(var(--vintage-burgundy) / 0.9);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px hsl(var(--vintage-brown));
+}
+
+.vintage-button-primary:active {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0px hsl(var(--vintage-brown));
+}
+
+.vintage-button-secondary {
+  background-color: hsl(var(--vintage-cream));
+  color: hsl(var(--vintage-brown));
+  border: 3px solid hsl(var(--vintage-brown));
+  border-radius: 0.5rem;
+  font-family: serif;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  box-shadow: 3px 3px 0px hsl(var(--vintage-brown) / 0.3);
+  transition: all 0.2s ease;
+}
+
+.vintage-button-secondary:hover {
+  background-color: hsl(var(--vintage-cream-dark));
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px hsl(var(--vintage-brown) / 0.4);
+}
+
+.vintage-button-light {
+  background-color: hsl(var(--vintage-cream));
+  color: hsl(var(--vintage-burgundy));
+  border: 3px solid hsl(var(--vintage-gold));
+  border-radius: 0.5rem;
+  font-family: serif;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  box-shadow: 3px 3px 0px hsl(var(--vintage-gold) / 0.5);
+  transition: all 0.2s ease;
+}
+
+.vintage-button-light:hover {
+  background-color: hsl(var(--vintage-gold) / 0.2);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px hsl(var(--vintage-gold) / 0.6);
+}
+
+/* Vintage Shadows */
+.shadow-vintage {
+  box-shadow: 4px 4px 0px hsl(var(--vintage-brown) / 0.2);
+}
+
+.shadow-vintage-lg {
+  box-shadow: 6px 6px 0px hsl(var(--vintage-brown) / 0.3);
 }

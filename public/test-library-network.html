@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Library Network Calls</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background: #0070f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #0051cc;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Test Library Network Calls</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Direct API Call</h2>
+        <p>This tests if the API endpoint can reach the database</p>
+        <button onclick="testDirectAPI()">Test Direct API</button>
+        <div id="direct-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Client-Side Supabase Call</h2>
+        <p>This simulates what the lesson-library component does</p>
+        <button onclick="testClientSide()">Test Client-Side Call</button>
+        <div id="client-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Open Browser DevTools (F12)</li>
+            <li>Go to the Network tab</li>
+            <li>Click the test buttons above</li>
+            <li>Watch for network requests to Supabase</li>
+            <li>Check if any requests are made and what their responses are</li>
+        </ol>
+    </div>
+
+    <script type="module">
+        window.testDirectAPI = async function() {
+            const resultDiv = document.getElementById('direct-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                console.log('[Test] Calling /api/test-lessons-direct...');
+                const response = await fetch('/api/test-lessons-direct');
+                const data = await response.json();
+                
+                console.log('[Test] Response:', data);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Success!</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Error</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                console.error('[Test] Error:', error);
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Network Error</p>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        };
+
+        window.testClientSide = async function() {
+            const resultDiv = document.getElementById('client-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                // Import Supabase client
+                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+                
+                const supabaseUrl = 'YOUR_SUPABASE_URL'; // Replace with actual URL
+                const supabaseKey = 'YOUR_SUPABASE_KEY'; // Replace with actual key
+                
+                console.log('[Test] Creating Supabase client...');
+                const supabase = createClient(supabaseUrl, supabaseKey);
+                
+                console.log('[Test] Getting user...');
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                
+                if (authError) {
+                    throw new Error(`Auth error: ${authError.message}`);
+                }
+                
+                if (!user) {
+                    throw new Error('No authenticated user');
+                }
+                
+                console.log('[Test] User:', user.email);
+                console.log('[Test] Querying lessons...');
+                
+                const { data, error } = await supabase
+                    .from('lessons')
+                    .select('*')
+                    .eq('tutor_id', user.id)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                console.log('[Test] Found', data?.length || 0, 'lessons');
+                
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Success!</p>
+                    <p>User: ${user.email}</p>
+                    <p>Lessons found: ${data?.length || 0}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('[Test] Error:', error);
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Error</p>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

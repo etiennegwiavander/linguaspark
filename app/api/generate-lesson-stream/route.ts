@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server"
 import { lessonAIServerGenerator } from "@/lib/lesson-ai-generator-server"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { createClient } from "@/lib/supabase"
 import { contentValidator } from "@/lib/content-validator"
 import { errorClassifier, type AIError } from "@/lib/error-classifier"
 
@@ -130,8 +130,29 @@ export async function POST(request: NextRequest) {
           }))
         )
 
-        const supabase = createServerSupabaseClient()
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        // Get auth token from request headers
+        const authHeader = request.headers.get('Authorization')
+        
+        if (!authHeader) {
+          controller.enqueue(
+            encoder.encode(createSSEMessage({
+              type: 'error',
+              error: {
+                type: 'AUTH_ERROR',
+                message: 'Authentication required - no authorization header',
+                errorId: `AUTH_${Date.now()}`
+              },
+              progressState: currentProgressState
+            }))
+          )
+          controller.close()
+          return
+        }
+
+        // Verify the token by creating a client with it
+        const supabase = createClient()
+        const token = authHeader.replace('Bearer ', '')
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
         if (authError || !user) {
           controller.enqueue(
@@ -139,7 +160,7 @@ export async function POST(request: NextRequest) {
               type: 'error',
               error: {
                 type: 'AUTH_ERROR',
-                message: 'Authentication required',
+                message: 'Invalid or expired token',
                 errorId: `AUTH_${Date.now()}`
               },
               progressState: currentProgressState

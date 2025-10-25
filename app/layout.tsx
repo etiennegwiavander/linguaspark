@@ -1,5 +1,5 @@
 import type React from "react"
-import { Inter, JetBrains_Mono } from "next/font/google"
+import { Inter, JetBrains_Mono, Merriweather, Lora } from "next/font/google"
 import "./globals.css"
 import AuthWrapper from "@/components/auth-wrapper"
 
@@ -13,14 +13,26 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 })
 
+const merriweather = Merriweather({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+})
+
+const lora = Lora({
+  variable: "--font-serif-alt",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+})
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
-      <body className="min-h-screen bg-background font-sans antialiased">
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${merriweather.variable} ${lora.variable} antialiased`}>
+      <body className="min-h-screen bg-vintage-cream font-sans antialiased">
         <AuthWrapper>{children}</AuthWrapper>
       </body>
     </html>

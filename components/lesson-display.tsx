@@ -19,7 +19,10 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { lessonExporter } from "@/lib/export-utils"
+import { exportToHTML } from "@/lib/export-html-pptx"
 import { enhanceDialogueWithAvatars, type Avatar } from "@/lib/avatar-utils"
+import WorkspaceSidebar from "@/components/workspace-sidebar"
+import type { Lesson } from "@/lib/lessons"
 
 interface LessonSection {
   id: string
@@ -107,6 +110,7 @@ interface LessonDisplayProps {
   onExportPDF: () => void
   onExportWord: () => void
   onNewLesson: () => void
+  onLoadLesson?: (lesson: Lesson) => void
 }
 
 // Avatar component for dialogue sections
@@ -136,7 +140,7 @@ function AvatarImage({ avatar, size = "sm" }: { avatar: Avatar; size?: "sm" | "m
   )
 }
 
-export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNewLesson }: LessonDisplayProps) {
+export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNewLesson, onLoadLesson }: LessonDisplayProps) {
   // Create a consistent lesson ID for avatar persistence
   const lessonId = React.useMemo(() => {
     if (lesson.id) return lesson.id
@@ -209,7 +213,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
   const [isExportingPDF, setIsExportingPDF] = useState(false)
   const [isExportingWord, setIsExportingWord] = useState(false)
+  const [isExportingHTML, setIsExportingHTML] = useState(false)
+  const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [exportError, setExportError] = useState("")
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const toggleSection = (sectionId: string) => {
     setSectionStates((prev) => ({
@@ -306,6 +313,110 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     }
   }
 
+  const handleExportHTML = async () => {
+    setIsExportingHTML(true)
+    setExportError("")
+
+    try {
+      const exportLesson = {
+        lessonTitle: safeLesson.lessonTitle,
+        lessonType: safeLesson.lessonType || "discussion",
+        studentLevel: safeLesson.studentLevel || "B1",
+        targetLanguage: safeLesson.targetLanguage || "english",
+        id: lessonId,
+        sections: {
+          warmup: safeLesson.sections.warmup || [],
+          vocabulary: safeLesson.sections.vocabulary || [],
+          reading: safeLesson.sections.reading || "",
+          comprehension: safeLesson.sections.comprehension || [],
+          discussion: safeLesson.sections.discussion || [],
+          dialoguePractice: safeLesson.sections.dialoguePractice || undefined,
+          dialogueFillGap: safeLesson.sections.dialogueFillGap || undefined,
+          grammar: safeLesson.sections.grammar || {
+            focus: "Grammar Focus",
+            examples: [],
+            exercise: []
+          },
+          pronunciation: safeLesson.sections.pronunciation || {
+            word: "example",
+            ipa: "/ɪɡˈzæmpəl/",
+            practice: "This is an example sentence."
+          },
+          wrapup: safeLesson.sections.wrapup || []
+        }
+      }
+
+      await exportToHTML(exportLesson, sectionStates)
+    } catch (error) {
+      console.error("HTML export error:", error)
+      setExportError("Failed to export HTML. Please try again.")
+    } finally {
+      setIsExportingHTML(false)
+    }
+  }
+
+  const handleSaveToLibrary = async () => {
+    setIsSavingToLibrary(true)
+    setExportError("")
+
+    try {
+      console.log('[LessonDisplay] 💾 Saving lesson to library...')
+
+      // Get source URL from metadata or extraction source
+      const sourceUrl = safeLesson.metadata?.sourceUrl ||
+        safeLesson.extractionSource?.url ||
+        undefined
+
+      // Get auth token from localStorage
+      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+      if (!sessionData) {
+        throw new Error('No authentication session found. Please sign in again.')
+      }
+
+      const session = JSON.parse(sessionData)
+      const authToken = session.access_token
+
+      console.log('[LessonDisplay] Calling save API...')
+
+      // Call the save API route
+      const response = await fetch('/api/save-lesson', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          title: safeLesson.lessonTitle,
+          lesson_type: safeLesson.lessonType || "discussion",
+          student_level: safeLesson.studentLevel || "B1",
+          target_language: safeLesson.targetLanguage || "english",
+          source_url: sourceUrl,
+          lesson_data: safeLesson,
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const { lesson } = await response.json()
+      console.log('[LessonDisplay] ✅ Lesson saved to library with ID:', lesson.id)
+      alert('Lesson saved to library successfully!')
+    } catch (error) {
+      console.error('[LessonDisplay] ❌ Failed to save lesson:', error)
+      if (error instanceof Error) {
+        setExportError(`Failed to save lesson: ${error.message}`)
+        alert(`Failed to save lesson: ${error.message}`)
+      } else {
+        setExportError("Failed to save lesson. Please try again.")
+        alert("Failed to save lesson. Please try again.")
+      }
+    } finally {
+      setIsSavingToLibrary(false)
+    }
+  }
+
   const sections: LessonSection[] = [
     {
       id: "warmup",
@@ -313,7 +424,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: MessageCircle,
       enabled: sectionStates.warmup,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           {safeLesson.sections.warmup.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
@@ -342,7 +453,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: BookOpen,
       enabled: sectionStates.vocabulary,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           {safeLesson.sections.vocabulary.map((item, index) => {
             // First item is the instruction
             if (index === 0 && item.word === "INSTRUCTION") {
@@ -406,7 +517,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: FileText,
       enabled: sectionStates.reading,
       content: (
-        <div className="prose prose-sm max-w-none">
+        <div className="prose prose-sm max-w-none px-2">
           {(() => {
             const readingContent = safeLesson.sections.reading
             const parts = readingContent.split('\n\n')
@@ -461,7 +572,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: CheckCircle,
       enabled: sectionStates.comprehension,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           {safeLesson.sections.comprehension.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
@@ -490,7 +601,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Users,
       enabled: sectionStates.dialoguePractice,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           <div className="mb-1.5">
             <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#EEF7DC' }} style={{ backgroundColor: "#EEF7DC" }}>
               {safeLesson.sections.dialoguePractice.instruction}
@@ -533,7 +644,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: MessageCircle,
       enabled: sectionStates.dialogueFillGap,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           <div className="mb-1.5">
             <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#F1FAFF' }} style={{ backgroundColor: "#F1FAFF" }}>
               {safeLesson.sections.dialogueFillGap.instruction}
@@ -581,7 +692,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Users,
       enabled: sectionStates.discussion,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           {safeLesson.sections.discussion.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
@@ -610,7 +721,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: BookOpen,
       enabled: sectionStates.grammar,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           <div>
             <h4 className="font-semibold text-base mb-1.5">{safeLesson.sections.grammar.focus}</h4>
 
@@ -691,7 +802,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: Volume2,
       enabled: sectionStates.pronunciation,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           {/* Instruction */}
           {safeLesson.sections.pronunciation?.instruction && (
             <p className="text-[15px] text-muted-foreground italic border-l-2 border-primary/20 pl-3 py-2 rounded-sm" style={{ backgroundColor: '#F1FAFF' }} style={{ backgroundColor: "#F1FAFF" }}>
@@ -810,7 +921,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       icon: CheckCircle,
       enabled: sectionStates.wrapup,
       content: (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 px-2">
           {safeLesson.sections.wrapup.map((question, index) => {
             // First item is the instruction
             if (index === 0) {
@@ -856,101 +967,41 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         </Alert>
       )}
 
-      {/* Two Column Layout: Controls Left, Content Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5">
+      {/* Two Column Layout: Workspace Sidebar Left, Content Right */}
+      <div className="flex gap-0 h-screen lg:h-auto ml-0">
 
-        {/* LEFT COLUMN - Controls & Debug (Sticky on large screens) */}
-        <div className="lg:col-span-4 space-y-1.5">
-          <div className="lg:sticky lg:top-4 space-y-1.5">
-
-
-            {/* Section Controls */}
-            <Card className="rounded-none">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-[28px] font-semibold">Lesson Sections</CardTitle>
-                <CardDescription className="text-xs">Toggle sections to customize your lesson</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1.5">
-                  {sections.map((section) => (
-                    <div key={section.id} className="flex items-center justify-between p-2 rounded-sm hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-1.5">
-                        <section.icon className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-base text-foreground">{section.title}</span>
-                      </div>
-                      <Switch checked={section.enabled} onCheckedChange={() => toggleSection(section.id)} />
-                    </div>
-                  ))}
-                </div>
-                {/* New Lesson Button - Top Right */}
-                <div className="mt-2 ">
-                  <Button variant="outline" size="lg" className="w-full" onClick={onNewLesson} >
-                    New Lesson
-                  </Button>
-                </div>
-
-              </CardContent>
-            </Card>
-
-            {/* Export Actions */}
-            <Card className="rounded-none">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-[28px] font-semibold">Export Lesson</CardTitle>
-                <CardDescription className="text-xs">
-                  Export with selected sections only
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleExportPDF}
-                    disabled={isExportingPDF || isExportingWord}
-                  >
-                    {isExportingPDF ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Exporting...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export PDF
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleExportWord}
-                    disabled={isExportingPDF || isExportingWord}
-                  >
-                    {isExportingWord ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Exporting...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export Word
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        {/* LEFT COLUMN - Workspace Sidebar (Auto-collapse on hover) */}
+        <div
+          className={`${isSidebarCollapsed ? 'lg:w-16' : 'lg:w-80'} transition-all duration-300 flex-shrink-0 hidden lg:block`}
+          onMouseEnter={() => setIsSidebarCollapsed(false)}
+        >
+          <div className="lg:sticky lg:top-0 h-screen">
+            <WorkspaceSidebar
+              sections={sections}
+              onToggleSection={toggleSection}
+              onExportPDF={handleExportPDF}
+              onExportWord={handleExportWord}
+              onExportHTML={handleExportHTML}
+              onSaveToLibrary={handleSaveToLibrary}
+              onNewLesson={onNewLesson}
+              onLoadLesson={onLoadLesson}
+              isExportingPDF={isExportingPDF}
+              isExportingWord={isExportingWord}
+              isExportingHTML={isExportingHTML}
+              isSavingToLibrary={isSavingToLibrary}
+              isCollapsed={isSidebarCollapsed}
+            />
           </div>
         </div>
 
-        {/* RIGHT COLUMN - Lesson Content (Scrollable) */}
-        <div className="lg:col-span-8">
-          <div className="space-y-1.5">
+        {/* RIGHT COLUMN - Lesson Content (Scrollable, Expands when sidebar collapsed) */}
+        <div
+          className="flex-1 transition-all duration-300 relative overflow-y-auto"
+          onMouseEnter={() => setIsSidebarCollapsed(true)}
+        >
+          <div className="space-y-1.5 px-2 ">
             {/* Header Card - Title and Banner Image */}
-            <Card className="scroll-mt-4 rounded-none">
+            <Card className="scroll-mt-4 rounded-none mx-28">
               <CardContent className="pt-6">
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
                   {/* Left Side: Title and Metadata */}
@@ -976,7 +1027,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
                   {/* Right Side: Banner Image */}
                   {((safeLesson as any).bannerImage || (safeLesson.metadata?.bannerImages && safeLesson.metadata.bannerImages.length > 0)) && (
-                    <div className="w-full lg:w-96 flex-shrink-0">
+                    <div className="w-full lg:w-82 flex-shrink-0 ">
                       <div className="rounded-lg overflow-hidden shadow-lg">
                         <img
                           src={(safeLesson as any).bannerImage || safeLesson.metadata.bannerImages[0].src}
@@ -999,7 +1050,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
             {sections
               .filter((section) => section.enabled)
               .map((section, index) => (
-                <Card key={section.id} className="scroll-mt-4 rounded-none">
+                <Card key={section.id} className="scroll-mt-4 mx-28 rounded-none">
                   <CardHeader className="pb-4">
                     <CardTitle asChild>
                       <h2 className="text-[28px] font-semibold text-foreground flex items-center gap-1.5">

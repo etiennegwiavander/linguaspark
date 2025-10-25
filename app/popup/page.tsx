@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import LessonGenerator from "@/components/lesson-generator"
 import LessonDisplay from "@/components/lesson-display"
 import { LessonInterfaceUtils } from "@/lib/lesson-interface-bridge"
+import UserMenu from "@/components/user-menu"
 
 // Declare chrome for extension context
 declare global {
@@ -16,12 +17,72 @@ export default function PopupPage() {
   const [selectedText, setSelectedText] = useState("")
   const [sourceUrl, setSourceUrl] = useState("")
   const [extractedMetadata, setExtractedMetadata] = useState<any>(null)
-  const [generatedLesson, setGeneratedLesson] = useState(null)
+  const [generatedLesson, setGeneratedLesson] = useState<any>(null)
 
-  // Load persisted lesson on mount
+  // Load persisted lesson or lesson from URL parameter on mount
   useEffect(() => {
-    const loadPersistedLesson = () => {
+    const loadLesson = async () => {
       try {
+        // Check if there's a lessonId in the URL
+        const urlParams = new URLSearchParams(window.location.search)
+        const lessonId = urlParams.get('lessonId')
+        
+        if (lessonId) {
+          console.log('[LinguaSpark Popup] 🔍 Loading lesson from database with ID:', lessonId)
+          
+          try {
+            // Get auth token from localStorage
+            const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+            if (!sessionData) {
+              throw new Error('No authentication session found. Please sign in again.')
+            }
+
+            const session = JSON.parse(sessionData)
+            const authToken = session.access_token
+
+            // Call the get lesson API route
+            const response = await fetch(`/api/get-lesson?id=${lessonId}`, {
+              headers: {
+                'Authorization': `Bearer ${authToken}`
+              }
+            })
+
+            if (!response.ok) {
+              const errorData = await response.json()
+              throw new Error(errorData.error || `HTTP ${response.status}`)
+            }
+
+            const { lesson } = await response.json()
+            
+            console.log('[LinguaSpark Popup] ✅ Loaded lesson from database:', lesson.title)
+            console.log('[LinguaSpark Popup] Lesson data structure:', {
+              hasLessonData: !!lesson.lesson_data,
+              lessonType: lesson.lesson_type,
+              studentLevel: lesson.student_level
+            })
+            
+            setGeneratedLesson(lesson.lesson_data)
+            setSourceUrl(lesson.source_url || '')
+            
+            // Persist to localStorage
+            localStorage.setItem('linguaspark_current_lesson', JSON.stringify(lesson.lesson_data))
+            return
+          } catch (loadError) {
+            console.error('[LinguaSpark Popup] ❌ Error loading lesson from database:', loadError)
+            if (loadError instanceof Error) {
+              console.error('[LinguaSpark Popup] Error details:', {
+                message: loadError.message,
+                name: loadError.name
+              })
+              alert(`Failed to load lesson: ${loadError.message}`)
+            }
+          }
+          
+          // Don't continue to localStorage fallback if we had a lessonId
+          return
+        }
+        
+        // Fallback to localStorage if no lessonId in URL
         const savedLesson = localStorage.getItem('linguaspark_current_lesson')
         if (savedLesson) {
           const lesson = JSON.parse(savedLesson)
@@ -29,10 +90,10 @@ export default function PopupPage() {
           setGeneratedLesson(lesson)
         }
       } catch (error) {
-        console.error('[LinguaSpark Popup] Failed to load persisted lesson:', error)
+        console.error('[LinguaSpark Popup] Failed to load lesson:', error)
       }
     }
-    loadPersistedLesson()
+    loadLesson()
   }, [])
 
   useEffect(() => {
@@ -232,8 +293,8 @@ export default function PopupPage() {
     }
   }
 
-  const handleLessonGenerated = (lesson: any) => {
-    console.log('[LinguaSpark Popup] Lesson generated, saving to localStorage')
+  const handleLessonGenerated = async (lesson: any) => {
+    console.log('[LinguaSpark Popup] Lesson generated, saving to localStorage and database')
     setGeneratedLesson(lesson)
 
     // Persist lesson to localStorage
@@ -242,6 +303,62 @@ export default function PopupPage() {
       console.log('[LinguaSpark Popup] ✅ Lesson saved to localStorage')
     } catch (error) {
       console.error('[LinguaSpark Popup] Failed to save lesson to localStorage:', error)
+    }
+
+    // Save to Supabase database using the new API route
+    try {
+      console.log('[LinguaSpark Popup] 💾 Attempting to save lesson to database...')
+      console.log('[LinguaSpark Popup] Lesson data:', {
+        title: lesson.lessonTitle,
+        lesson_type: lesson.lessonType,
+        student_level: lesson.studentLevel,
+        target_language: lesson.targetLanguage,
+        has_source_url: !!sourceUrl,
+      })
+
+      // Get auth token from localStorage
+      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+      if (!sessionData) {
+        throw new Error('No authentication session found')
+      }
+
+      const session = JSON.parse(sessionData)
+      const authToken = session.access_token
+
+      // Call the save API route
+      const response = await fetch('/api/save-lesson', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          title: lesson.lessonTitle,
+          lesson_type: lesson.lessonType,
+          student_level: lesson.studentLevel,
+          target_language: lesson.targetLanguage,
+          source_url: sourceUrl || undefined,
+          lesson_data: lesson,
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const { lesson: savedLesson } = await response.json()
+      console.log('[LinguaSpark Popup] ✅ Lesson saved to database with ID:', savedLesson.id)
+    } catch (error) {
+      console.error('[LinguaSpark Popup] ❌ Failed to save lesson to database:', error)
+      if (error instanceof Error) {
+        console.error('[LinguaSpark Popup] Error details:', {
+          message: error.message,
+          name: error.name,
+        })
+      }
+      // Show user-friendly error notification (non-blocking)
+      console.warn('[LinguaSpark Popup] Lesson generated but not saved to library. User can save manually.')
     }
   }
 
@@ -268,12 +385,31 @@ export default function PopupPage() {
     console.log("Exporting as Word...")
   }
 
+  const handleLoadLesson = (lesson: any) => {
+    console.log('[LinguaSpark Popup] Loading lesson from history:', lesson.title)
+    // Convert database lesson format to display format
+    const lessonData = lesson.lesson_data
+    setGeneratedLesson(lessonData)
+
+    // Persist loaded lesson to localStorage
+    try {
+      localStorage.setItem('linguaspark_current_lesson', JSON.stringify(lessonData))
+      console.log('[LinguaSpark Popup] ✅ Loaded lesson saved to localStorage')
+    } catch (error) {
+      console.error('[LinguaSpark Popup] Failed to save loaded lesson:', error)
+    }
+  }
+
   return (
-    <div className="w-full min-h-screen">
-      <div className="w-full px-6 lg:px-8 py-4 space-y-4">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-primary">LinguaSpark</h1>
-          <p className="text-sm text-muted-foreground">Transform content into lessons</p>
+    <div className="w-full min-h-screen bg-vintage-cream">
+      <div className="w-full space-y-4">
+        {/* Header with user menu - Vintage Style */}
+        <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b-3 border-vintage-brown bg-vintage-cream-dark">
+          <div className="text-center flex-1">
+            <h1 className="text-2xl font-serif font-bold text-vintage-brown">LinguaSpark</h1>
+            <p className="text-sm text-vintage-brown/70">Transform content into professional lessons</p>
+          </div>
+          <UserMenu />
         </div>
 
         {!generatedLesson ? (
@@ -300,6 +436,7 @@ export default function PopupPage() {
             onExportPDF={handleExportPDF}
             onExportWord={handleExportWord}
             onNewLesson={handleNewLesson}
+            onLoadLesson={handleLoadLesson}
           />
         )}
       </div>

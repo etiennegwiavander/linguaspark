@@ -59,53 +59,125 @@ export const lessonService = {
     student_id?: string
   }) {
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (authError) {
+      console.error('[LessonService] Auth error:', authError)
+      throw new Error(`Authentication error: ${authError.message}`)
+    }
+
+    if (!session?.user) {
+      console.error('[LessonService] No authenticated user')
+      throw new Error("No authenticated user")
+    }
+
+    const user = session.user
+
+    console.log('[LessonService] Saving lesson for user:', user.id)
+    console.log('[LessonService] Lesson data:', {
+      title: lessonData.title,
+      lesson_type: lessonData.lesson_type,
+      student_level: lessonData.student_level,
+      target_language: lessonData.target_language,
+    })
+
+    // First, ensure tutor profile exists
+    const { data: tutorProfile, error: tutorError } = await supabase
+      .from("tutors")
+      .select("id")
+      .eq("id", user.id)
+      .single()
+
+    if (tutorError && tutorError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('[LessonService] Error checking tutor profile:', tutorError)
+    }
+
+    if (!tutorProfile) {
+      console.log('[LessonService] Tutor profile not found, creating one...')
+      const { error: createTutorError } = await supabase
+        .from("tutors")
+        .insert({
+          id: user.id,
+          email: user.email || '',
+        })
+
+      if (createTutorError) {
+        console.error('[LessonService] Failed to create tutor profile:', createTutorError)
+        throw new Error(`Failed to create tutor profile: ${createTutorError.message}`)
+      }
+      console.log('[LessonService] ✅ Tutor profile created')
+    }
 
     const { data, error } = await supabase
       .from("lessons")
       .insert({
         ...lessonData,
-        tutor_id: user.data.user.id,
+        tutor_id: user.id,
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[LessonService] Failed to insert lesson:', error)
+      throw new Error(`Failed to save lesson: ${error.message}`)
+    }
+
+    console.log('[LessonService] ✅ Lesson saved successfully:', data.id)
     return data as Lesson
   },
 
   async getLessons(limit = 20, offset = 0) {
+    console.log('[LessonService] getLessons called with limit:', limit, 'offset:', offset)
+    
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    
+    // Use getSession() instead of getUser() - it's more reliable and doesn't hang
+    console.log('[LessonService] Getting session...')
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    console.log('[LessonService] Session obtained:', session?.user?.email || 'NO SESSION')
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (sessionError) {
+      console.error('[LessonService] Session error:', sessionError)
+      throw new Error(`Authentication error: ${sessionError.message}`)
+    }
+
+    if (!session?.user) {
+      console.error('[LessonService] No authenticated session')
+      throw new Error("No authenticated user")
+    }
+
+    const user = session.user
+    console.log('[LessonService] Fetching lessons for user:', user.id)
 
     const { data, error } = await supabase
       .from("lessons")
-      .select(`
-        *,
-        students (
-          id,
-          name,
-          level,
-          target_language
-        )
-      `)
-      .eq("tutor_id", user.data.user.id)
+      .select("*")
+      .eq("tutor_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (error) throw error
+    if (error) {
+      console.error('[LessonService] Error fetching lessons:', error)
+      console.error('[LessonService] Error code:', error.code)
+      console.error('[LessonService] Error message:', error.message)
+      console.error('[LessonService] Error details:', error.details)
+      throw new Error(`Failed to fetch lessons: ${error.message}`)
+    }
+
+    console.log('[LessonService] Successfully fetched', data?.length || 0, 'lessons')
+    if (data && data.length > 0) {
+      console.log('[LessonService] First lesson ID:', data[0].id)
+    }
+
     return data as (Lesson & { students?: Student })[]
   },
 
   async getLesson(id: string) {
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (authError || !session?.user) throw new Error("No authenticated user")
+    const user = session.user
 
     const { data, error } = await supabase
       .from("lessons")
@@ -119,7 +191,7 @@ export const lessonService = {
         )
       `)
       .eq("id", id)
-      .eq("tutor_id", user.data.user.id)
+      .eq("tutor_id", user.id)
       .single()
 
     if (error) throw error
@@ -128,9 +200,10 @@ export const lessonService = {
 
   async updateLesson(id: string, updates: Partial<Lesson>) {
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (authError || !session?.user) throw new Error("No authenticated user")
+    const user = session.user
 
     const { data, error } = await supabase
       .from("lessons")
@@ -139,7 +212,7 @@ export const lessonService = {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .eq("tutor_id", user.data.user.id)
+      .eq("tutor_id", user.id)
       .select()
       .single()
 
@@ -149,22 +222,24 @@ export const lessonService = {
 
   async deleteLesson(id: string) {
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (authError || !session?.user) throw new Error("No authenticated user")
+    const user = session.user
 
-    const { error } = await supabase.from("lessons").delete().eq("id", id).eq("tutor_id", user.data.user.id)
+    const { error } = await supabase.from("lessons").delete().eq("id", id).eq("tutor_id", user.id)
 
     if (error) throw error
   },
 
   async getStudents() {
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (authError || !session?.user) throw new Error("No authenticated user")
+    const user = session.user
 
-    const { data, error } = await supabase.from("students").select("*").eq("tutor_id", user.data.user.id).order("name")
+    const { data, error } = await supabase.from("students").select("*").eq("tutor_id", user.id).order("name")
 
     if (error) throw error
     return data as Student[]
@@ -176,15 +251,16 @@ export const lessonService = {
     target_language: string
   }) {
     const supabase = getSupabaseClient()
-    const user = await supabase.auth.getUser()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (!user.data.user) throw new Error("No authenticated user")
+    if (authError || !session?.user) throw new Error("No authenticated user")
+    const user = session.user
 
     const { data, error } = await supabase
       .from("students")
       .insert({
         ...student,
-        tutor_id: user.data.user.id,
+        tutor_id: user.id,
       })
       .select()
       .single()
