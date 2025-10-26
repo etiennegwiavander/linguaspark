@@ -121,7 +121,7 @@ export default function WorkspaceSidebar({
   }
 
   return (
-    <div className="h-full bg-muted/30 border-r border-border flex flex-col">
+    <div className="h-full bg-muted border-r border-border flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-border flex-shrink-0">
         <h2 className="text-lg font-semibold text-foreground">Workspace</h2>
