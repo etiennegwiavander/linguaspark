@@ -948,17 +948,6 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
     },
   ]
 
-  // Debug logging in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log("🎓 Lesson Display - Received lesson:", {
-      hasLesson: !!lesson,
-      hasSections: !!lesson?.sections,
-      sectionKeys: lesson?.sections ? Object.keys(lesson.sections) : [],
-      lessonStructure: lesson
-    })
-    console.log("🛡️ Safe lesson structure:", safeLesson)
-  }
-
   return (
     <div className="w-full space-y-1.5">
       {/* Export Error Alert - Full Width */}
