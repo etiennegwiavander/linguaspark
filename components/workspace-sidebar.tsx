@@ -282,7 +282,7 @@ export default function WorkspaceSidebar({
         </div>
 
         {/* Lesson History */}
-        <div className="border-b border-border">
+        {/* <div className="border-b border-border">
           <button
             onClick={() => toggleSection("history")}
             className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
@@ -350,7 +350,7 @@ export default function WorkspaceSidebar({
               )}
             </div>
           )}
-        </div>
+        </div> */}
       </div>
 
       {/* Footer Actions */}
