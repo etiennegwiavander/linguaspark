@@ -1,5 +1,8 @@
 {
-  "/library/page": "app/library/page.js",
-  "/page": "app/page.js",
-  "/popup/page": "app/popup/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/get-lessons/route": "app/api/get-lessons/route.js",
+  "/(protected)/popup/page": "app/(protected)/popup/page.js",
+  "/(protected)/library/page": "app/(protected)/library/page.js",
+  "/(public)/(landing)/page": "app/(public)/(landing)/page.js",
+  "/(public)/(auth)/signin/page": "app/(public)/(auth)/signin/page.js"
 }

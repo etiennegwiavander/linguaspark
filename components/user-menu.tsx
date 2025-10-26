@@ -26,29 +26,16 @@ export default function UserMenu() {
     console.log('[UserMenu] Sign out clicked')
     setIsSigningOut(true)
     
-    // Set a timeout to force reload if sign-out takes too long
-    const timeoutId = setTimeout(() => {
-      console.log('[UserMenu] Sign out timeout, forcing reload...')
-      window.location.reload()
-    }, 3000) // 3 seconds timeout
-    
     try {
       console.log('[UserMenu] Calling signOut()...')
+      // signOut in auth-wrapper will handle redirect
       await signOut()
-      console.log('[UserMenu] Sign out successful')
-      
-      clearTimeout(timeoutId)
-      
-      // Force reload to clear state and show sign-in form
-      console.log('[UserMenu] Reloading page...')
-      window.location.reload()
     } catch (error) {
-      clearTimeout(timeoutId)
       console.error('[UserMenu] Sign out error:', error)
-      
-      // Even if there's an error, try to reload (might still work)
-      console.log('[UserMenu] Error occurred, reloading anyway...')
-      window.location.reload()
+      // If error, still try to redirect
+      window.location.href = '/'
+    } finally {
+      setIsSigningOut(false)
     }
   }
 

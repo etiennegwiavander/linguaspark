@@ -73,6 +73,7 @@ export default function WorkspaceSidebar({
     if (expandedSections.history && lessonHistory.length === 0) {
       loadLessonHistory()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedSections.history])
 
   const loadLessonHistory = async () => {

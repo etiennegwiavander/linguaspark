@@ -218,7 +218,7 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
   const [isExportingHTML, setIsExportingHTML] = useState(false)
   const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [exportError, setExportError] = useState("")
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true) // Start collapsed on mobile
 
   const toggleSection = (sectionId: string) => {
     setSectionStates((prev) => ({

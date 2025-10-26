@@ -123,7 +123,9 @@ export default function LessonGenerator({
         setTargetLanguage("english")
       }
     }
-  }, [initialText, sourceUrl, lessonType, studentLevel, targetLanguage])
+    // Only depend on initialText and sourceUrl to avoid infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialText, sourceUrl])
 
   // Clear error when user makes changes
   const clearError = () => {
@@ -165,7 +167,8 @@ export default function LessonGenerator({
     }
 
     checkExtractionSource()
-  }, [hasAppliedInitialValues])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Handle clearing extraction data
   const handleClearExtraction = async () => {

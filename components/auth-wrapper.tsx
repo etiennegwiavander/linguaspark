@@ -72,7 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       setLoading(false)
-      
+
       // Create tutor profile if user exists and is confirmed
       if (session?.user && session.user.email_confirmed_at) {
         createTutorProfile(session.user)
@@ -116,9 +116,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     })
 
     if (error) throw error
-    
+
     console.log("Signup response:", data)
-    
+
     // Check if user needs email confirmation
     if (data.user && !data.session) {
       console.log("User created but needs email confirmation")
@@ -128,8 +128,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    console.log('[AuthWrapper] Starting sign out...')
+
+    try {
+      // Add timeout to prevent hanging
+      const signOutPromise = supabase.auth.signOut({ scope: 'global' })
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sign out timeout')), 5000)
+      )
+
+      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any
+
+      if (error) {
+        console.error('[AuthWrapper] Sign out error:', error)
+        // Don't throw, just continue to clear state
+      }
+
+      console.log('[AuthWrapper] Sign out successful')
+    } catch (error) {
+      console.error('[AuthWrapper] Sign out failed or timed out:', error)
+      // Continue anyway to clear client state
+    }
+
+    console.log('[AuthWrapper] Clearing state and redirecting...')
+
+    // Clear user state immediately
+    setUser(null)
+
+    // Clear all local storage related to auth
+    try {
+      const keys = Object.keys(localStorage)
+      keys.forEach(key => {
+        if (key.includes('supabase') || key.includes('auth')) {
+          localStorage.removeItem(key)
+        }
+      })
+    } catch (e) {
+      console.error('[AuthWrapper] Error clearing localStorage:', e)
+    }
+
+    // Use replace to prevent back button from returning to authenticated page
+    window.location.replace('/signin')
   }
 
   const value = {
@@ -157,6 +196,34 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const supabase = getSupabaseClient()
+
+  useEffect(() => {
+    // Redirect to sign in if not authenticated
+    if (!loading && !user) {
+      window.location.href = '/signin'
+    }
+
+    // Re-verify session when page becomes visible (e.g., after browser back button)
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && user) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session) {
+            // Session expired but user state still exists - force reload
+            console.log('[AuthGuard] Session expired on visibility change, reloading...')
+            window.location.replace('/signin')
+          }
+        } catch (error) {
+          console.error('[AuthGuard] Error verifying session:', error)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user])
 
   if (loading) {
     return (
@@ -167,127 +234,15 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <AuthForm />
+    // Show loading while redirecting
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return <>{children}</>
 }
 
-function AuthForm() {
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [fullName, setFullName] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
-  const { signIn, signUp } = useAuth()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-    setSuccess("")
-
-    try {
-      if (isSignUp) {
-        await signUp(email, password, fullName)
-        setSuccess("Account created! Please check your email to confirm your account, then sign in.")
-        setIsSignUp(false) // Switch to sign in form
-        setEmail("") // Clear form
-        setPassword("")
-        setFullName("")
-      } else {
-        await signIn(email, password)
-      }
-    } catch (err: any) {
-      setError(err.message || "An error occurred")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">LinguaSpark</CardTitle>
-          <CardDescription>{isSignUp ? "Create your tutor account" : "Sign in to your account"}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {success && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
-
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isSignUp ? "Creating Account..." : "Signing In..."}
-                </>
-              ) : isSignUp ? (
-                "Create Account"
-              ) : (
-                "Sign In"
-              )}
-            </Button>
-
-            <div className="text-center">
-              <Button type="button" variant="link" onClick={() => setIsSignUp(!isSignUp)} className="text-sm">
-                {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}

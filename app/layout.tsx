@@ -1,7 +1,6 @@
 import type React from "react"
 import { Inter, JetBrains_Mono, Merriweather, Lora } from "next/font/google"
 import "./globals.css"
-import AuthWrapper from "@/components/auth-wrapper"
 
 const inter = Inter({
   variable: "--font-inter",
@@ -33,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${merriweather.variable} ${lora.variable} antialiased`}>
       <body className="min-h-screen bg-vintage-cream font-sans antialiased">
-        <AuthWrapper>{children}</AuthWrapper>
+        {children}
       </body>
     </html>
   )
