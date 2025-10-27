@@ -168,7 +168,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     // Use replace to prevent back button from returning to authenticated page
-    window.location.replace('/signin')
+    window.location.replace('/auth/admin/login')
   }
 
   const value = {
@@ -201,7 +201,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Redirect to sign in if not authenticated
     if (!loading && !user) {
-      window.location.href = '/signin'
+      window.location.href = '/auth/admin/login'
     }
 
     // Re-verify session when page becomes visible (e.g., after browser back button)
@@ -212,7 +212,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           if (!session) {
             // Session expired but user state still exists - force reload
             console.log('[AuthGuard] Session expired on visibility change, reloading...')
-            window.location.replace('/signin')
+            window.location.replace('/auth/admin/login')
           }
         } catch (error) {
           console.error('[AuthGuard] Error verifying session:', error)

@@ -3,26 +3,19 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
   ChevronDown,
   ChevronRight,
   BookOpen,
-  MessageCircle,
-  Volume2,
-  CheckCircle,
-  Users,
   FileText,
   Download,
   History,
   Loader2,
-  Clock,
   Trash2,
   Save,
 } from "lucide-react"
 import { lessonService, type Lesson } from "@/lib/lessons"
-import { formatDistanceToNow } from "date-fns"
 
 interface WorkspaceSidebarProps {
   sections: Array<{
@@ -38,11 +31,16 @@ interface WorkspaceSidebarProps {
   onSaveToLibrary?: () => void
   onNewLesson: () => void
   onLoadLesson?: (lesson: Lesson) => void
+  onDeleteLesson?: () => void
   isExportingPDF: boolean
   isExportingWord: boolean
   isExportingHTML?: boolean
   isSavingToLibrary?: boolean
+  isDeletingLesson?: boolean
   isCollapsed: boolean
+  lessonSource?: 'personal' | 'public'
+  isAdmin?: boolean
+  showDeleteButton?: boolean
 }
 
 export default function WorkspaceSidebar({
@@ -54,11 +52,16 @@ export default function WorkspaceSidebar({
   onSaveToLibrary,
   onNewLesson,
   onLoadLesson,
+  onDeleteLesson,
   isExportingPDF,
   isExportingWord,
   isExportingHTML,
   isSavingToLibrary,
+  isDeletingLesson = false,
   isCollapsed,
+  lessonSource = 'personal',
+  isAdmin = false,
+  showDeleteButton = true,
 }: WorkspaceSidebarProps) {
   const [expandedSections, setExpandedSections] = useState({
     lessonSections: true,
@@ -69,12 +72,18 @@ export default function WorkspaceSidebar({
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null)
 
+  // Determine if delete button should be shown based on lesson source and admin status
+  const shouldShowDelete = lessonSource === 'personal'
+    ? showDeleteButton
+    : (lessonSource === 'public' && isAdmin)
+
   useEffect(() => {
-    if (expandedSections.history && lessonHistory.length === 0) {
+    // Only load history for personal lessons
+    if (expandedSections.history && lessonHistory.length === 0 && lessonSource === 'personal') {
       loadLessonHistory()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedSections.history])
+  }, [expandedSections.history, lessonSource])
 
   const loadLessonHistory = async () => {
     setLoadingHistory(true)
@@ -88,7 +97,7 @@ export default function WorkspaceSidebar({
     }
   }
 
-  const handleDeleteLesson = async (lessonId: string, e: React.MouseEvent) => {
+  const handleDeleteLessonFromHistory = async (lessonId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm("Are you sure you want to delete this lesson?")) return
 
@@ -101,6 +110,12 @@ export default function WorkspaceSidebar({
       alert("Failed to delete lesson")
     } finally {
       setDeletingLessonId(null)
+    }
+  }
+
+  const handleDeleteCurrentLesson = () => {
+    if (onDeleteLesson) {
+      onDeleteLesson()
     }
   }
 
@@ -267,6 +282,32 @@ export default function WorkspaceSidebar({
                   </>
                 )}
               </Button>
+
+              {/* Delete button - shown based on lesson source and admin status */}
+              {shouldShowDelete && onDeleteLesson && (
+                <>
+                  <Separator className="my-2" />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full justify-start text-xs"
+                    onClick={handleDeleteCurrentLesson}
+                    disabled={isDeletingLesson}
+                  >
+                    {isDeletingLesson ? (
+                      <>
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete Lesson
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -274,11 +315,11 @@ export default function WorkspaceSidebar({
         {/* Lesson Library Link */}
         <div className="border-b border-border">
           <a
-            href="/library"
+            href="/my-library"
             className="w-full px-4 py-3 flex items-center gap-2 hover:bg-muted/50 transition-colors block"
           >
             <History className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Lesson Library</span>
+            <span className="text-sm font-medium">My Library</span>
           </a>
         </div>
 

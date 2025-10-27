@@ -6,6 +6,7 @@ interface LessonData {
   studentLevel: string
   targetLanguage: string
   id?: string
+  isPublicLesson?: boolean
   sections: {
     warmup: string[]
     vocabulary: Array<{ word: string; meaning: string; example?: string; examples?: string[] }>
@@ -335,6 +336,7 @@ export async function exportToHTML(
     <div class="lesson-meta">Target Language: ${lessonData.targetLanguage.charAt(0).toUpperCase() + lessonData.targetLanguage.slice(1)}</div>
     <div class="lesson-meta">Level: ${lessonData.studentLevel} | Type: ${lessonData.lessonType}</div>
     <div class="lesson-meta">Generated on: ${formatDate()}</div>
+    ${lessonData.isPublicLesson ? '<div class="lesson-meta" style="font-style: italic;">From LinguaSpark Public Library</div>' : ''}
   </div>`
 
   // Add banner image if available

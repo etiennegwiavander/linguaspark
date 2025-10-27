@@ -1,5 +1,9 @@
 // LinguaSpark Extension Popup Script
 
+// Global state for admin status
+let isAdminUser = false;
+let currentUserId = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[LinguaSpark] Popup script loaded');
     
@@ -13,8 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('[LinguaSpark] Redirecting to full interface...');
         window.location.href = 'http://localhost:3000/popup?source=' + (source || 'extension');
     } else {
-        // This is the popup - show interface options
-        showPopupInterface();
+        // This is the popup - check admin status and show interface options
+        checkAdminStatus().then(() => {
+            showPopupInterface();
+        });
     }
 });
 
@@ -73,5 +79,71 @@ function openFullInterface() {
         // Fallback for when chrome.tabs is not available
         window.open('http://localhost:3000', '_blank');
         window.close();
+    }
+}
+
+/**
+ * Check if the current user has admin privileges
+ * Stores admin status in chrome.storage for use throughout the extension
+ */
+async function checkAdminStatus() {
+    try {
+        console.log('[LinguaSpark] Checking admin status...');
+        
+        // Get the current user's session from the web app
+        const response = await fetch('http://localhost:3000/api/auth/session', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            console.log('[LinguaSpark] No active session found');
+            isAdminUser = false;
+            currentUserId = null;
+            chrome.storage.local.set({ isAdmin: false, userId: null });
+            return;
+        }
+        
+        const sessionData = await response.json();
+        
+        if (!sessionData.user || !sessionData.user.id) {
+            console.log('[LinguaSpark] No user in session');
+            isAdminUser = false;
+            currentUserId = null;
+            chrome.storage.local.set({ isAdmin: false, userId: null });
+            return;
+        }
+        
+        currentUserId = sessionData.user.id;
+        
+        // Check admin status via API
+        const adminCheckResponse = await fetch('http://localhost:3000/api/admin/check-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ userId: currentUserId })
+        });
+        
+        if (adminCheckResponse.ok) {
+            const adminData = await adminCheckResponse.json();
+            isAdminUser = adminData.isAdmin === true;
+            console.log('[LinguaSpark] Admin status:', isAdminUser);
+        } else {
+            isAdminUser = false;
+            console.log('[LinguaSpark] Admin check failed');
+        }
+        
+        // Store in chrome.storage for access from content scripts
+        chrome.storage.local.set({ 
+            isAdmin: isAdminUser, 
+            userId: currentUserId 
+        });
+        
+    } catch (error) {
+        console.error('[LinguaSpark] Error checking admin status:', error);
+        isAdminUser = false;
+        currentUserId = null;
+        chrome.storage.local.set({ isAdmin: false, userId: null });
     }
 }

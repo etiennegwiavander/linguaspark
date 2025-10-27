@@ -11,7 +11,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   if (request.action === 'openLessonInterface') {
     // Get content from Chrome storage and pass it to popup via API
-    chrome.storage.local.get(['lessonConfiguration', 'extractedContent', 'extractionSource', 'extractionTimestamp', 'sourceUrl', 'sourceTitle'], (result) => {
+    chrome.storage.local.get(['lessonConfiguration', 'extractedContent', 'extractionSource', 'extractionTimestamp', 'sourceUrl', 'sourceTitle', 'isAdmin', 'saveToPublic'], (result) => {
       if (result.lessonConfiguration) {
         // Generate unique session ID
         const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -33,6 +33,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             
             let url = `http://localhost:3000/popup?source=extraction&autoPopulate=true&sessionId=${sessionId}`;
             url += `&title=${encodedTitle}&sourceUrl=${encodedUrl}&type=${result.lessonConfiguration.suggestedType}&level=${result.lessonConfiguration.suggestedLevel}`;
+            
+            // Add saveToPublic flag if admin user selected public library
+            if (result.saveToPublic === true) {
+              url += '&saveToPublic=true';
+              console.log('[LinguaSpark Background] Lesson will be saved to public library');
+            }
             
             console.log('[LinguaSpark Background] Content stored in API for session:', sessionId);
             console.log('[LinguaSpark Background] Content length:', result.lessonConfiguration.sourceContent.length, 'characters');

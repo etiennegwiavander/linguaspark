@@ -21,7 +21,6 @@ export default function PublicNavbar() {
               <h1 className="font-serif text-2xl font-bold text-vintage-brown">
                 LinguaSpark
               </h1>
-              <p className="text-xs text-vintage-brown/60">Chrome Extension</p>
             </div>
           </Link>
           <div className="flex items-center gap-4">
@@ -31,6 +30,14 @@ export default function PublicNavbar() {
                 className="text-vintage-brown hover:text-vintage-burgundy font-serif"
               >
                 Home
+              </Button>
+            </Link>
+            <Link href="/library">
+              <Button
+                variant="ghost"
+                className="text-vintage-brown hover:text-vintage-burgundy font-serif"
+              >
+                Lesson Materials
               </Button>
             </Link>
           </div>

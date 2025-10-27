@@ -24,6 +24,15 @@ import { lessonExporter } from "@/lib/export-utils"
 import { exportToHTML } from "@/lib/export-html-pptx"
 import { enhanceDialogueWithAvatars, type Avatar } from "@/lib/avatar-utils"
 import WorkspaceSidebar from "@/components/workspace-sidebar"
+import { AdminLessonCreationDialog } from "@/components/admin-lesson-creation-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import type { Lesson } from "@/lib/lessons"
 
 interface LessonSection {
@@ -219,6 +228,53 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
   const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [exportError, setExportError] = useState("")
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true) // Start collapsed on mobile
+  
+  // Admin public library state
+  const [showSaveLocationDialog, setShowSaveLocationDialog] = useState(false)
+  const [showAdminLessonDialog, setShowAdminLessonDialog] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        console.log('[LessonDisplay] 🔍 Checking admin status...')
+        const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+        if (!sessionData) {
+          console.log('[LessonDisplay] ❌ No session data found')
+          return
+        }
+        
+        const session = JSON.parse(sessionData)
+        const userId = session.user?.id
+        
+        if (!userId) {
+          console.log('[LessonDisplay] ❌ No user ID found')
+          return
+        }
+        
+        console.log('[LessonDisplay] 📡 Calling admin check API with userId:', userId)
+        const response = await fetch('/api/admin/check-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('[LessonDisplay] ✅ Admin check response:', data)
+          setIsAdmin(data.isAdmin === true)
+          console.log('[LessonDisplay] 🎯 isAdmin set to:', data.isAdmin === true)
+        } else {
+          console.log('[LessonDisplay] ❌ Admin check failed with status:', response.status)
+        }
+      } catch (error) {
+        console.error('[LessonDisplay] ❌ Failed to check admin status:', error)
+      }
+    }
+    
+    checkAdminStatus()
+  }, [])
 
   const toggleSection = (sectionId: string) => {
     setSectionStates((prev) => ({
@@ -358,11 +414,26 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
   }
 
   const handleSaveToLibrary = async () => {
+    console.log('[LessonDisplay] 💾 handleSaveToLibrary called, isAdmin:', isAdmin)
+    
+    // If admin, show dialog to choose where to save
+    if (isAdmin) {
+      console.log('[LessonDisplay] ✅ User is admin, showing save location dialog')
+      setShowSaveLocationDialog(true)
+      return
+    }
+    
+    console.log('[LessonDisplay] ℹ️ User is not admin, saving to personal library')
+    // Non-admin: save to personal library directly
+    await saveToPersonalLibrary()
+  }
+  
+  const saveToPersonalLibrary = async () => {
     setIsSavingToLibrary(true)
     setExportError("")
 
     try {
-      console.log('[LessonDisplay] 💾 Saving lesson to library...')
+      console.log('[LessonDisplay] 💾 Saving lesson to personal library...')
 
       // Get source URL from metadata or extraction source
       const sourceUrl = safeLesson.metadata?.sourceUrl ||
@@ -403,10 +474,121 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       }
 
       const { lesson } = await response.json()
-      console.log('[LessonDisplay] ✅ Lesson saved to library with ID:', lesson.id)
-      alert('Lesson saved to library successfully!')
+      console.log('[LessonDisplay] ✅ Lesson saved to personal library with ID:', lesson.id)
+      alert('Lesson saved to your personal library successfully!')
     } catch (error) {
       console.error('[LessonDisplay] ❌ Failed to save lesson:', error)
+      if (error instanceof Error) {
+        setExportError(`Failed to save lesson: ${error.message}`)
+        alert(`Failed to save lesson: ${error.message}`)
+      } else {
+        setExportError("Failed to save lesson. Please try again.")
+        alert("Failed to save lesson. Please try again.")
+      }
+    } finally {
+      setIsSavingToLibrary(false)
+    }
+  }
+  
+  const saveToPublicLibrary = async (metadata: any) => {
+    setIsSavingToLibrary(true)
+    setExportError("")
+    setShowAdminLessonDialog(false)
+
+    try {
+      console.log('[LessonDisplay] 💾 Saving lesson to public library...')
+
+      // Get source URL from metadata or extraction source
+      const sourceUrl = safeLesson.metadata?.sourceUrl ||
+        safeLesson.extractionSource?.url ||
+        undefined
+
+      // Get auth token from localStorage
+      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+      if (!sessionData) {
+        throw new Error('No authentication session found. Please sign in again.')
+      }
+
+      const session = JSON.parse(sessionData)
+      const authToken = session.access_token
+
+      console.log('[LessonDisplay] Calling public lessons create API...')
+
+      // Transform sections array into expected flat structure
+      const transformedLesson: any = {
+        title: safeLesson.lessonTitle || safeLesson.title,
+        metadata: {
+          ...safeLesson.metadata,
+          cefr_level: safeLesson.studentLevel || safeLesson.metadata?.cefr_level || "B1",
+          lesson_type: safeLesson.lessonType || safeLesson.metadata?.lesson_type || "discussion",
+          source_url: sourceUrl || safeLesson.metadata?.source_url,
+        }
+      };
+
+      // Transform sections array into flat properties
+      if (safeLesson.sections && Array.isArray(safeLesson.sections)) {
+        safeLesson.sections.forEach((section: any) => {
+          if (section.type) {
+            transformedLesson[section.type] = section;
+          }
+        });
+      }
+
+      // Ensure required sections exist with fallbacks
+      if (!transformedLesson.warmup) {
+        transformedLesson.warmup = {
+          questions: ["What do you know about this topic?"]
+        };
+      }
+      
+      if (!transformedLesson.wrapup) {
+        transformedLesson.wrapup = {
+          summary: "In this lesson, we explored the key concepts and practiced using them in context."
+        };
+      }
+
+      // Ensure at least one main content section exists
+      const mainSections = ['vocabulary', 'grammar', 'reading', 'discussion', 'pronunciation'];
+      const hasMainSection = mainSections.some(section => transformedLesson[section]);
+      
+      if (!hasMainSection) {
+        // Create a discussion section as fallback
+        transformedLesson.discussion = {
+          questions: ["What are your thoughts on this topic?", "How does this relate to your experience?"]
+        };
+      }
+
+      const lessonContent = transformedLesson;
+
+      // Call the public lessons create API route
+      const response = await fetch('/api/public-lessons/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          lesson: lessonContent,
+          metadata: {
+            category: metadata.category,
+            tags: metadata.tags,
+            estimated_duration_minutes: metadata.estimated_duration_minutes,
+          }
+          // No userId needed here - web app uses session-based auth
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      console.log('[LessonDisplay] ✅ Lesson saved to public library with ID:', result.lesson_id)
+      alert('Lesson saved to public library successfully!')
+    } catch (error) {
+      console.error('[LessonDisplay] ❌ Failed to save lesson to public library:', error)
       if (error instanceof Error) {
         setExportError(`Failed to save lesson: ${error.message}`)
         alert(`Failed to save lesson: ${error.message}`)
@@ -950,6 +1132,16 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
 
   return (
     <div className="w-full space-y-1.5">
+      {/* Admin Status Debug - Remove after testing */}
+      {isAdmin && (
+        <Alert className="bg-green-50 border-green-200">
+          <AlertCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-xs text-green-800">
+            ✅ Admin Mode Active - You can save to public library
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* Export Error Alert - Full Width */}
       {exportError && (
         <Alert variant="destructive">
@@ -1131,6 +1323,55 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
           </div>
         </div>
       </div>
+      
+      {/* Admin Save Location Dialog */}
+      <Dialog open={showSaveLocationDialog} onOpenChange={setShowSaveLocationDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Save Lesson</DialogTitle>
+            <DialogDescription>
+              Choose where to save this lesson
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Button
+              className="w-full"
+              onClick={() => {
+                setShowSaveLocationDialog(false)
+                saveToPersonalLibrary()
+              }}
+            >
+              Save to My Personal Library
+            </Button>
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => {
+                setShowSaveLocationDialog(false)
+                setShowAdminLessonDialog(true)
+              }}
+            >
+              Save to Public Library
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowSaveLocationDialog(false)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Admin Lesson Creation Dialog */}
+      <AdminLessonCreationDialog
+        open={showAdminLessonDialog}
+        onOpenChange={setShowAdminLessonDialog}
+        onConfirm={saveToPublicLibrary}
+        onCancel={() => setShowAdminLessonDialog(false)}
+      />
     </div>
   )
 }

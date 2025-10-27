@@ -1,16 +1,5 @@
 {
   "pages": {
-    "/(public)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(public)/layout.js"
-    ],
-    "/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/layout.css",
-      "static/chunks/app/layout.js"
-    ],
     "/(protected)/popup/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -21,35 +10,26 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(protected)/layout.js"
     ],
-    "/(public)/(landing)/page": [
+    "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(public)/(landing)/page.js"
+      "static/css/app/layout.css",
+      "static/chunks/app/layout.js"
     ],
-    "/(public)/(landing)/layout": [
+    "/(protected)/my-library/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(public)/(landing)/layout.js"
+      "static/chunks/app/(protected)/my-library/page.js"
     ],
-    "/(public)/(auth)/signin/page": [
+    "/(public)/library/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(public)/(auth)/signin/page.js"
+      "static/chunks/app/(public)/library/page.js"
     ],
-    "/(public)/(auth)/layout": [
+    "/(public)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(public)/(auth)/layout.js"
-    ],
-    "/(protected)/library/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/library/page.js"
-    ],
-    "/_not-found/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/(public)/layout.js"
     ]
   }
 }

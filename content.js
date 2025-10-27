@@ -358,6 +358,108 @@
     }
   }
 
+  // Show save destination dialog for admin users
+  async function showSaveDestinationDialog() {
+    return new Promise((resolve) => {
+      // Create dialog overlay
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      `;
+      
+      // Create dialog
+      const dialog = document.createElement('div');
+      dialog.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      `;
+      
+      dialog.innerHTML = `
+        <h2 style="margin: 0 0 16px 0; font-size: 24px; color: #1a1a1a;">
+          Save Lesson Destination
+        </h2>
+        <p style="margin: 0 0 24px 0; color: #666; font-size: 16px; line-height: 1.5;">
+          As an admin, you can save this lesson to your personal library or to the public library for all users to access.
+        </p>
+        <div style="display: flex; gap: 12px;">
+          <button id="linguaspark-save-personal" style="
+            flex: 1;
+            padding: 12px 24px;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+          ">
+            Personal Library
+          </button>
+          <button id="linguaspark-save-public" style="
+            flex: 1;
+            padding: 12px 24px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+          ">
+            Public Library
+          </button>
+        </div>
+      `;
+      
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      
+      // Add hover effects
+      const personalBtn = dialog.querySelector('#linguaspark-save-personal');
+      const publicBtn = dialog.querySelector('#linguaspark-save-public');
+      
+      personalBtn.addEventListener('mouseenter', () => {
+        personalBtn.style.background = '#4b5563';
+      });
+      personalBtn.addEventListener('mouseleave', () => {
+        personalBtn.style.background = '#6b7280';
+      });
+      
+      publicBtn.addEventListener('mouseenter', () => {
+        publicBtn.style.background = '#1d4ed8';
+      });
+      publicBtn.addEventListener('mouseleave', () => {
+        publicBtn.style.background = '#2563eb';
+      });
+      
+      // Handle button clicks
+      personalBtn.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+        resolve(false); // Save to personal library
+      });
+      
+      publicBtn.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+        resolve(true); // Save to public library
+      });
+    });
+  }
+
   // Safe chrome runtime message sending with context validation
   async function safeSendMessage(message) {
     return new Promise((resolve, reject) => {
@@ -678,8 +780,37 @@
         </svg>
       `;
 
-      // Open lesson generation interface using safe message sending
-      console.log("[LinguaSpark] Opening lesson interface...");
+      // Check if user is admin and show save destination dialog
+      console.log("[LinguaSpark] Checking admin status...");
+      
+      // Get admin status from storage
+      const adminStatus = await new Promise((resolve) => {
+        chrome.storage.local.get(['isAdmin'], (result) => {
+          resolve(result.isAdmin === true);
+        });
+      });
+      
+      console.log("[LinguaSpark] Admin status:", adminStatus);
+      
+      // If admin, show save destination dialog
+      if (adminStatus) {
+        const saveToPublic = await showSaveDestinationDialog();
+        
+        // Store the choice in chrome.storage
+        await new Promise((resolve) => {
+          chrome.storage.local.set({ saveToPublic: saveToPublic }, () => {
+            console.log("[LinguaSpark] Save destination set:", saveToPublic ? "Public Library" : "Personal Library");
+            resolve();
+          });
+        });
+      } else {
+        // Clear any previous saveToPublic flag
+        await new Promise((resolve) => {
+          chrome.storage.local.remove('saveToPublic', () => {
+            resolve();
+          });
+        });
+      }
 
       // Open lesson generation interface using safe message sending
       console.log("[LinguaSpark] Opening lesson interface...");

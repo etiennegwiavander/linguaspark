@@ -8,6 +8,9 @@ export default function LandingPage() {
   const router = useRouter();
 
   const handleGetStarted = () => {
+    router.push("/signin");
+  };
+  const handleLessonMaterials = () => {
     router.push("/library");
   };
 
@@ -20,9 +23,9 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               <div className="relative w-8 h-8">
                 <div className="absolute inset-0 bg-vintage-gold/20 rounded-full blur-sm"></div>
-                <img 
-                  src="/mascot.png" 
-                  alt="Sparky Mascot" 
+                <img
+                  src="/mascot.png"
+                  alt="Sparky Mascot"
                   className="relative w-full h-full object-contain"
                 />
               </div>
@@ -30,7 +33,7 @@ export default function LandingPage() {
                 <h1 className="font-serif text-2xl font-bold text-vintage-brown">
                   LinguaSpark
                 </h1>
-                <p className="text-xs text-vintage-brown/60">Chrome Extension</p>
+
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -42,19 +45,20 @@ export default function LandingPage() {
                 Features
               </Button>
               <Button
-                onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}
+                onClick={handleLessonMaterials}
                 variant="ghost"
                 className="text-vintage-brown hover:text-vintage-burgundy font-serif"
               >
-                How It Works
+                Lesson Materials
               </Button>
               <Button
                 onClick={handleGetStarted}
                 className="vintage-button-primary"
               >
                 <Chrome className="mr-2 h-4 w-4" />
-                Launch App
+                Get Started
               </Button>
+
             </div>
           </div>
         </div>
@@ -78,7 +82,7 @@ export default function LandingPage() {
                 <span className="block text-vintage-burgundy mt-2">Professional Lessons</span>
               </h1>
               <p className="text-xl text-vintage-brown/80 mb-10 leading-relaxed">
-                LinguaSpark is a Chrome extension that turns web articles, blogs, and content into engaging language lessons with AI-powered generation. 
+                LinguaSpark is a Chrome extension that turns web articles, blogs, and content into engaging language lessons with AI-powered generation.
                 Create professional teaching materials in minutes, not hours.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -109,9 +113,9 @@ export default function LandingPage() {
               <div className="absolute -top-8 -right-8 z-20">
                 <div className="relative w-20 h-20">
                   <div className="absolute inset-0 bg-vintage-gold/30 rounded-full blur-xl animate-pulse"></div>
-                  <img 
-                    src="/mascot.png" 
-                    alt="Sparky Mascot" 
+                  <img
+                    src="/mascot.png"
+                    alt="Sparky Mascot"
                     className="relative w-full h-full object-contain drop-shadow-2xl"
                   />
                 </div>
@@ -161,7 +165,7 @@ export default function LandingPage() {
                         Discussion questions
                       </div>
                     </div>
-                    
+
                     {/* AI Sparkle Button */}
                     <button className="absolute -right-4 -bottom-4 bg-vintage-gold border-3 border-vintage-brown p-3 rounded-full shadow-vintage hover:shadow-vintage-lg hover:scale-110 transition-all duration-200">
                       <Sparkles className="w-6 h-6 text-vintage-burgundy" />
@@ -318,7 +322,7 @@ export default function LandingPage() {
             className="vintage-button-light text-lg px-10 py-6 h-auto"
           >
             <Chrome className="mr-2 h-5 w-5" />
-            Launch Extension
+            Get Started Free
           </Button>
           <p className="mt-6 text-sm opacity-75">
             Free to use • Works in Chrome browser
@@ -331,9 +335,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img 
-                src="/mascot.png" 
-                alt="Sparky Mascot" 
+              <img
+                src="/mascot.png"
+                alt="Sparky Mascot"
                 className="w-8 h-8 object-contain opacity-90"
               />
               <div className="text-center md:text-left">

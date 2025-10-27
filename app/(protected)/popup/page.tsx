@@ -5,6 +5,8 @@ import LessonGenerator from "@/components/lesson-generator"
 import LessonDisplay from "@/components/lesson-display"
 import { LessonInterfaceUtils } from "@/lib/lesson-interface-bridge"
 import UserMenu from "@/components/user-menu"
+import { AdminLessonCreationDialog } from "@/components/admin-lesson-creation-dialog"
+import type { PublicLessonMetadata } from "@/lib/types/public-lessons"
 
 // Declare chrome for extension context
 declare global {
@@ -18,6 +20,64 @@ export default function PopupPage() {
   const [sourceUrl, setSourceUrl] = useState("")
   const [extractedMetadata, setExtractedMetadata] = useState<any>(null)
   const [generatedLesson, setGeneratedLesson] = useState<any>(null)
+  const [saveToPublic, setSaveToPublic] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAdminLessonDialog, setShowAdminLessonDialog] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  // Check for saveToPublic parameter and admin status on mount
+  useEffect(() => {
+    const checkAdminAndSaveToPublic = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search)
+        const saveToPublicParam = urlParams.get('saveToPublic')
+        
+        if (saveToPublicParam === 'true') {
+          console.log('[LinguaSpark Popup] 🔍 saveToPublic parameter detected')
+          setSaveToPublic(true)
+          
+          // Check if user is admin
+          const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+          if (sessionData) {
+            const session = JSON.parse(sessionData)
+            console.log('[LinguaSpark Popup] 📦 Session data structure:', {
+              hasAccessToken: !!session.access_token,
+              hasUser: !!session.user,
+              userId: session.user?.id,
+              sessionKeys: Object.keys(session)
+            })
+            const authToken = session.access_token
+            const user = session.user
+            
+            // Store userId for later use
+            if (user?.id) {
+              setUserId(user.id)
+              console.log('[LinguaSpark Popup] 👤 User ID set to:', user.id)
+            } else {
+              console.error('[LinguaSpark Popup] ❌ No user ID found in session!')
+            }
+            
+            // Check admin status
+            const response = await fetch('/api/admin/check-status', {
+              headers: {
+                'Authorization': `Bearer ${authToken}`
+              }
+            })
+            
+            if (response.ok) {
+              const { isAdmin: adminStatus } = await response.json()
+              setIsAdmin(adminStatus)
+              console.log('[LinguaSpark Popup] 👑 Admin status:', adminStatus)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[LinguaSpark Popup] Failed to check admin status:', error)
+      }
+    }
+    
+    checkAdminAndSaveToPublic()
+  }, [])
 
   // Load persisted lesson or lesson from URL parameter on mount
   useEffect(() => {
@@ -294,7 +354,7 @@ export default function PopupPage() {
   }
 
   const handleLessonGenerated = async (lesson: any) => {
-    console.log('[LinguaSpark Popup] Lesson generated, saving to localStorage and database')
+    console.log('[LinguaSpark Popup] Lesson generated')
     setGeneratedLesson(lesson)
 
     // Persist lesson to localStorage
@@ -305,9 +365,21 @@ export default function PopupPage() {
       console.error('[LinguaSpark Popup] Failed to save lesson to localStorage:', error)
     }
 
-    // Save to Supabase database using the new API route
+    // Check if this should be saved to public library
+    if (saveToPublic && isAdmin) {
+      console.log('[LinguaSpark Popup] 🌐 Triggering save to public library flow')
+      // Show admin dialog to collect metadata
+      setShowAdminLessonDialog(true)
+      return
+    }
+
+    // Normal save flow - save to personal library
+    await saveToPersonalLibrary(lesson)
+  }
+
+  const saveToPersonalLibrary = async (lesson: any) => {
     try {
-      console.log('[LinguaSpark Popup] 💾 Attempting to save lesson to database...')
+      console.log('[LinguaSpark Popup] 💾 Attempting to save lesson to personal library...')
       console.log('[LinguaSpark Popup] Lesson data:', {
         title: lesson.lessonTitle,
         lesson_type: lesson.lessonType,
@@ -348,9 +420,9 @@ export default function PopupPage() {
       }
 
       const { lesson: savedLesson } = await response.json()
-      console.log('[LinguaSpark Popup] ✅ Lesson saved to database with ID:', savedLesson.id)
+      console.log('[LinguaSpark Popup] ✅ Lesson saved to personal library with ID:', savedLesson.id)
     } catch (error) {
-      console.error('[LinguaSpark Popup] ❌ Failed to save lesson to database:', error)
+      console.error('[LinguaSpark Popup] ❌ Failed to save lesson to personal library:', error)
       if (error instanceof Error) {
         console.error('[LinguaSpark Popup] Error details:', {
           message: error.message,
@@ -359,6 +431,126 @@ export default function PopupPage() {
       }
       // Show user-friendly error notification (non-blocking)
       console.warn('[LinguaSpark Popup] Lesson generated but not saved to library. User can save manually.')
+    }
+  }
+
+  const saveToPublicLibrary = async (metadata: PublicLessonMetadata) => {
+    setShowAdminLessonDialog(false)
+
+    try {
+      console.log('[LinguaSpark Popup] 💾 Saving lesson to public library...')
+
+      if (!generatedLesson) {
+        throw new Error('No lesson to save')
+      }
+
+      if (!userId) {
+        throw new Error('User ID not available')
+      }
+
+      // Get auth token from localStorage
+      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+      if (!sessionData) {
+        throw new Error('No authentication session found')
+      }
+
+      const session = JSON.parse(sessionData)
+      const authToken = session.access_token
+
+      console.log('[LinguaSpark Popup] Calling public lessons create API...')
+      console.log('[LinguaSpark Popup] 🔑 userId:', userId)
+      console.log('[LinguaSpark Popup] 📝 metadata:', metadata)
+
+      // Transform sections array into expected flat structure
+      const transformedLesson: any = {
+        title: generatedLesson.lessonTitle || generatedLesson.title,
+        metadata: {
+          ...generatedLesson.metadata,
+          cefr_level: generatedLesson.studentLevel || generatedLesson.metadata?.cefr_level || "B1",
+          lesson_type: generatedLesson.lessonType || generatedLesson.metadata?.lesson_type || "discussion",
+          source_url: sourceUrl || generatedLesson.metadata?.source_url,
+        }
+      };
+
+      // Transform sections array into flat properties
+      if (generatedLesson.sections && Array.isArray(generatedLesson.sections)) {
+        generatedLesson.sections.forEach((section: any) => {
+          if (section.type) {
+            transformedLesson[section.type] = section;
+          }
+        });
+      }
+
+      // Ensure required sections exist with fallbacks
+      if (!transformedLesson.warmup) {
+        transformedLesson.warmup = {
+          questions: ["What do you know about this topic?"]
+        };
+      }
+      
+      if (!transformedLesson.wrapup) {
+        transformedLesson.wrapup = {
+          summary: "In this lesson, we explored the key concepts and practiced using them in context."
+        };
+      }
+
+      // Ensure at least one main content section exists
+      const mainSections = ['vocabulary', 'grammar', 'reading', 'discussion', 'pronunciation'];
+      const hasMainSection = mainSections.some(section => transformedLesson[section]);
+      
+      if (!hasMainSection) {
+        // Create a discussion section as fallback
+        transformedLesson.discussion = {
+          questions: ["What are your thoughts on this topic?", "How does this relate to your experience?"]
+        };
+      }
+
+      const lessonContent = transformedLesson;
+
+      // Call the public lessons create API route with userId
+      // Structure the request according to API expectations
+      const requestBody = {
+        lesson: lessonContent,
+        metadata: {
+          category: metadata.category,
+          tags: metadata.tags,
+          estimated_duration_minutes: metadata.estimated_duration_minutes,
+        },
+        userId: userId, // Pass userId for extension context
+      };
+
+      console.log('[LinguaSpark Popup] 📤 Request body structure:', {
+        hasLesson: !!requestBody.lesson,
+        hasMetadata: !!requestBody.metadata,
+        hasUserId: !!requestBody.userId,
+        userId: requestBody.userId
+      })
+
+      const response = await fetch('/api/public-lessons/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      console.log('[LinguaSpark Popup] ✅ Lesson saved to public library with ID:', result.lesson_id)
+      alert('Lesson saved to public library successfully!')
+    } catch (error) {
+      console.error('[LinguaSpark Popup] ❌ Failed to save lesson to public library:', error)
+      if (error instanceof Error) {
+        alert(`Failed to save lesson: ${error.message}`)
+      } else {
+        alert("Failed to save lesson. Please try again.")
+      }
     }
   }
 
@@ -420,6 +612,8 @@ export default function PopupPage() {
                 <div>Debug: selectedText length = {selectedText.length}</div>
                 <div>Debug: sourceUrl = {sourceUrl}</div>
                 <div>Debug: URL params = {window.location.search}</div>
+                <div>Debug: saveToPublic = {saveToPublic.toString()}</div>
+                <div>Debug: isAdmin = {isAdmin.toString()}</div>
               </div>
             )}
             <LessonGenerator
@@ -440,6 +634,14 @@ export default function PopupPage() {
           />
         )}
       </div>
+
+      {/* Admin Lesson Creation Dialog */}
+      <AdminLessonCreationDialog
+        open={showAdminLessonDialog}
+        onOpenChange={setShowAdminLessonDialog}
+        onConfirm={saveToPublicLibrary}
+        onCancel={() => setShowAdminLessonDialog(false)}
+      />
     </div>
   )
 }
