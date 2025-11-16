@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isTab) {
         // Redirect to the full Next.js application
         console.log('[LinguaSpark] Redirecting to full interface...');
-        window.location.href = 'http://localhost:3000/popup?source=' + (source || 'extension');
+        window.location.href = 'http://localhost:3001/popup?source=' + (source || 'extension');
     } else {
         // This is the popup - check admin status and show interface options
         checkAdminStatus().then(() => {
@@ -70,14 +70,14 @@ function openFullInterface() {
     
     if (chrome && chrome.tabs) {
         chrome.tabs.create({
-            url: 'http://localhost:3000'
+            url: 'http://localhost:3001'
         }, function(tab) {
             console.log('[LinguaSpark] Opened tab:', tab.id);
             window.close();
         });
     } else {
         // Fallback for when chrome.tabs is not available
-        window.open('http://localhost:3000', '_blank');
+        window.open('http://localhost:3001', '_blank');
         window.close();
     }
 }
@@ -91,7 +91,7 @@ async function checkAdminStatus() {
         console.log('[LinguaSpark] Checking admin status...');
         
         // Get the current user's session from the web app
-        const response = await fetch('http://localhost:3000/api/auth/session', {
+        const response = await fetch('http://localhost:3001/api/auth/session', {
             credentials: 'include'
         });
         
@@ -116,7 +116,7 @@ async function checkAdminStatus() {
         currentUserId = sessionData.user.id;
         
         // Check admin status via API
-        const adminCheckResponse = await fetch('http://localhost:3000/api/admin/check-status', {
+        const adminCheckResponse = await fetch('http://localhost:3001/api/admin/check-status', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

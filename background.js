@@ -17,7 +17,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
         // Store content in API for popup to retrieve
-        fetch('http://localhost:3000/api/get-extracted-content', {
+        fetch('http://localhost:3001/api/get-extracted-content', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const encodedTitle = encodeURIComponent(result.lessonConfiguration.metadata.title || '');
             const encodedUrl = encodeURIComponent(result.lessonConfiguration.metadata.sourceUrl || '');
             
-            let url = `http://localhost:3000/popup?source=extraction&autoPopulate=true&sessionId=${sessionId}`;
+            let url = `http://localhost:3001/popup?source=extraction&autoPopulate=true&sessionId=${sessionId}`;
             url += `&title=${encodedTitle}&sourceUrl=${encodedUrl}&type=${result.lessonConfiguration.suggestedType}&level=${result.lessonConfiguration.suggestedLevel}`;
             
             // Add saveToPublic flag if admin user selected public library

@@ -156,10 +156,10 @@
       "/settings/",
     ];
 
-    // Always exclude our own LinguaSpark pages (localhost:3000)
+    // Always exclude our own LinguaSpark pages (localhost:3001)
     if (
       (hostname === "localhost" || hostname === "127.0.0.1") &&
-      url.includes(":3000")
+      url.includes(":3001")
     ) {
       return true;
     }
@@ -466,7 +466,7 @@
       // Create fallback URL with metadata AND content
       const createFallbackUrl = () => {
         const baseUrl =
-          "http://localhost:3000/popup?source=extraction&autoPopulate=true";
+          "http://localhost:3001/popup?source=extraction&autoPopulate=true";
         if (message.data) {
           const params = new URLSearchParams();
           params.set("source", "extraction");
@@ -477,7 +477,7 @@
           if (message.data.type) params.set("type", message.data.type);
           if (message.data.level) params.set("level", message.data.level);
           if (message.data.content) params.set("content", message.data.content); // CRITICAL: Include content in URL
-          return `http://localhost:3000/popup?${params.toString()}`;
+          return `http://localhost:3001/popup?${params.toString()}`;
         }
         return baseUrl;
       };
