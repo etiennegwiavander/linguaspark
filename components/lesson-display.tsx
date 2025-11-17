@@ -769,10 +769,12 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               )
             }
             // Rest are actual questions
+            // Remove leading number if present (e.g., "1. " or "2. ")
+            const cleanQuestion = question.replace(/^\d+\.\s*/, '')
             return (
               <div key={index} className="flex items-start gap-1.5">
                 <span className="text-[15px] font-medium text-primary">{index}.</span>
-                <p className="text-base text-foreground">{question}</p>
+                <p className="text-base text-foreground">{cleanQuestion}</p>
               </div>
             )
           })}
@@ -1118,10 +1120,12 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               )
             }
             // Rest are actual questions
+            // Remove leading number if present (e.g., "1. " or "2. ")
+            const cleanQuestion = question.replace(/^\d+\.\s*/, '')
             return (
               <div key={index} className="flex items-start gap-1.5">
                 <span className="text-[15px] font-medium text-primary">{index}.</span>
-                <p className="text-base text-foreground">{question}</p>
+                <p className="text-base text-foreground">{cleanQuestion}</p>
               </div>
             )
           })}
