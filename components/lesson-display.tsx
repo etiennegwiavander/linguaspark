@@ -1223,8 +1223,8 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
                   {/* Left Side: Title and Metadata */}
                   <div className="flex-1 min-w-0">
-                    {/* Lesson Title - Responsive font sizes that adapt to container width */}
-                    <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-medium text-foreground leading-tight mb-4 break-words">
+                    {/* Lesson Title - Responsive font sizes that adapt to container width, with word wrapping */}
+                    <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-medium text-foreground leading-tight mb-4 break-words whitespace-normal overflow-visible">
                       {safeLesson.lessonTitle}
                     </h1>
 

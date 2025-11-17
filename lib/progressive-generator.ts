@@ -2842,7 +2842,7 @@ CONVERSATIONAL FLOW REQUIREMENTS:
 - Show progression in the conversation - start with introduction, develop the topic, conclude naturally
 
 FORMAT:
-Return ONLY the dialogue lines in this exact format:
+Return the dialogue lines followed by the answer key in this exact format:
 Student: [line with possible _____ for gap]
 Tutor: [line with possible _____ for gap]
 Student: [line with possible _____ for gap]
@@ -2857,15 +2857,17 @@ Student: [line with possible _____ for gap]
 Tutor: [line with possible _____ for gap]
 Student: [line with possible _____ for gap]
 Tutor: [line with possible _____ for gap]
+
+Answers: [word1], [word2], [word3], [word4], [word5], [word6]
 
 EXAMPLE FOR ${context.difficultyLevel} LEVEL:
-${context.difficultyLevel === 'A1' ? 'Student: I _____ to learn about this.\nTutor: What do you _____ about it?' :
-          context.difficultyLevel === 'A2' ? 'Student: I\'ve been _____ about this topic.\nTutor: What did you _____ most interesting?' :
-            context.difficultyLevel === 'B1' ? 'Student: I\'ve been _____ into this topic recently.\nTutor: What aspects have you _____ across?' :
-              context.difficultyLevel === 'B2' ? 'Student: The _____ of this topic requires careful analysis.\nTutor: How do you _____ the different perspectives?' :
-                'Student: The _____ nature of this topic is fascinating.\nTutor: How would you _____ the apparent contradictions?'}
+${context.difficultyLevel === 'A1' ? 'Student: I _____ to learn about this.\nTutor: What do you _____ about it?\nStudent: I think it is very _____.\n\nAnswers: want, know, interesting' :
+          context.difficultyLevel === 'A2' ? 'Student: I\'ve been _____ about this topic.\nTutor: What did you _____ most interesting?\nStudent: The way it _____ our lives.\n\nAnswers: reading, find, affects' :
+            context.difficultyLevel === 'B1' ? 'Student: I\'ve been _____ into this topic recently.\nTutor: What aspects have you _____ across?\nStudent: Several _____ perspectives.\n\nAnswers: looking, come, interesting' :
+              context.difficultyLevel === 'B2' ? 'Student: The _____ of this topic requires careful analysis.\nTutor: How do you _____ the different perspectives?\nStudent: By considering the broader _____.\n\nAnswers: complexity, reconcile, context' :
+                'Student: The _____ nature of this topic is fascinating.\nTutor: How would you _____ the apparent contradictions?\nStudent: Through a more _____ framework.\n\nAnswers: multifaceted, reconcile, nuanced'}
 
-Do NOT include any numbering, explanations, or extra text. Just the dialogue lines with gaps.`
+CRITICAL: You MUST include the "Answers:" line with the correct words that fill each blank, in the order they appear in the dialogue.`
 
       return prompt
     }
@@ -3235,10 +3237,26 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
         const dialogueLines: Array<{ character: string; line: string; isGap?: boolean }> = []
         const answers: string[] = []
 
+        // First, look for an "Answers:" section in the response
+        const answersSectionMatch = response.match(/(?:^|\n)(?:Answers?|Answer Key):\s*(.+?)(?:\n\n|\n(?:Student|Tutor):|$)/is)
+        if (answersSectionMatch) {
+          const answersText = answersSectionMatch[1].trim()
+          // Parse comma-separated or numbered list
+          const extractedAnswers = answersText
+            .split(/[,\n]/)
+            .map(a => a.replace(/^\d+[\.\)]\s*/, '').trim())
+            .filter(a => a.length > 0 && a.length < 50)
+          answers.push(...extractedAnswers)
+          console.log(`📝 Extracted ${answers.length} answers from response:`, answers)
+        }
+
         response.split('\n')
           .map(line => line.trim())
           .filter(line => line.length > 0)
           .forEach(line => {
+            // Skip answer section lines
+            if (line.match(/^(?:Answers?|Answer Key):/i)) return
+            
             // Parse "Speaker: text" format
             const match = line.match(/^(Student|Tutor):\s*(.+)$/i)
             if (match) {
@@ -3249,16 +3267,11 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
               const hasGap = text.includes('_____')
 
               if (hasGap) {
-                // Extract the missing word(s) - this is a simplified approach
-                // In a real scenario, we'd need the AI to provide answers separately
                 dialogueLines.push({
                   character,
                   line: text,
                   isGap: true
                 })
-
-                // Try to infer what word should go in the gap (simplified)
-                // For now, we'll ask AI to provide answers separately
               } else {
                 dialogueLines.push({
                   character,
@@ -3268,18 +3281,20 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
             }
           })
 
-        // Generate answers for the gaps
+        // If no answers found in response, make a contextual AI call
         const gapCount = dialogueLines.filter(line => line.isGap).length
-        if (gapCount > 0) {
-          const answersPrompt = `For the dialogue with ${gapCount} gaps marked with _____, provide the missing words. Return only the words, one per line, in order:`
+        if (answers.length === 0 && gapCount > 0) {
+          const dialogueContext = dialogueLines.map(d => `${d.character}: ${d.line}`).join('\n')
+          const answersPrompt = `Given this dialogue about ${context.mainThemes[0] || 'the topic'}, provide the exact words that should fill each blank (_____):\n\n${dialogueContext}\n\nReturn only the missing words, one per line, in the order they appear:`
           try {
             const answersResponse = await this.getOpenRouterAI().prompt(answersPrompt)
             const extractedAnswers = answersResponse.split('\n')
-              .map(line => line.trim())
-              .filter(line => line.length > 0)
+              .map(line => line.replace(/^\d+[\.\)]\s*/, '').trim())
+              .filter(line => line.length > 0 && line.length < 50)
               .slice(0, gapCount)
 
             answers.push(...extractedAnswers)
+            console.log(`📝 Generated ${answers.length} contextual answers:`, answers)
           } catch (error) {
             console.log('⚠️ Failed to extract answers, using placeholders')
             for (let i = 0; i < gapCount; i++) {
