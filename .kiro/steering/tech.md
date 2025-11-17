@@ -15,7 +15,7 @@ inclusion: always
 ## Backend & Data
 
 - **Supabase** - Authentication, PostgreSQL with RLS policies
-- **Google AI APIs** - Primary AI provider (Gemini models)
+- **OpenRouter API** - Primary AI provider (DeepSeek V3 model)
 - **Chrome Extension** - Manifest v3 architecture
 
 ## Development Conventions

@@ -1,5 +1,5 @@
 import { metadata } from "@/app/layout"
-import { createGoogleAIServerService } from "./google-ai-server"
+import { createOpenRouterAIService } from "./openrouter-ai-server"
 import { ProgressiveGeneratorImpl, type CEFRLevel, type LessonSection, type ProgressCallback } from "./progressive-generator"
 import { usageMonitor, type GenerationContext } from "./usage-monitor"
 
@@ -77,14 +77,14 @@ interface GeneratedLesson {
 }
 
 export class LessonAIServerGenerator {
-  private googleAI: ReturnType<typeof createGoogleAIServerService> | null = null
+  private openRouterAI: ReturnType<typeof createOpenRouterAIService> | null = null
   private progressiveGenerator: ProgressiveGeneratorImpl | null = null
 
-  private getGoogleAI() {
-    if (!this.googleAI) {
-      this.googleAI = createGoogleAIServerService()
+  private getOpenRouterAI() {
+    if (!this.openRouterAI) {
+      this.openRouterAI = createOpenRouterAIService()
     }
-    return this.googleAI
+    return this.openRouterAI
   }
 
   private getProgressiveGenerator() {
@@ -123,7 +123,7 @@ REQUIREMENTS:
 Rewrite the content clearly and completely:`
 
       console.log("📝 Content adaptation prompt:", prompt.length, "chars")
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
 
       return response.trim() || sourceText.substring(0, 400)
     } catch (error) {
@@ -346,7 +346,7 @@ Rewrite the content clearly and completely:`
     try {
       console.log("🔥 Minimal warmup prompt:", prompt.length, "chars")
       console.log("🎯 Topic identified:", mainTopic)
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
 
       // Extract only actual questions (must end with ?)
       const questions = response.split('\n')
@@ -457,7 +457,7 @@ Rewrite the content clearly and completely:`
         // Generate AI definition
         const definitionPrompt = `Define "${word}" simply for ${studentLevel} level. Context: ${sourceText.substring(0, 80)}. Give only the definition, no extra text:`
         console.log("📚 Vocab definition prompt:", definitionPrompt.length, "chars")
-        const rawMeaning = await this.getGoogleAI().prompt(definitionPrompt)
+        const rawMeaning = await this.getOpenRouterAI().prompt(definitionPrompt)
         const meaning = this.cleanDefinition(rawMeaning, studentLevel)
 
         // Generate AI contextual examples
@@ -490,7 +490,7 @@ Rewrite the content clearly and completely:`
 
     try {
       console.log("❓ Minimal comprehension prompt:", prompt.length, "chars")
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
 
       const questions = response.split('\n')
         .map(line => line.trim())
@@ -519,7 +519,7 @@ Rewrite the content clearly and completely:`
     const prompt = `Rewrite this text for ${studentLevel} level students. Keep it 200-400 words: ${sourceText.substring(0, 500)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       return response.trim()
     } catch (error) {
       throw new Error("Failed to generate reading passage: " + error.message)
@@ -531,7 +531,7 @@ Rewrite the content clearly and completely:`
     const prompt = `Write 3 ${studentLevel} discussion questions about this text. Only return questions: ${sourceText.substring(0, 200)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const questions = response.split('\n')
         .map(line => line.trim())
         .filter(line => line.endsWith('?') && line.length > 10)
@@ -552,7 +552,7 @@ Rewrite the content clearly and completely:`
     const prompt = `Create a grammar lesson for ${studentLevel} level based on this text. Return JSON with focus, examples, exercise: ${sourceText.substring(0, 200)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       return JSON.parse(response)
     } catch (error) {
       throw new Error("Failed to generate grammar section: " + error.message)
@@ -565,7 +565,7 @@ Rewrite the content clearly and completely:`
     const prompt = `Create pronunciation practice for "${word}". Return JSON with word, ipa, practice:`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       return JSON.parse(response)
     } catch (error) {
       throw new Error("Failed to generate pronunciation section: " + error.message)
@@ -577,7 +577,7 @@ Rewrite the content clearly and completely:`
     const prompt = `Write 3 ${studentLevel} wrap-up questions about this lesson. Only return questions: ${sourceText.substring(0, 200)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const questions = response.split('\n')
         .map(line => line.trim())
         .filter(line => line.endsWith('?') && line.length > 10)
@@ -736,7 +736,7 @@ Summary:`
 
     try {
       console.log("🤖 Calling AI for contextual summary...")
-      const summary = await this.getGoogleAI().prompt(summaryPrompt, {
+      const summary = await this.getOpenRouterAI().prompt(summaryPrompt, {
         temperature: 0.4,
         maxTokens: 300, // Reduced from 500
       })
@@ -815,7 +815,7 @@ Example: "How do cultural attitudes toward [concept] influence [topic] in differ
       console.log("🤖 Calling AI for contextual warm-up questions...")
       console.log("📝 Warm-up prompt:", warmupPrompt.substring(0, 200) + "...")
 
-      const response = await this.getGoogleAI().prompt(warmupPrompt, {
+      const response = await this.getOpenRouterAI().prompt(warmupPrompt, {
         temperature: 0.6,
         maxTokens: 150, // Reduced from 300
       })
@@ -911,7 +911,7 @@ Return JSON with: warmup (use provided), vocabulary (4 words from content), read
 
     try {
       console.log("🤖 Calling AI for lesson structure...")
-      const response = await this.getGoogleAI().prompt(prompt, {
+      const response = await this.getOpenRouterAI().prompt(prompt, {
         temperature: 0.7,
         maxTokens: 1500, // Reduced from 3000 to avoid token limits
       })
@@ -986,7 +986,7 @@ Level: ${studentLevel}
 
 Make the example relevant to the source material and appropriate for ${studentLevel} level students.
 `
-          const enhancedExample = await this.getGoogleAI().write(contextualExamplePrompt, {
+          const enhancedExample = await this.getOpenRouterAI().write(contextualExamplePrompt, {
             tone: "casual",
             length: "short"
           })
@@ -997,7 +997,7 @@ Make the example relevant to the source material and appropriate for ${studentLe
 Explain the meaning of "${vocab.word}" in the context of: ${contentAnalysis.topics[0] || contentAnalysis.contentType}
 Keep it simple for ${studentLevel} level students.
 `
-          const contextualMeaning = await this.getGoogleAI().write(contextualMeaningPrompt, {
+          const contextualMeaning = await this.getOpenRouterAI().write(contextualMeaningPrompt, {
             tone: "casual",
             length: "short"
           })
@@ -1021,7 +1021,7 @@ Make them more specific to the content, engaging for ${studentLevel} level stude
 
 Return 3-4 enhanced questions that reference specific aspects of the content.
 `
-        const enhancedDiscussion = await this.getGoogleAI().write(enhancedDiscussionPrompt, {
+        const enhancedDiscussion = await this.getOpenRouterAI().write(enhancedDiscussionPrompt, {
           tone: "casual",
           length: "medium",
           format: "bullet-points"
@@ -1043,7 +1043,7 @@ Original text: "${sections.reading}"
 
 Create a well-structured, ${studentLevel}-appropriate reading passage that maintains the key information but improves readability.
 `
-        const enhancedReading = await this.getGoogleAI().rewrite(sections.reading, {
+        const enhancedReading = await this.getOpenRouterAI().rewrite(sections.reading, {
           tone: "casual",
           length: "same",
           audience: this.getAudienceLevel(studentLevel)
@@ -1064,7 +1064,7 @@ Key vocabulary: ${contentAnalysis.keyVocabulary.slice(0, 5).join(', ')}
 
 Make examples relevant to the content and appropriate for ${studentLevel} level.
 `
-        const contextualGrammarExamples = await this.getGoogleAI().write(grammarExamplesPrompt, {
+        const contextualGrammarExamples = await this.getOpenRouterAI().write(grammarExamplesPrompt, {
           tone: "casual",
           length: "short",
           format: "bullet-points"
@@ -1085,7 +1085,7 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
     for (const sectionPath of sectionsToProofread) {
       const value = this.getNestedValue(lesson, sectionPath)
       if (typeof value === "string") {
-        const proofread = await this.getGoogleAI().proofread(value, {
+        const proofread = await this.getOpenRouterAI().proofread(value, {
           checkGrammar: true,
           checkSpelling: true,
           checkStyle: true,
@@ -1877,3 +1877,4 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
 }
 
 export const lessonAIServerGenerator = new LessonAIServerGenerator()
+

@@ -3,7 +3,7 @@
  * Uses multiple Gemini models in parallel for faster, more reliable generation
  */
 
-import { createGoogleAIServerService } from './google-ai-server'
+import { createOpenRouterAIService } from './openrouter-ai-server'
 
 // Model configuration with priorities
 export const MODEL_CONFIG = {

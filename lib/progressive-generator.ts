@@ -1,4 +1,4 @@
-import { createGoogleAIServerService } from "./google-ai-server"
+import { createOpenRouterAIService } from "./openrouter-ai-server"
 import { WarmupValidator } from "./warmup-validator"
 import {
   dialogueValidator,
@@ -127,7 +127,7 @@ export interface ProgressiveGenerator {
 
 // Implementation of Progressive Generator
 export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
-  private googleAI: ReturnType<typeof createGoogleAIServerService> | null = null
+  private openRouterAI: ReturnType<typeof createOpenRouterAIService> | null = null
   private warmupValidator: WarmupValidator
   private progressCallback?: ProgressCallback
   private completedSections: string[] = []
@@ -169,11 +169,11 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
     qualityMetricsTracker.reset()
   }
 
-  private getGoogleAI() {
-    if (!this.googleAI) {
-      this.googleAI = createGoogleAIServerService()
+  private getOpenRouterAI() {
+    if (!this.openRouterAI) {
+      this.openRouterAI = createOpenRouterAIService()
     }
-    return this.googleAI
+    return this.openRouterAI
   }
 
   /**
@@ -445,7 +445,7 @@ Engoo-style titles are:
 
 Generate title:`
 
-      const response = await this.getGoogleAI().prompt(engooPrompt, { maxTokens: 60 })
+      const response = await this.getOpenRouterAI().prompt(engooPrompt, { maxTokens: 60 })
       const aiTitle = response.trim()
         .replace(/['"]/g, '')
         .replace(/^(Title:?|Generate title:?)\s*/i, '')
@@ -510,7 +510,7 @@ Generate title:`
 ${sourceText.substring(0, 500)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const words = response.split('\n')
         .map(line => line.trim().toLowerCase())
         .filter(word => word.length > 2 && word.length < 20)
@@ -529,7 +529,7 @@ ${sourceText.substring(0, 500)}`
 ${sourceText.substring(0, 400)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const themes = response.split('\n')
         .map(line => line.trim().toLowerCase())
         .filter(theme => theme.length > 3 && theme.length < 50)
@@ -548,7 +548,7 @@ ${sourceText.substring(0, 400)}`
 ${sourceText.substring(0, 600)}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       return response.trim().substring(0, 300)
     } catch (error) {
       console.log("⚠️ AI summary failed, using truncation")
@@ -662,7 +662,7 @@ Return ONLY 3 questions, one per line, with no numbering or extra text:`
         const prompt = this.buildWarmupPrompt(context)
 
         // Generate questions
-        const response = await this.getGoogleAI().prompt(prompt)
+        const response = await this.getOpenRouterAI().prompt(prompt)
         const questions = response.split('\n')
           .map(line => line.trim())
           .filter(line => line.length > 0)
@@ -940,14 +940,14 @@ Return ${exampleCount} sentences, one per line, no numbering:`
         try {
           // Generate definition
           const definitionPrompt = `Define "${word}" simply for ${context.difficultyLevel} level. Context: ${context.contentSummary.substring(0, 100)}. Give only the definition:`
-          const meaning = await this.getGoogleAI().prompt(definitionPrompt)
+          const meaning = await this.getOpenRouterAI().prompt(definitionPrompt)
 
           // Generate contextually relevant examples with enhanced prompt
           const examplesPrompt = this.buildVocabularyExamplePrompt(word, context, exampleCount)
           let examplesResponse: string;
           
           try {
-            examplesResponse = await this.getGoogleAI().prompt(examplesPrompt)
+            examplesResponse = await this.getOpenRouterAI().prompt(examplesPrompt)
           } catch (promptError: any) {
             // Handle MAX_TOKENS error gracefully - accept partial response
             if (promptError.code === 'MAX_TOKENS' && promptError.message) {
@@ -1054,7 +1054,7 @@ Keep it 200-400 words:
 ${context.sourceText}`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const instruction = "Read the following text carefully. Your tutor will help you with any difficult words or concepts:"
       return `${instruction}\n\n${response.trim()}`
     } catch (error) {
@@ -1079,7 +1079,7 @@ ${context.contentSummary}
 Return only questions, one per line:`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const questions = response.split('\n')
         .map(line => line.trim())
         .filter(line => line.endsWith('?') && line.length > 10)
@@ -1594,7 +1594,7 @@ Return ONLY 5 questions, one per line, with no numbering, bullets, or extra text
         const prompt = this.buildDiscussionPrompt(context)
 
         // Generate questions
-        const response = await this.getGoogleAI().prompt(prompt)
+        const response = await this.getOpenRouterAI().prompt(prompt)
         const questions = response.split('\n')
           .map(line => line.trim())
           .filter(line => line.length > 0)
@@ -1846,7 +1846,7 @@ Return CONCISE JSON (brief explanations, 3 examples, 3 exercises):
         let response: string;
         try {
           // Increase maxOutputTokens to 3000 to allow complete JSON response
-          response = await this.getGoogleAI().prompt(prompt, { maxTokens: 3000 })
+          response = await this.getOpenRouterAI().prompt(prompt, { maxTokens: 3000 })
         } catch (promptError: any) {
           // Handle MAX_TOKENS error - accept partial response if available
           if (promptError.code === 'MAX_TOKENS') {
@@ -2540,7 +2540,7 @@ DIFFICULTY_2: moderate`
         for (const word of selectedWords) {
           try {
             const wordPrompt = this.buildPronunciationWordPrompt(word, context)
-            const wordResponse = await this.getGoogleAI().prompt(wordPrompt)
+            const wordResponse = await this.getOpenRouterAI().prompt(wordPrompt)
 
             console.log(`📝 Raw AI response for "${word}":`, wordResponse.substring(0, 200))
 
@@ -2575,7 +2575,7 @@ DIFFICULTY_2: moderate`
         let tongueTwisters = []
         try {
           const twisterPrompt = this.buildTongueTwisterPrompt(context, minTongueTwisters)
-          const twisterResponse = await this.getGoogleAI().prompt(twisterPrompt)
+          const twisterResponse = await this.getOpenRouterAI().prompt(twisterPrompt)
 
           // Parse structured text response
           tongueTwisters = this.parseTongueTwisterResponse(twisterResponse, minTongueTwisters)
@@ -2667,7 +2667,7 @@ ${context.contentSummary}
 Return only questions, one per line:`
 
     try {
-      const response = await this.getGoogleAI().prompt(prompt)
+      const response = await this.getOpenRouterAI().prompt(prompt)
       const questions = response.split('\n')
         .map(line => line.trim())
         .filter(line => line.endsWith('?') && line.length > 10)
@@ -3110,7 +3110,7 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
         const prompt = this.buildDialoguePrompt(context, vocabularyWords, 'practice')
 
         // Generate dialogue
-        const response = await this.getGoogleAI().prompt(prompt)
+        const response = await this.getOpenRouterAI().prompt(prompt)
 
         // Parse dialogue lines
         const dialogueLines = response.split('\n')
@@ -3160,7 +3160,7 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
 
         // Generate follow-up questions
         const followUpPrompt = `Create 3 follow-up discussion questions for ${context.difficultyLevel} level students about the dialogue topic. Return only questions, one per line:`
-        const followUpResponse = await this.getGoogleAI().prompt(followUpPrompt)
+        const followUpResponse = await this.getOpenRouterAI().prompt(followUpPrompt)
         const followUpQuestions = followUpResponse.split('\n')
           .map(line => line.trim())
           .filter(line => line.endsWith('?') && line.length > 10)
@@ -3229,7 +3229,7 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
         const prompt = this.buildDialoguePrompt(context, vocabularyWords, 'fill-in-gap')
 
         // Generate dialogue
-        const response = await this.getGoogleAI().prompt(prompt)
+        const response = await this.getOpenRouterAI().prompt(prompt)
 
         // Parse dialogue lines and extract answers
         const dialogueLines: Array<{ character: string; line: string; isGap?: boolean }> = []
@@ -3273,7 +3273,7 @@ Do NOT include any numbering, explanations, or extra text. Just the dialogue lin
         if (gapCount > 0) {
           const answersPrompt = `For the dialogue with ${gapCount} gaps marked with _____, provide the missing words. Return only the words, one per line, in order:`
           try {
-            const answersResponse = await this.getGoogleAI().prompt(answersPrompt)
+            const answersResponse = await this.getOpenRouterAI().prompt(answersPrompt)
             const extractedAnswers = answersResponse.split('\n')
               .map(line => line.trim())
               .filter(line => line.length > 0)
