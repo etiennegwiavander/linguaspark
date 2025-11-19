@@ -87,7 +87,11 @@ export default function PublicLibraryPage() {
     async function loadLessons() {
       try {
         setLoading(true);
-        const response = await fetch('/api/public-lessons/list?limit=100');
+        // Add timestamp to bust cache
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/public-lessons/list?limit=100&_t=${timestamp}`, {
+          cache: 'no-store',
+        });
         
         if (!response.ok) {
           console.error('Failed to fetch lessons');
@@ -182,9 +186,23 @@ export default function PublicLibraryPage() {
         throw new Error(errorData.message || 'Failed to delete lesson');
       }
 
-      // Remove lesson from state
+      // Remove lesson from state immediately for instant UI feedback
       setLessons(lessons.filter(l => l.id !== lessonToDelete.id));
       console.log('[Library] ✅ Lesson deleted successfully');
+      
+      // Reload lessons from server to ensure consistency
+      const timestamp = new Date().getTime();
+      const refreshResponse = await fetch(`/api/public-lessons/list?limit=100&_t=${timestamp}`, {
+        cache: 'no-store',
+      });
+      
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        if (refreshData.success) {
+          setLessons(refreshData.lessons || []);
+          console.log('[Library] 📋 Lessons reloaded from server');
+        }
+      }
       
       // Refresh the router to clear any cached data
       router.refresh();
