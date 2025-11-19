@@ -185,6 +185,10 @@ export default function PublicLibraryPage() {
       // Remove lesson from state
       setLessons(lessons.filter(l => l.id !== lessonToDelete.id));
       console.log('[Library] ✅ Lesson deleted successfully');
+      
+      // Refresh the router to clear any cached data
+      router.refresh();
+      
       alert('Lesson deleted successfully!');
     } catch (error) {
       console.error('[Library] ❌ Failed to delete lesson:', error);

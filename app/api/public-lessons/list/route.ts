@@ -2,6 +2,10 @@ import { NextRequest } from 'next/server';
 import { getPublicLessons } from '@/lib/public-lessons-server';
 import type { PublicLessonFilters } from '@/lib/types/public-lessons';
 
+// Disable caching for this route to ensure fresh data after deletions
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -54,6 +58,12 @@ export async function GET(request: NextRequest) {
       success: true,
       lessons: result.data.lessons,
       nextCursor: result.data.nextCursor
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
   } catch (error) {
     console.error('Error in public lessons list API:', error);
