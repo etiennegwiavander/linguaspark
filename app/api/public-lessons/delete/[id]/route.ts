@@ -58,7 +58,8 @@ export async function DELETE(
     }
 
     // Attempt to delete the lesson (admin verification happens in the function)
-    const result = await deletePublicLesson(lessonId, user.id);
+    // Skip auth check since we already verified the user above
+    const result = await deletePublicLesson(lessonId, user.id, true);
 
     if (!result.success) {
       // Return appropriate status code based on error type

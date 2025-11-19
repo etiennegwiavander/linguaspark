@@ -338,19 +338,23 @@ export async function updatePublicLesson(
  */
 export async function deletePublicLesson(
   lessonId: string,
-  userId: string
+  userId: string,
+  skipAuthCheck: boolean = false
 ): Promise<OperationResult> {
   try {
     const supabase = await createServerSupabaseClient();
 
-    // Verify user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.id !== userId) {
-      return {
-        success: false,
-        error: 'AUTHENTICATION_ERROR',
-        message: 'User must be authenticated to delete public lessons',
-      };
+    // Skip auth check if already verified by caller (e.g., API route)
+    if (!skipAuthCheck) {
+      // Verify user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.id !== userId) {
+        return {
+          success: false,
+          error: 'AUTHENTICATION_ERROR',
+          message: 'User must be authenticated to delete public lessons',
+        };
+      }
     }
 
     // Verify admin status
