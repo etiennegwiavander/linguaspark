@@ -154,20 +154,20 @@ export default function PublicLibraryPage() {
     try {
       console.log('[Library] Deleting lesson:', lessonToDelete.id);
       
-      // Get auth token from localStorage
-      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token');
-      if (!sessionData) {
+      // Refresh the session to get a fresh token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
         throw new Error('No authentication session found. Please sign in again.');
       }
 
-      const session = JSON.parse(sessionData);
       const authToken = session.access_token;
 
       if (!authToken) {
         throw new Error('No access token found. Please sign in again.');
       }
 
-      console.log('[Library] Using auth token for delete request');
+      console.log('[Library] Using refreshed auth token for delete request');
       
       const response = await fetch(`/api/public-lessons/delete/${lessonToDelete.id}`, {
         method: 'DELETE',
