@@ -4,7 +4,17 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import PublicNavbar from '@/components/public-navbar';
 import PublicFooter from '@/components/public-footer';
 import LessonDisplay from '@/components/lesson-display';
@@ -168,6 +178,8 @@ export default function PublicLessonView({
   const router = useRouter();
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Convert lesson to display format
   const displayLesson = convertToLessonDisplayFormat(lesson);
@@ -209,20 +221,61 @@ export default function PublicLessonView({
     console.log('Load lesson not supported for public lessons');
   };
 
+  const handleDeleteLesson = async () => {
+    setIsDeleting(true);
+    try {
+      console.log('[PublicLessonView] Deleting lesson:', lesson.id);
+      
+      const response = await fetch(`/api/public-lessons/delete/${lesson.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete lesson');
+      }
+
+      console.log('[PublicLessonView] ✅ Lesson deleted successfully');
+      alert('Lesson deleted successfully!');
+      router.push('/library');
+    } catch (error) {
+      console.error('[PublicLessonView] ❌ Failed to delete lesson:', error);
+      alert(`Failed to delete lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <PublicNavbar />
 
       <main className="flex-1">
-        {/* Back button */}
+        {/* Back button and Admin Actions */}
         <div className="container mx-auto px-6 pt-6">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/library')}
-          >
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Library
-          </Button>
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/library')}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Back to Library
+            </Button>
+
+            {/* Admin Delete Button */}
+            {isAdmin && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={isDeleting}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Lesson
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Use the same LessonDisplay component as personal library */}
@@ -236,6 +289,28 @@ export default function PublicLessonView({
       </main>
 
       <PublicFooter />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lesson</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{lesson.title}"? This action cannot be undone and will remove the lesson from the public library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLesson}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
