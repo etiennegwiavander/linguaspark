@@ -25,13 +25,16 @@ export const createServerSupabaseClient = async (accessToken?: string) => {
           // user sessions.
         }
       },
-    },
-    global: {
-      headers: accessToken ? {
-        Authorization: `Bearer ${accessToken}`
-      } : {}
     }
   })
+
+  // If an access token is provided, set it as the session
+  if (accessToken) {
+    await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: '' // Not needed for Bearer token auth
+    })
+  }
 
   return client
 }
