@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +43,7 @@ import type { PublicLesson } from '@/lib/types/public-lessons';
 
 export default function PublicLibraryPage() {
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
+  const supabase = createClient();
   const [lessons, setLessons] = useState<PublicLesson[]>([]);
   const [filteredLessons, setFilteredLessons] = useState<PublicLesson[]>([]);
   const [loading, setLoading] = useState(true);
