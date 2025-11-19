@@ -1,5 +1,6 @@
 import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
@@ -7,6 +8,18 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholde
 
 // Server client (for API routes and server components)
 export const createServerSupabaseClient = async (accessToken?: string) => {
+  // If an access token is provided, create a client with that token
+  if (accessToken) {
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      }
+    })
+  }
+
+  // Otherwise use cookie-based auth
   const cookieStore = await cookies()
 
   const client = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -27,14 +40,6 @@ export const createServerSupabaseClient = async (accessToken?: string) => {
       },
     }
   })
-
-  // If an access token is provided, set it as the session
-  if (accessToken) {
-    await client.auth.setSession({
-      access_token: accessToken,
-      refresh_token: '' // Not needed for Bearer token auth
-    })
-  }
 
   return client
 }
