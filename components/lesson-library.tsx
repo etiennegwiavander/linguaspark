@@ -49,47 +49,47 @@ export default function LessonLibrary() {
 
   const loadLessons = React.useCallback(async () => {
     console.log('[LessonLibrary] loadLessons called, user:', user?.email || 'NO USER')
-    
+
     if (!user) {
       console.log('[LessonLibrary] No user, returning early')
       return
     }
-    
+
     console.log('[LessonLibrary] Setting loading=true')
     setLoading(true)
     setError(null)
-    
+
     try {
       console.log('[LessonLibrary] Calling API route to get lessons')
-      
+
       // Get the session from localStorage (where Supabase stores it)
       const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
       if (!sessionData) {
         throw new Error('No session found')
       }
-      
+
       const session = JSON.parse(sessionData)
       const accessToken = session.access_token
-      
+
       console.log('[LessonLibrary] Got access token from localStorage')
-      
+
       const response = await fetch('/api/get-lessons', {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       })
-      
+
       console.log('[LessonLibrary] API response status:', response.status)
-      
+
       if (!response.ok) {
         const errorData = await response.json()
         console.error('[LessonLibrary] API error:', errorData)
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
-      
+
       const { lessons: data } = await response.json()
       console.log('[LessonLibrary] Got data:', data?.length || 0, 'lessons')
-      
+
       setLessons(data || [])
     } catch (error) {
       console.error("❌ [LessonLibrary] Failed to load lessons:", error)
@@ -160,7 +160,7 @@ export default function LessonLibrary() {
     setDeletingId(id)
     try {
       console.log('[LessonLibrary] Deleting lesson:', id)
-      
+
       // Get auth token from localStorage
       const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
       if (!sessionData) {

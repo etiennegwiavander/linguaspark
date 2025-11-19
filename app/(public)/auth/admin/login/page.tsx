@@ -10,6 +10,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, AlertCircle, Shield, Home } from "lucide-react"
 import Link from "next/link"
 
+interface TutorData {
+  is_admin: boolean
+}
+
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -18,7 +22,20 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const supabase = getSupabaseClient()
 
-  // Check if already authenticated
+  if (!supabase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-vintage-cream">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Supabase client not initialized. Please check your environment variables.
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  // Check if already authenticated and listen for auth changes
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -28,14 +45,45 @@ export default function AdminLoginPage() {
           .from('tutors')
           .select('is_admin')
           .eq('id', session.user.id)
-          .single()
+          .single() as { data: TutorData | null }
 
         if (tutor?.is_admin) {
-          router.push('/popup')
+          console.log('[AdminLogin] Admin user detected, redirecting to /admin/dashboard')
+          // Use window.location for hard redirect
+          window.location.href = '/admin/dashboard'
         }
       }
     }
+    
     checkAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AdminLogin] Auth state changed:', event)
+      
+      if (event === 'SIGNED_IN' && session) {
+        // Check if user is admin
+        const { data: tutor } = await supabase
+          .from('tutors')
+          .select('is_admin')
+          .eq('id', session.user.id)
+          .single() as { data: TutorData | null }
+
+        if (tutor?.is_admin) {
+          console.log('[AdminLogin] Admin verified, redirecting to /admin/dashboard')
+          // Use window.location for hard redirect to bypass any routing issues
+          window.location.href = '/admin/dashboard'
+        } else {
+          console.log('[AdminLogin] Not an admin, signing out')
+          await supabase.auth.signOut()
+          setError('Access denied. This login is for admin users only.')
+        }
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [router, supabase])
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -58,7 +106,7 @@ export default function AdminLoginPage() {
           .from('tutors')
           .select('is_admin')
           .eq('id', data.user.id)
-          .single()
+          .single() as { data: TutorData | null; error: any }
 
         if (tutorError) {
           throw new Error('Failed to verify admin status')
@@ -70,14 +118,15 @@ export default function AdminLoginPage() {
           throw new Error('Access denied. This login is for admin users only.')
         }
 
-        // Redirect to app
-        router.push('/popup')
+        // Don't redirect here - let the onAuthStateChange listener handle it
+        // This prevents the loading state from getting stuck
+        console.log('[AdminLogin] Sign in successful, waiting for auth state change...')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in')
-    } finally {
       setLoading(false)
     }
+    // Don't set loading to false in finally - let the redirect happen
   }
 
   return (

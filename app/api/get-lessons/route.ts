@@ -16,7 +16,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No authorization header' }, { status: 401 })
     }
     
-    console.log('[API] Fetching lessons with user token')
+    // Verify admin status
+    const token = authHeader.replace('Bearer ', '')
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication failed' }, { status: 401 })
+    }
+    
+    const { data: tutorData } = await supabase
+      .from('tutors')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+    
+    if (!tutorData?.is_admin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+    
+    console.log('[API] Admin verified, fetching lessons with user token')
     
     // Make direct REST API call with user's token
     const response = await fetch(

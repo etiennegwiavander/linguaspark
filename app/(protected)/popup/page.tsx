@@ -24,59 +24,91 @@ export default function PopupPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [showAdminLessonDialog, setShowAdminLessonDialog] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(true)
+  const [adminError, setAdminError] = useState<string | null>(null)
 
-  // Check for saveToPublic parameter and admin status on mount
+  // Verify admin access on mount - REQUIRED for extension
   useEffect(() => {
-    const checkAdminAndSaveToPublic = async () => {
+    const verifyAdminAccess = async () => {
       try {
+        console.log('[LinguaSpark Popup] 🔐 Verifying admin access...')
+        setIsVerifyingAdmin(true)
+        
+        // Get session from localStorage
+        const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
+        
+        if (!sessionData) {
+          console.error('[LinguaSpark Popup] ❌ No session found')
+          setAdminError('Please sign in to use this extension')
+          setIsVerifyingAdmin(false)
+          // Redirect to login after 2 seconds
+          setTimeout(() => {
+            window.location.href = '/auth/admin/login?redirectTo=/popup'
+          }, 2000)
+          return
+        }
+        
+        const session = JSON.parse(sessionData)
+        const authToken = session.access_token
+        const user = session.user
+        
+        if (!user?.id) {
+          console.error('[LinguaSpark Popup] ❌ No user ID in session')
+          setAdminError('Invalid session. Please sign in again.')
+          setIsVerifyingAdmin(false)
+          return
+        }
+        
+        setUserId(user.id)
+        console.log('[LinguaSpark Popup] 👤 User ID:', user.id)
+        
+        // Check admin status
+        const response = await fetch('/api/admin/check-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ userId: user.id })
+        })
+        
+        if (!response.ok) {
+          console.error('[LinguaSpark Popup] ❌ Admin check failed:', response.status)
+          setAdminError('Failed to verify admin status')
+          setIsVerifyingAdmin(false)
+          return
+        }
+        
+        const { isAdmin: adminStatus } = await response.json()
+        console.log('[LinguaSpark Popup] 👑 Admin status:', adminStatus)
+        
+        if (!adminStatus) {
+          console.error('[LinguaSpark Popup] ❌ User is not an admin')
+          setAdminError('Admin access required. This extension is only available to administrators.')
+          setIsVerifyingAdmin(false)
+          return
+        }
+        
+        // Success - user is admin
+        setIsAdmin(true)
+        setIsVerifyingAdmin(false)
+        console.log('[LinguaSpark Popup] ✅ Admin access verified')
+        
+        // Check for saveToPublic parameter
         const urlParams = new URLSearchParams(window.location.search)
         const saveToPublicParam = urlParams.get('saveToPublic')
-        
         if (saveToPublicParam === 'true') {
-          console.log('[LinguaSpark Popup] 🔍 saveToPublic parameter detected')
           setSaveToPublic(true)
-          
-          // Check if user is admin
-          const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token')
-          if (sessionData) {
-            const session = JSON.parse(sessionData)
-            console.log('[LinguaSpark Popup] 📦 Session data structure:', {
-              hasAccessToken: !!session.access_token,
-              hasUser: !!session.user,
-              userId: session.user?.id,
-              sessionKeys: Object.keys(session)
-            })
-            const authToken = session.access_token
-            const user = session.user
-            
-            // Store userId for later use
-            if (user?.id) {
-              setUserId(user.id)
-              console.log('[LinguaSpark Popup] 👤 User ID set to:', user.id)
-            } else {
-              console.error('[LinguaSpark Popup] ❌ No user ID found in session!')
-            }
-            
-            // Check admin status
-            const response = await fetch('/api/admin/check-status', {
-              headers: {
-                'Authorization': `Bearer ${authToken}`
-              }
-            })
-            
-            if (response.ok) {
-              const { isAdmin: adminStatus } = await response.json()
-              setIsAdmin(adminStatus)
-              console.log('[LinguaSpark Popup] 👑 Admin status:', adminStatus)
-            }
-          }
         }
+        
       } catch (error) {
-        console.error('[LinguaSpark Popup] Failed to check admin status:', error)
+        console.error('[LinguaSpark Popup] ❌ Error verifying admin:', error)
+        setAdminError('An error occurred. Please try again.')
+        setIsVerifyingAdmin(false)
       }
     }
     
-    checkAdminAndSaveToPublic()
+    verifyAdminAccess()
   }, [])
 
   // Load persisted lesson or lesson from URL parameter on mount
@@ -472,13 +504,33 @@ export default function PopupPage() {
         }
       };
 
-      // Transform sections array into flat properties
-      if (generatedLesson.sections && Array.isArray(generatedLesson.sections)) {
-        generatedLesson.sections.forEach((section: any) => {
-          if (section.type) {
-            transformedLesson[section.type] = section;
-          }
+      // Copy all sections from the generated lesson
+      console.log('[LinguaSpark Popup] 📋 Generated lesson structure:', {
+        hasTitle: !!generatedLesson.lessonTitle,
+        hasSections: !!generatedLesson.sections,
+        sectionsType: typeof generatedLesson.sections,
+        isArray: Array.isArray(generatedLesson.sections),
+        sectionKeys: generatedLesson.sections ? Object.keys(generatedLesson.sections) : []
+      });
+      
+      if (generatedLesson.sections) {
+        // Sections is an object, not an array - copy all properties
+        const sectionKeys = Object.keys(generatedLesson.sections);
+        console.log('[LinguaSpark Popup] 📝 Copying sections:', sectionKeys);
+        
+        sectionKeys.forEach((sectionKey) => {
+          const sectionData = generatedLesson.sections[sectionKey];
+          console.log(`[LinguaSpark Popup] Section "${sectionKey}":`, {
+            type: typeof sectionData,
+            hasContent: !!sectionData,
+            keys: sectionData && typeof sectionData === 'object' ? Object.keys(sectionData) : []
+          });
+          transformedLesson[sectionKey] = sectionData;
         });
+        
+        console.log('[LinguaSpark Popup] ✅ Transformed lesson sections:', Object.keys(transformedLesson).filter(k => k !== 'title' && k !== 'metadata'));
+      } else {
+        console.warn('[LinguaSpark Popup] ⚠️ No sections found in generated lesson!');
       }
 
       // Ensure required sections exist with fallbacks
@@ -592,6 +644,42 @@ export default function PopupPage() {
     }
   }
 
+  // Show admin verification UI
+  if (isVerifyingAdmin) {
+    return (
+      <div className="w-full min-h-screen bg-vintage-cream flex items-center justify-center">
+        <div className="text-center space-y-4 p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-vintage-brown mx-auto"></div>
+          <h2 className="text-xl font-serif font-bold text-vintage-brown">Verifying Admin Access...</h2>
+          <p className="text-sm text-vintage-brown/70">Please wait</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Show error if not admin
+  if (adminError) {
+    return (
+      <div className="w-full min-h-screen bg-vintage-cream flex items-center justify-center">
+        <div className="text-center space-y-4 p-8 max-w-md">
+          <div className="text-red-600 text-5xl">🔒</div>
+          <h2 className="text-xl font-serif font-bold text-vintage-brown">Admin Access Required</h2>
+          <p className="text-sm text-vintage-brown/70">{adminError}</p>
+          <p className="text-xs text-vintage-brown/50 mt-4">
+            This extension is only available to LinguaSpark administrators. 
+            Contact your administrator for access.
+          </p>
+          <button
+            onClick={() => window.location.href = '/auth/admin/login?redirectTo=/popup'}
+            className="mt-4 px-4 py-2 bg-vintage-brown text-white rounded hover:bg-vintage-brown/90"
+          >
+            Go to Admin Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full min-h-screen bg-vintage-cream">
       <div className="w-full space-y-4">
@@ -599,7 +687,7 @@ export default function PopupPage() {
         <div className="sticky top-0 z-50 flex items-center justify-between px-6 pt-4 pb-3 border-b-3 border-vintage-brown bg-vintage-cream-dark shadow-sm">
           <div className="text-center flex-1">
             <h1 className="text-2xl font-serif font-bold text-vintage-brown">LinguaSpark</h1>
-            <p className="text-sm text-vintage-brown/70">Transform content into professional lessons</p>
+            <p className="text-sm text-vintage-brown/70">Admin Lesson Creator</p>
           </div>
           <UserMenu />
         </div>

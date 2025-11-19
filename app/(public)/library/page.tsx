@@ -1,161 +1,307 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  BookOpen,
+  Search,
+  Filter,
+  Calendar,
+  Globe,
+  GraduationCap,
+  FileText,
+  Eye,
+  Loader2,
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import PublicNavbar from '@/components/public-navbar';
 import PublicFooter from '@/components/public-footer';
 import type { PublicLesson } from '@/lib/types/public-lessons';
 
-export const metadata: Metadata = {
-  title: 'Public Lesson Library | LinguaSpark',
-  description: 'Browse and discover professional language lessons created by tutors worldwide',
-};
+export default function PublicLibraryPage() {
+  const router = useRouter();
+  const [lessons, setLessons] = useState<PublicLesson[]>([]);
+  const [filteredLessons, setFilteredLessons] = useState<PublicLesson[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
 
-// Enable ISR with 5 minute revalidation
-export const revalidate = 300;
+  // Load lessons
+  useEffect(() => {
+    async function loadLessons() {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/public-lessons/list?limit=100');
+        
+        if (!response.ok) {
+          console.error('Failed to fetch lessons');
+          return;
+        }
 
-// Temporary placeholder components until tasks 12 and 13 are complete
-function PublicLessonCard({ lesson }: { lesson: PublicLesson }) {
-  return (
-    <div className="bg-white border-2 border-vintage-brown rounded-lg p-6 shadow-vintage hover:shadow-vintage-lg transition-shadow">
-      {lesson.banner_image_url && (
-        <div className="mb-4 rounded-lg overflow-hidden border border-vintage-brown/20">
-          <img
-            src={lesson.banner_image_url}
-            alt={lesson.title}
-            className="w-full h-48 object-cover"
-          />
-        </div>
-      )}
-      <h3 className="font-serif text-xl font-bold text-vintage-brown mb-2">
-        {lesson.title}
-      </h3>
-      <div className="flex flex-wrap gap-2 mb-3">
-        <span className="px-2 py-1 bg-vintage-gold/20 text-vintage-brown text-xs rounded border border-vintage-gold">
-          {lesson.cefr_level}
-        </span>
-        <span className="px-2 py-1 bg-vintage-burgundy/10 text-vintage-burgundy text-xs rounded border border-vintage-burgundy/30">
-          {lesson.lesson_type}
-        </span>
-        <span className="px-2 py-1 bg-vintage-brown/10 text-vintage-brown text-xs rounded border border-vintage-brown/30">
-          {lesson.category}
-        </span>
-      </div>
-      {lesson.estimated_duration_minutes && (
-        <p className="text-sm text-vintage-brown/60 mb-4">
-          {lesson.estimated_duration_minutes} minutes
-        </p>
-      )}
-      <Link href={`/public-lessons/${lesson.id}`}>
-        <Button className="w-full bg-vintage-burgundy hover:bg-vintage-burgundy/90 text-vintage-cream">
-          View Lesson
-        </Button>
-      </Link>
-    </div>
-  );
-}
-
-function PublicLibraryFilters() {
-  return (
-    <div className="bg-white border-2 border-vintage-brown rounded-lg p-6 shadow-vintage">
-      <h2 className="font-serif text-lg font-bold text-vintage-brown mb-4">
-        Filters
-      </h2>
-      <p className="text-sm text-vintage-brown/60">
-        Filter functionality coming soon...
-      </p>
-    </div>
-  );
-}
-
-async function fetchPublicLessons(): Promise<{
-  lessons: PublicLesson[];
-  nextCursor?: string;
-}> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/public-lessons/list?limit=20`, {
-      next: { revalidate: 300 },
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch public lessons:', response.statusText);
-      return { lessons: [] };
+        const data = await response.json();
+        if (data.success) {
+          setLessons(data.lessons || []);
+        }
+      } catch (error) {
+        console.error('Error loading lessons:', error);
+      } finally {
+        setLoading(false);
+      }
     }
 
-    const data = await response.json();
-    
-    if (!data.success) {
-      console.error('API returned error:', data.error);
-      return { lessons: [] };
+    loadLessons();
+  }, []);
+
+  // Filter lessons
+  useEffect(() => {
+    let filtered = lessons;
+
+    if (searchQuery) {
+      filtered = filtered.filter((lesson) =>
+        lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lesson.source_url?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
 
-    return {
-      lessons: data.lessons || [],
-      nextCursor: data.nextCursor,
-    };
-  } catch (error) {
-    console.error('Error fetching public lessons:', error);
-    return { lessons: [] };
-  }
-}
+    if (filterLevel !== 'all') {
+      filtered = filtered.filter((lesson) => lesson.cefr_level === filterLevel);
+    }
 
-export default async function PublicLibraryPage() {
-  const { lessons, nextCursor } = await fetchPublicLessons();
+    if (filterType !== 'all') {
+      filtered = filtered.filter((lesson) => lesson.lesson_type === filterType);
+    }
+
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter((lesson) => lesson.category === filterCategory);
+    }
+
+    setFilteredLessons(filtered);
+  }, [lessons, searchQuery, filterLevel, filterType, filterCategory]);
+
+  const handleViewLesson = (lessonId: string) => {
+    router.push(`/library/${lessonId}`);
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterLevel('all');
+    setFilterType('all');
+    setFilterCategory('all');
+  };
+
+  const uniqueLevels = Array.from(new Set(lessons.map((l) => l.cefr_level)));
+  const uniqueTypes = Array.from(new Set(lessons.map((l) => l.lesson_type)));
+  const uniqueCategories = Array.from(new Set(lessons.map((l) => l.category)));
+
+  const activeFiltersCount =
+    (searchQuery ? 1 : 0) +
+    (filterLevel !== 'all' ? 1 : 0) +
+    (filterType !== 'all' ? 1 : 0) +
+    (filterCategory !== 'all' ? 1 : 0);
 
   return (
-    <div className="min-h-screen flex flex-col bg-vintage-cream">
+    <div className="min-h-screen flex flex-col bg-background">
       <PublicNavbar />
       
-      <main className="flex-1 container mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="font-serif text-4xl font-bold text-vintage-brown mb-3">
-            Public Lesson Library
+      <main className="flex-1 container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <BookOpen className="h-8 w-8" />
+            Lesson Library
           </h1>
-          <p className="text-lg text-vintage-brown/70">
-            Discover professional language lessons created by tutors worldwide
+          <p className="text-muted-foreground mt-1">
+            {filteredLessons.length} of {lessons.length} lessons
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Filters Sidebar */}
-          <aside className="lg:col-span-1">
-            <PublicLibraryFilters />
-          </aside>
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filters
+              {activeFiltersCount > 0 && (
+                <Badge variant="secondary">{activeFiltersCount} active</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search lessons by title or source..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-          {/* Lessons Grid */}
-          <div className="lg:col-span-3">
-            {lessons.length === 0 ? (
-              <div className="bg-white border-2 border-vintage-brown rounded-lg p-12 text-center shadow-vintage">
-                <p className="text-lg text-vintage-brown/60 mb-4">
-                  No lessons available yet
-                </p>
-                <p className="text-sm text-vintage-brown/50">
-                  Check back soon for new content!
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  {lessons.map((lesson) => (
-                    <PublicLessonCard key={lesson.id} lesson={lesson} />
+            {/* Filter Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Select value={filterLevel} onValueChange={setFilterLevel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  {uniqueLevels.map((level) => (
+                    <SelectItem key={level} value={level}>
+                      {level}
+                    </SelectItem>
                   ))}
-                </div>
+                </SelectContent>
+              </Select>
 
-                {/* Pagination Controls */}
-                {nextCursor && (
-                  <div className="flex justify-center">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {uniqueTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Languages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Languages</SelectItem>
+                  {uniqueCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center">
+                {activeFiltersCount > 0 && (
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lessons Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-4 text-muted-foreground">Loading lessons...</p>
+          </div>
+        ) : filteredLessons.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No lessons found</h3>
+              <p className="text-muted-foreground">
+                {lessons.length === 0
+                  ? 'Check back soon for new content!'
+                  : 'Try adjusting your filters'}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredLessons.map((lesson) => {
+              // Get banner image from content.metadata
+              const bannerImage = lesson.content?.metadata?.bannerImages?.[0]?.src;
+              
+              return (
+                <Card
+                  key={lesson.id}
+                  className="hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
+                  onClick={() => handleViewLesson(lesson.id)}
+                >
+                  {/* Banner Image */}
+                  {bannerImage && (
+                    <div className="w-full h-48 overflow-hidden bg-muted">
+                      <img
+                        src={bannerImage}
+                        alt={lesson.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                  <CardHeader>
+                    <CardTitle className="text-lg line-clamp-2">
+                      {lesson.title}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-2 text-xs">
+                      <Calendar className="h-3 w-3" />
+                      {formatDistanceToNow(new Date(lesson.created_at), { addSuffix: true })}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Badges */}
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="default" className="flex items-center gap-1">
+                        <GraduationCap className="h-3 w-3" />
+                        {lesson.cefr_level}
+                      </Badge>
+                      <Badge variant="secondary" className="flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        {lesson.lesson_type}
+                      </Badge>
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {lesson.category}
+                      </Badge>
+                    </div>
+
+                    {/* Source */}
+                    {lesson.source_url && (
+                      <div className="text-xs text-muted-foreground truncate">
+                        <span className="font-medium">Source:</span>{' '}
+                        {new URL(lesson.source_url).hostname}
+                      </div>
+                    )}
+
+                    {/* View Button */}
                     <Button
                       variant="outline"
-                      className="border-2 border-vintage-brown text-vintage-brown hover:bg-vintage-brown hover:text-vintage-cream"
+                      size="sm"
+                      className="w-full flex items-center gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewLesson(lesson.id);
+                      }}
                     >
-                      Load More
+                      <Eye className="h-4 w-4" />
+                      View Lesson
                     </Button>
-                  </div>
-                )}
-              </>
-            )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        </div>
+        )}
       </main>
 
       <PublicFooter />

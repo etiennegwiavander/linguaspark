@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LinguaSpark - AI Language Lesson Generator",
-  "version": "1.0.0",
-  "description": "Transform any webpage into interactive language lessons with AI-powered content extraction and Sparky, your friendly learning assistant.",
+  "name": "LinguaSpark - Admin Lesson Creator",
+  "version": "2.0.0",
+  "description": "Create and publish AI-generated language lessons to the public library. Admin access required.",
   
   "permissions": [
     "activeTab",

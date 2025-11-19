@@ -46,6 +46,19 @@ export async function DELETE(request: Request) {
 
         console.log('[API] Authenticated user:', user.id)
 
+        // Verify admin status
+        const { data: tutorData } = await supabase
+            .from('tutors')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single()
+        
+        if (!tutorData?.is_admin) {
+            return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+        }
+        
+        console.log('[API] Admin verified')
+
         // Delete lesson (RLS policy will ensure user owns it)
         const { error: deleteError } = await supabase
             .from("lessons")

@@ -41,15 +41,29 @@ export async function POST(request: Request) {
     
     console.log('[API] Authenticated user:', user.id)
     
+    // Verify admin status
+    const { data: tutorData, error: tutorError } = await supabase
+      .from('tutors')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+    
+    if (tutorError || !tutorData?.is_admin) {
+      console.error('[API] Admin verification failed:', tutorError)
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+    
+    console.log('[API] Admin verified')
+    
     // Check if tutor profile exists
-    const { data: tutorProfile, error: tutorError } = await supabase
+    const { data: tutorProfile, error: tutorCheckError } = await supabase
       .from("tutors")
       .select("id")
       .eq("id", user.id)
       .single()
     
-    if (tutorError && tutorError.code !== 'PGRST116') {
-      console.error('[API] Error checking tutor profile:', tutorError)
+    if (tutorCheckError && tutorCheckError.code !== 'PGRST116') {
+      console.error('[API] Error checking tutor profile:', tutorCheckError)
     }
     
     if (!tutorProfile) {
