@@ -23,7 +23,18 @@ import {
   FileText,
   Eye,
   Loader2,
+  Trash2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatDistanceToNow } from 'date-fns';
 import PublicNavbar from '@/components/public-navbar';
 import PublicFooter from '@/components/public-footer';
@@ -38,6 +49,38 @@ export default function PublicLibraryPage() {
   const [filterLevel, setFilterLevel] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<PublicLesson | null>(null);
+
+  // Check admin status
+  useEffect(() => {
+    async function checkAdminStatus() {
+      try {
+        const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token');
+        if (!sessionData) return;
+        
+        const session = JSON.parse(sessionData);
+        const userId = session.user?.id;
+        if (!userId) return;
+        
+        const response = await fetch('/api/admin/check-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsAdmin(data.isAdmin === true);
+        }
+      } catch (error) {
+        console.error('Failed to check admin status:', error);
+      }
+    }
+    
+    checkAdminStatus();
+  }, []);
 
   // Load lessons
   useEffect(() => {
@@ -93,6 +136,37 @@ export default function PublicLibraryPage() {
 
   const handleViewLesson = (lessonId: string) => {
     router.push(`/library/${lessonId}`);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, lesson: PublicLesson) => {
+    e.stopPropagation();
+    setLessonToDelete(lesson);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!lessonToDelete) return;
+    
+    setDeletingLessonId(lessonToDelete.id);
+    try {
+      const response = await fetch(`/api/public-lessons/delete/${lessonToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete lesson');
+      }
+
+      // Remove lesson from state
+      setLessons(lessons.filter(l => l.id !== lessonToDelete.id));
+      alert('Lesson deleted successfully!');
+    } catch (error) {
+      console.error('Failed to delete lesson:', error);
+      alert(`Failed to delete lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeletingLessonId(null);
+      setLessonToDelete(null);
+    }
   };
 
   const clearFilters = () => {
@@ -283,19 +357,38 @@ export default function PublicLibraryPage() {
                       </div>
                     )}
 
-                    {/* View Button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full flex items-center gap-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewLesson(lesson.id);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                      View Lesson
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 flex items-center gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewLesson(lesson.id);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Button>
+                      
+                      {/* Admin Delete Button */}
+                      {isAdmin && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex items-center gap-2"
+                          onClick={(e) => handleDeleteClick(e, lesson)}
+                          disabled={deletingLessonId === lesson.id}
+                        >
+                          {deletingLessonId === lesson.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -305,6 +398,28 @@ export default function PublicLibraryPage() {
       </main>
 
       <PublicFooter />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!lessonToDelete} onOpenChange={(open) => !open && setLessonToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lesson</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{lessonToDelete?.title}"? This action cannot be undone and will remove the lesson from the public library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingLessonId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={!!deletingLessonId}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingLessonId ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
