@@ -6,10 +6,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
 // Server client (for API routes and server components)
-export const createServerSupabaseClient = async () => {
+export const createServerSupabaseClient = async (accessToken?: string) => {
   const cookieStore = await cookies()
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  const client = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -26,5 +26,12 @@ export const createServerSupabaseClient = async () => {
         }
       },
     },
+    global: {
+      headers: accessToken ? {
+        Authorization: `Bearer ${accessToken}`
+      } : {}
+    }
   })
+
+  return client
 }

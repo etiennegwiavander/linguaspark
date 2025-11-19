@@ -339,10 +339,15 @@ export async function updatePublicLesson(
 export async function deletePublicLesson(
   lessonId: string,
   userId: string,
-  skipAuthCheck: boolean = false
+  skipAuthCheck: boolean = false,
+  accessToken?: string
 ): Promise<OperationResult> {
   try {
-    const supabase = await createServerSupabaseClient();
+    // Create Supabase client with access token if provided (for Bearer token auth)
+    // This ensures auth.uid() works correctly in RLS policies
+    const supabase = accessToken 
+      ? await createServerSupabaseClient(accessToken)
+      : await createServerSupabaseClient();
 
     // Skip auth check if already verified by caller (e.g., API route)
     if (!skipAuthCheck) {
@@ -376,6 +381,7 @@ export async function deletePublicLesson(
     console.log('[deletePublicLesson] Attempting to delete lesson:', lessonId);
     console.log('[deletePublicLesson] User ID:', userId);
     console.log('[deletePublicLesson] Is admin:', tutor?.is_admin);
+    console.log('[deletePublicLesson] Using access token:', !!accessToken);
     
     const { error, count } = await supabase
       .from('public_lessons')

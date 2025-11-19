@@ -26,6 +26,7 @@ export async function DELETE(
     // First try cookie-based auth
     let user = null;
     let authError = null;
+    let accessToken: string | undefined = undefined;
     
     const cookieAuth = await supabase.auth.getUser();
     if (cookieAuth.data.user) {
@@ -35,6 +36,7 @@ export async function DELETE(
       const authHeader = request.headers.get('authorization');
       if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
+        accessToken = token; // Store token for RLS
         const tokenAuth = await supabase.auth.getUser(token);
         if (tokenAuth.data.user) {
           user = tokenAuth.data.user;
@@ -59,7 +61,8 @@ export async function DELETE(
 
     // Attempt to delete the lesson (admin verification happens in the function)
     // Skip auth check since we already verified the user above
-    const result = await deletePublicLesson(lessonId, user.id, true);
+    // Pass access token so RLS policies work correctly
+    const result = await deletePublicLesson(lessonId, user.id, true, accessToken);
 
     if (!result.success) {
       // Return appropriate status code based on error type
