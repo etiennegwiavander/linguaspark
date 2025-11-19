@@ -525,25 +525,56 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
         }
       };
 
-      // Transform sections array into flat properties
-      if (safeLesson.sections && Array.isArray(safeLesson.sections)) {
-        safeLesson.sections.forEach((section: any) => {
-          if (section.type) {
-            transformedLesson[section.type] = section;
-          }
-        });
+      // Copy all sections from the lesson
+      console.log('[LessonDisplay] 📋 Lesson structure:', {
+        hasSections: !!safeLesson.sections,
+        sectionsType: typeof safeLesson.sections,
+        isArray: Array.isArray(safeLesson.sections),
+        sectionKeys: safeLesson.sections && typeof safeLesson.sections === 'object' ? Object.keys(safeLesson.sections) : []
+      });
+      
+      if (safeLesson.sections) {
+        if (typeof safeLesson.sections === 'object' && !Array.isArray(safeLesson.sections)) {
+          // Sections is an object - copy all properties
+          const sectionKeys = Object.keys(safeLesson.sections);
+          console.log('[LessonDisplay] 📝 Copying sections:', sectionKeys);
+          
+          sectionKeys.forEach((sectionKey) => {
+            transformedLesson[sectionKey] = safeLesson.sections[sectionKey];
+          });
+          
+          console.log('[LessonDisplay] ✅ Transformed lesson sections:', Object.keys(transformedLesson).filter(k => k !== 'title' && k !== 'metadata'));
+        } else if (Array.isArray(safeLesson.sections)) {
+          // Legacy: sections as array
+          safeLesson.sections.forEach((section: any) => {
+            if (section.type) {
+              transformedLesson[section.type] = section;
+            }
+          });
+        }
+      } else {
+        console.warn('[LessonDisplay] ⚠️ No sections found in lesson!');
       }
 
-      // Ensure required sections exist with fallbacks
-      if (!transformedLesson.warmup) {
+      // Transform warmup from array to object format if needed
+      if (transformedLesson.warmup && Array.isArray(transformedLesson.warmup)) {
+        transformedLesson.warmup = {
+          questions: transformedLesson.warmup
+        };
+      } else if (!transformedLesson.warmup) {
         transformedLesson.warmup = {
           questions: ["What do you know about this topic?"]
         };
       }
       
-      if (!transformedLesson.wrapup) {
+      // Transform wrapup from array to object format if needed
+      if (transformedLesson.wrapup && Array.isArray(transformedLesson.wrapup)) {
         transformedLesson.wrapup = {
-          summary: "In this lesson, we explored the key concepts and practiced using them in context."
+          questions: transformedLesson.wrapup
+        };
+      } else if (!transformedLesson.wrapup) {
+        transformedLesson.wrapup = {
+          questions: ["Reflect on your learning by discussing these wrap-up questions:", "What did you learn today?", "How can you apply this knowledge?"]
         };
       }
 
@@ -1330,33 +1361,64 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       
       {/* Admin Save Location Dialog */}
       <Dialog open={showSaveLocationDialog} onOpenChange={setShowSaveLocationDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Save Lesson</DialogTitle>
+            <DialogTitle className="flex items-center space-x-2">
+              <span>Save Lesson</span>
+              <Badge variant="outline" className="bg-vintage-gold text-vintage-brown">Admin</Badge>
+            </DialogTitle>
             <DialogDescription>
-              Choose where to save this lesson
+              Choose where to save this lesson. You can save to your personal library or share it publicly.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Button
-              className="w-full"
+          <div className="space-y-3 py-4">
+            {/* Personal Library Option */}
+            <Card 
+              className="cursor-pointer hover:border-vintage-brown transition-colors"
               onClick={() => {
                 setShowSaveLocationDialog(false)
                 saveToPersonalLibrary()
               }}
             >
-              Save to My Personal Library
-            </Button>
-            <Button
-              className="w-full"
-              variant="outline"
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-vintage-brown/10 flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-5 h-5 text-vintage-brown" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-vintage-brown mb-1">My Personal Library</h3>
+                    <p className="text-sm text-vintage-brown/70">
+                      Private workspace for drafts and personal use. Only visible to you.
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-vintage-brown/40" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Public Library Option */}
+            <Card 
+              className="cursor-pointer hover:border-vintage-brown transition-colors"
               onClick={() => {
                 setShowSaveLocationDialog(false)
                 setShowAdminLessonDialog(true)
               }}
             >
-              Save to Public Library
-            </Button>
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-vintage-gold/20 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-vintage-brown" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-vintage-brown mb-1">Public Library</h3>
+                    <p className="text-sm text-vintage-brown/70">
+                      Share with everyone. Lesson will be visible on the public website.
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-vintage-brown/40" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
           <DialogFooter>
             <Button
