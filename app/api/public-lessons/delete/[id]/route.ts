@@ -20,9 +20,31 @@ export async function DELETE(
       );
     }
 
-    // Get authenticated user
+    // Get authenticated user - try both cookie-based and Bearer token auth
     const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    // First try cookie-based auth
+    let user = null;
+    let authError = null;
+    
+    const cookieAuth = await supabase.auth.getUser();
+    if (cookieAuth.data.user) {
+      user = cookieAuth.data.user;
+    } else {
+      // Try Bearer token from Authorization header
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const tokenAuth = await supabase.auth.getUser(token);
+        if (tokenAuth.data.user) {
+          user = tokenAuth.data.user;
+        } else {
+          authError = tokenAuth.error;
+        }
+      } else {
+        authError = cookieAuth.error;
+      }
+    }
 
     if (authError || !user) {
       return NextResponse.json(

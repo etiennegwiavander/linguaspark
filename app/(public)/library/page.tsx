@@ -150,11 +150,27 @@ export default function PublicLibraryPage() {
     try {
       console.log('[Library] Deleting lesson:', lessonToDelete.id);
       
+      // Get auth token from localStorage
+      const sessionData = localStorage.getItem('sb-jbkpnirowdvlwlgheqho-auth-token');
+      if (!sessionData) {
+        throw new Error('No authentication session found. Please sign in again.');
+      }
+
+      const session = JSON.parse(sessionData);
+      const authToken = session.access_token;
+
+      if (!authToken) {
+        throw new Error('No access token found. Please sign in again.');
+      }
+
+      console.log('[Library] Using auth token for delete request');
+      
       const response = await fetch(`/api/public-lessons/delete/${lessonToDelete.id}`, {
         method: 'DELETE',
         credentials: 'include', // Include cookies for authentication
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
       });
 
