@@ -373,12 +373,19 @@ export async function deletePublicLesson(
     }
 
     // Proceed with deletion
-    const { error } = await supabase
+    console.log('[deletePublicLesson] Attempting to delete lesson:', lessonId);
+    console.log('[deletePublicLesson] User ID:', userId);
+    console.log('[deletePublicLesson] Is admin:', tutor?.is_admin);
+    
+    const { error, count } = await supabase
       .from('public_lessons')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', lessonId);
 
+    console.log('[deletePublicLesson] Delete result - error:', error, 'count:', count);
+
     if (error) {
+      console.error('[deletePublicLesson] Database error:', error);
       return {
         success: false,
         error: 'DATABASE_ERROR',
@@ -386,6 +393,16 @@ export async function deletePublicLesson(
       };
     }
 
+    if (count === 0) {
+      console.warn('[deletePublicLesson] No rows deleted - lesson may not exist or RLS blocked it');
+      return {
+        success: false,
+        error: 'NOT_FOUND',
+        message: 'Lesson not found or you do not have permission to delete it',
+      };
+    }
+
+    console.log('[deletePublicLesson] ✅ Successfully deleted lesson');
     return {
       success: true,
       message: 'Public lesson deleted successfully',
