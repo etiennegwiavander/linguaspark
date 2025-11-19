@@ -148,20 +148,30 @@ export default function PublicLibraryPage() {
     
     setDeletingLessonId(lessonToDelete.id);
     try {
+      console.log('[Library] Deleting lesson:', lessonToDelete.id);
+      
       const response = await fetch(`/api/public-lessons/delete/${lessonToDelete.id}`, {
         method: 'DELETE',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+
+      console.log('[Library] Delete response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('[Library] Delete error:', errorData);
         throw new Error(errorData.message || 'Failed to delete lesson');
       }
 
       // Remove lesson from state
       setLessons(lessons.filter(l => l.id !== lessonToDelete.id));
+      console.log('[Library] ✅ Lesson deleted successfully');
       alert('Lesson deleted successfully!');
     } catch (error) {
-      console.error('Failed to delete lesson:', error);
+      console.error('[Library] ❌ Failed to delete lesson:', error);
       alert(`Failed to delete lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setDeletingLessonId(null);
@@ -413,7 +423,7 @@ export default function PublicLibraryPage() {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={!!deletingLessonId}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
             >
               {deletingLessonId ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
