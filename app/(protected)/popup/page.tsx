@@ -16,8 +16,45 @@ declare global {
 }
 
 export default function PopupPage() {
-  const [selectedText, setSelectedText] = useState("")
-  const [sourceUrl, setSourceUrl] = useState("")
+  // Initialize with URL parameters immediately
+  const getInitialContent = () => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const contentParam = urlParams.get('content')
+      if (contentParam) {
+        try {
+          // Try decoding the content parameter
+          const decoded = decodeURIComponent(contentParam)
+          console.log('[LinguaSpark Popup] 🎯 Initial content from URL:', decoded.length, 'characters')
+          return decoded
+        } catch (error) {
+          console.error('[LinguaSpark Popup] ❌ Error decoding content, using raw content:', error)
+          // If decoding fails, use the raw content (it might already be decoded)
+          console.log('[LinguaSpark Popup] 🔄 Using raw content parameter:', contentParam.length, 'characters')
+          return contentParam
+        }
+      }
+    }
+    return ""
+  }
+
+  const getInitialSourceUrl = () => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const sourceParam = urlParams.get('sourceUrl')
+      if (sourceParam) {
+        try {
+          return decodeURIComponent(sourceParam)
+        } catch (error) {
+          console.error('[LinguaSpark Popup] ❌ Error decoding initial sourceUrl:', error)
+        }
+      }
+    }
+    return ""
+  }
+
+  const [selectedText, setSelectedText] = useState(getInitialContent)
+  const [sourceUrl, setSourceUrl] = useState(getInitialSourceUrl)
   const [extractedMetadata, setExtractedMetadata] = useState<any>(null)
   const [generatedLesson, setGeneratedLesson] = useState<any>(null)
   const [saveToPublic, setSaveToPublic] = useState(false)
@@ -26,6 +63,46 @@ export default function PopupPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(true)
   const [adminError, setAdminError] = useState<string | null>(null)
+
+  // IMMEDIATE URL parameter check - runs first
+  useEffect(() => {
+    console.log('[LinguaSpark Popup] 🚀 IMMEDIATE URL check on mount...')
+    const urlParams = new URLSearchParams(window.location.search)
+    const contentParam = urlParams.get('content')
+    const sourceParam = urlParams.get('sourceUrl')
+    
+    console.log('[LinguaSpark Popup] URL params on mount:', {
+      hasContent: !!contentParam,
+      contentLength: contentParam?.length || 0,
+      hasSource: !!sourceParam,
+      isExtraction: urlParams.get('source') === 'extraction',
+      autoPopulate: urlParams.get('autoPopulate') === 'true'
+    })
+    
+    if (contentParam && contentParam.length > 0) {
+      try {
+        const decoded = decodeURIComponent(contentParam)
+        console.log('[LinguaSpark Popup] 🎯 IMMEDIATE: Setting content from URL:', decoded.length, 'characters')
+        setSelectedText(decoded)
+        
+        if (sourceParam) {
+          const decodedSource = decodeURIComponent(sourceParam)
+          setSourceUrl(decodedSource)
+        }
+      } catch (error) {
+        console.error('[LinguaSpark Popup] ❌ IMMEDIATE: Error decoding, using raw content:', error)
+        // Use raw content if decoding fails
+        console.log('[LinguaSpark Popup] 🔄 IMMEDIATE: Using raw content:', contentParam.length, 'characters')
+        setSelectedText(contentParam)
+        
+        if (sourceParam) {
+          setSourceUrl(sourceParam)
+        }
+      }
+    } else {
+      console.log('[LinguaSpark Popup] ⚠️ IMMEDIATE: No content parameter found')
+    }
+  }, [])
 
   // Verify admin access on mount - REQUIRED for extension
   useEffect(() => {
@@ -189,8 +266,18 @@ export default function PopupPage() {
   }, [])
 
   useEffect(() => {
+    // Only load content after admin verification is complete
+    if (isVerifyingAdmin) {
+      console.log('[LinguaSpark Popup] ⏳ Waiting for admin verification to complete...')
+      return
+    }
+    
     const loadContent = async () => {
       try {
+        console.log('[LinguaSpark Popup] 🚀 loadContent useEffect starting...')
+        console.log('[LinguaSpark Popup] Current selectedText state:', selectedText.length)
+        console.log('[LinguaSpark Popup] Current sourceUrl state:', sourceUrl)
+        
         // Debug storage state
         if (process.env.NODE_ENV === 'development') {
           await LessonInterfaceUtils.debugStorageState()
@@ -200,6 +287,20 @@ export default function PopupPage() {
         const urlParams = new URLSearchParams(window.location.search)
         const contentParam = urlParams.get('content')
         const sourceParam = urlParams.get('sourceUrl')
+        
+        console.log('[LinguaSpark Popup] 🔍 URL params check:', {
+          hasContent: !!contentParam,
+          contentLength: contentParam?.length || 0,
+          hasSourceUrl: !!sourceParam,
+          allParams: Object.fromEntries(urlParams)
+        })
+        
+        console.log('[LinguaSpark Popup] URL parameter check:', {
+          hasContent: !!contentParam,
+          contentLength: contentParam?.length || 0,
+          hasSourceUrl: !!sourceParam,
+          sourceUrl: sourceParam
+        })
 
         // Check if this is an extraction source
         const isExtractionSource = urlParams.get('source') === 'extraction';
@@ -209,14 +310,34 @@ export default function PopupPage() {
           console.log('[LinguaSpark Popup] URL params:', Object.fromEntries(urlParams));
 
           // Primary: Check for content in URL parameters (cross-domain solution)
-          if (contentParam && sourceParam) {
-            const decodedContent = decodeURIComponent(contentParam);
-            const decodedSourceUrl = decodeURIComponent(sourceParam);
-            console.log('[LinguaSpark Popup] ✅ Found content in URL parameters, length:', decodedContent.length);
-            console.log('[LinguaSpark Popup] Source URL:', decodedSourceUrl);
+          if (contentParam) {
+            console.log('[LinguaSpark Popup] 🎯 Processing URL parameters...');
+            console.log('[LinguaSpark Popup] Raw content param length:', contentParam.length);
+            console.log('[LinguaSpark Popup] Raw source param:', sourceParam || 'Not provided');
             
+            let decodedContent, decodedSourceUrl;
+            
+            try {
+              decodedContent = decodeURIComponent(contentParam);
+              decodedSourceUrl = sourceParam ? decodeURIComponent(sourceParam) : '';
+            } catch (error) {
+              console.error('[LinguaSpark Popup] ❌ Error decoding URL parameters, using raw values:', error);
+              decodedContent = contentParam;
+              decodedSourceUrl = sourceParam || '';
+            }
+            
+            console.log('[LinguaSpark Popup] ✅ Found content in URL parameters, length:', decodedContent.length);
+            console.log('[LinguaSpark Popup] Source URL:', decodedSourceUrl || 'Empty');
+            
+            console.log('[LinguaSpark Popup] 🎯 Setting selectedText to content...')
             setSelectedText(decodedContent);
             setSourceUrl(decodedSourceUrl);
+            console.log('[LinguaSpark Popup] ✅ State updated - selectedText should now be:', decodedContent.length, 'characters')
+            
+            // Force a re-render to ensure the state update is applied
+            setTimeout(() => {
+              console.log('[LinguaSpark Popup] 🔄 Checking selectedText after timeout:', selectedText.length)
+            }, 100)
             
             // Check if there's metadata available
             const hasMetadata = urlParams.get('hasMetadata') === 'true';
@@ -391,7 +512,7 @@ export default function PopupPage() {
     }
 
     loadContent()
-  }, [])
+  }, [isVerifyingAdmin])
 
   const handleExtractFromPage = () => {
     if (typeof window !== "undefined" && window.chrome?.tabs) {
@@ -738,9 +859,29 @@ export default function PopupPage() {
                 <div>Debug: URL params = {window.location.search}</div>
                 <div>Debug: saveToPublic = {saveToPublic.toString()}</div>
                 <div>Debug: isAdmin = {isAdmin.toString()}</div>
+                <div>Debug: isVerifyingAdmin = {isVerifyingAdmin.toString()}</div>
+                {(() => {
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const contentParam = urlParams.get('content');
+                  return (
+                    <div>
+                      <div>Debug: URL content param length = {contentParam?.length || 0}</div>
+                      <div>Debug: URL content preview = {contentParam?.substring(0, 100) || 'None'}...</div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
+            {(() => {
+              console.log('[LinguaSpark Popup] 🎯 Rendering LessonGenerator with props:', {
+                initialTextLength: selectedText.length,
+                sourceUrl: sourceUrl,
+                hasExtractedMetadata: !!extractedMetadata
+              })
+              return null
+            })()}
             <LessonGenerator
+              key={selectedText.length > 0 ? `content-${selectedText.length}` : 'empty'}
               initialText={selectedText}
               sourceUrl={sourceUrl}
               extractedMetadata={extractedMetadata}

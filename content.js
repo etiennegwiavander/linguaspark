@@ -45,6 +45,9 @@
   // Analyze page content to determine if button should be shown
   async function analyzePageContent() {
     try {
+      // Wait a bit for page to fully load before analyzing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const content = extractCleanContent();
       const wordCount = content.wordCount;
       const contentType = determineContentType();
@@ -491,7 +494,21 @@
         console.log("[LinguaSpark] Clean content extracted:", {
           textLength: cleanContent.text?.length || 0,
           wordCount: cleanContent.wordCount || 0,
+          hasText: !!cleanContent.text,
+          textPreview: cleanContent.text?.substring(0, 100) + "...",
         });
+
+        // Add validation for empty content
+        if (!cleanContent.text || cleanContent.text.trim().length < 50) {
+          console.error("[LinguaSpark] ❌ Content extraction failed:", {
+            textLength: cleanContent.text?.length || 0,
+            text: cleanContent.text || "null",
+            url: window.location.href,
+            hostname: window.location.hostname,
+            title: document.title
+          });
+          throw new Error(`Content extraction failed: only ${cleanContent.text?.length || 0} characters extracted`);
+        }
 
         // Create enhanced content structure from clean content
         extractedContent = {
@@ -718,9 +735,21 @@
       console.log("[LinguaSpark] Opening lesson interface with content...");
 
       // Prepare content for URL transmission (truncate if too long)
-      const contentForUrl = lessonConfiguration.sourceContent.length > 8000 
+      console.log("[LinguaSpark] Preparing content for URL:", {
+        sourceContentLength: lessonConfiguration.sourceContent?.length || 0,
+        sourceContentPreview: lessonConfiguration.sourceContent?.substring(0, 100) + "...",
+        hasSourceContent: !!lessonConfiguration.sourceContent
+      });
+
+      const contentForUrl = lessonConfiguration.sourceContent && lessonConfiguration.sourceContent.length > 8000 
         ? lessonConfiguration.sourceContent.substring(0, 8000) + "... [Content truncated - full content available in localStorage]"
-        : lessonConfiguration.sourceContent;
+        : lessonConfiguration.sourceContent || "";
+
+      console.log("[LinguaSpark] Content prepared for URL:", {
+        contentForUrlLength: contentForUrl.length,
+        contentForUrlPreview: contentForUrl.substring(0, 100) + "...",
+        willBeEmpty: contentForUrl.length === 0
+      });
 
       const urlParams = new URLSearchParams({
         source: "extraction",
@@ -1075,15 +1104,30 @@
 
   // Function to extract clean content from page with enhanced context
   function extractCleanContent() {
-    // Debug: Check raw content length
-    console.log(
-      "[DEBUG] Raw document.body.innerText length:",
-      document.body.innerText?.length
-    );
-    console.log(
-      "[DEBUG] Raw document.body.textContent length:",
-      document.body.textContent?.length
-    );
+    try {
+      // Debug: Check raw content length
+      console.log(
+        "[DEBUG] Raw document.body.innerText length:",
+        document.body?.innerText?.length || 0
+      );
+      console.log(
+        "[DEBUG] Raw document.body.textContent length:",
+        document.body?.textContent?.length || 0
+      );
+      
+      // Check if document is ready
+      if (!document.body) {
+        console.warn("[DEBUG] Document body not available yet");
+        return {
+          text: "",
+          structuredContent: {},
+          metadata: {},
+          wordCount: 0,
+          readingTime: 0,
+          bannerImage: null,
+          images: [],
+        };
+      }
 
     // First, try to get content directly from body without cloning (more reliable)
     let text = "";
@@ -1092,14 +1136,27 @@
     const strategies = [
       // Strategy 1: Site-specific article content
       () => {
-        // BBC-specific extraction
-        if (window.location.hostname.includes("bbc.com")) {
+        const hostname = window.location.hostname.toLowerCase();
+        
+        // BBC-specific extraction (enhanced)
+        if (hostname.includes("bbc.com") || hostname.includes("bbc.co.uk")) {
           const selectors = [
+            // New BBC selectors (2024)
             '[data-component="text-block"]',
-            ".ssrcss-1q0x1qg-Paragraph",
-            ".ssrcss-uf6wea-RichTextComponentWrapper",
-            'article [data-component="text-block"] p',
-            "main article p",
+            '[data-component="text-block"] p',
+            '.ssrcss-1q0x1qg-Paragraph',
+            '.ssrcss-uf6wea-RichTextComponentWrapper',
+            '.ssrcss-pv1rh6-ArticleWrapper p',
+            '.ssrcss-11r1m41-RichTextComponentWrapper p',
+            'article [data-component="text-block"]',
+            'main article p',
+            '.gel-body-copy',
+            '.story-body__inner p',
+            '.media-body p',
+            // Fallback BBC selectors
+            'article p',
+            'main p',
+            '.content p'
           ];
 
           let articleText = "";
@@ -1115,6 +1172,135 @@
               if (articleText.length > 500) {
                 console.log(
                   `[DEBUG] Strategy 1 - BBC article content (${selector}):`,
+                  articleText.length
+                );
+                return articleText;
+              }
+            }
+          }
+        }
+
+        // CNN-specific extraction
+        if (hostname.includes("cnn.com")) {
+          const selectors = [
+            '.zn-body__paragraph',
+            '.el__leafmedia--sourced-paragraph',
+            '.paragraph',
+            'article .zn-body__paragraph',
+            'main .paragraph',
+            '.l-container p',
+            '.pg-rail-tall__body p',
+            'article p',
+            'main p'
+          ];
+
+          let articleText = "";
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              elements.forEach((el) => {
+                const text = el.innerText || el.textContent || "";
+                if (text.trim().length > 20) {
+                  articleText += text.trim() + "\n\n";
+                }
+              });
+              if (articleText.length > 500) {
+                console.log(
+                  `[DEBUG] Strategy 1 - CNN article content (${selector}):`,
+                  articleText.length
+                );
+                return articleText;
+              }
+            }
+          }
+        }
+
+        // Reuters-specific extraction
+        if (hostname.includes("reuters.com")) {
+          const selectors = [
+            '[data-testid="paragraph"]',
+            '.StandardArticleBody_body p',
+            '.ArticleBodyWrapper p',
+            '.PaywallArticleBody_body p',
+            'article p',
+            'main p'
+          ];
+
+          let articleText = "";
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              elements.forEach((el) => {
+                const text = el.innerText || el.textContent || "";
+                if (text.trim().length > 20) {
+                  articleText += text.trim() + "\n\n";
+                }
+              });
+              if (articleText.length > 500) {
+                console.log(
+                  `[DEBUG] Strategy 1 - Reuters article content (${selector}):`,
+                  articleText.length
+                );
+                return articleText;
+              }
+            }
+          }
+        }
+
+        // Guardian-specific extraction
+        if (hostname.includes("theguardian.com")) {
+          const selectors = [
+            '.dcr-1eu2fzd p',
+            '.content__article-body p',
+            '.article-body-commercial-selector p',
+            'article p',
+            'main p'
+          ];
+
+          let articleText = "";
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              elements.forEach((el) => {
+                const text = el.innerText || el.textContent || "";
+                if (text.trim().length > 20) {
+                  articleText += text.trim() + "\n\n";
+                }
+              });
+              if (articleText.length > 500) {
+                console.log(
+                  `[DEBUG] Strategy 1 - Guardian article content (${selector}):`,
+                  articleText.length
+                );
+                return articleText;
+              }
+            }
+          }
+        }
+
+        // New York Times-specific extraction
+        if (hostname.includes("nytimes.com")) {
+          const selectors = [
+            '.StoryBodyCompanionColumn p',
+            '.css-53u6y8 p',
+            'section[name="articleBody"] p',
+            'article p',
+            'main p'
+          ];
+
+          let articleText = "";
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              elements.forEach((el) => {
+                const text = el.innerText || el.textContent || "";
+                if (text.trim().length > 20) {
+                  articleText += text.trim() + "\n\n";
+                }
+              });
+              if (articleText.length > 500) {
+                console.log(
+                  `[DEBUG] Strategy 1 - NYT article content (${selector}):`,
                   articleText.length
                 );
                 return articleText;
@@ -1237,22 +1423,54 @@
         return "";
       },
 
-      // Strategy 2: Main content selectors (prioritized)
+      // Strategy 2: Main content selectors (prioritized and enhanced)
       () => {
         const contentSelectors = [
+          // Semantic HTML5 elements (highest priority)
           "article",
           "main article",
+          '[role="main"] article',
           '[role="main"]',
+          
+          // Common article/post content classes
           ".post-content",
-          ".entry-content",
+          ".entry-content", 
           ".article-content",
-          ".content-body",
-          ".post-body",
           ".article-body",
+          ".post-body",
+          ".content-body",
+          ".story-content",
+          ".story-body",
+          ".news-content",
+          ".news-body",
+          
+          // Main content containers
           ".main-content",
+          ".primary-content",
+          ".content-main",
+          ".page-content",
+          
+          // Generic content containers
           "main",
+          "#main-content",
           "#content",
           ".content",
+          "#primary",
+          ".primary",
+          
+          // News-specific selectors
+          ".article-wrap",
+          ".article-container",
+          ".story-wrap",
+          ".story-container",
+          ".news-article",
+          
+          // Blog/CMS selectors
+          ".hentry",
+          ".post",
+          ".entry",
+          ".single-post",
+          ".blog-post"
         ];
 
         for (const selector of contentSelectors) {
@@ -1348,16 +1566,34 @@
     for (let i = 0; i < strategies.length; i++) {
       try {
         const strategyText = strategies[i]();
+        console.log(`[DEBUG] Strategy ${i + 1} extracted ${strategyText.length} characters`);
+        
         if (strategyText && strategyText.length > 200) {
           text = strategyText;
           console.log(
-            `[DEBUG] Using strategy ${i + 1} with ${text.length} characters`
+            `[DEBUG] ✅ Using strategy ${i + 1} with ${text.length} characters`
           );
           break;
+        } else if (strategyText && strategyText.length > 0) {
+          console.log(`[DEBUG] ⚠️ Strategy ${i + 1} content too short: ${strategyText.length} chars`);
         }
       } catch (error) {
-        console.warn(`[DEBUG] Strategy ${i + 1} failed:`, error);
+        console.warn(`[DEBUG] ❌ Strategy ${i + 1} failed:`, error);
       }
+    }
+
+    // Enhanced debugging for failed extractions
+    if (text.length < 200) {
+      console.warn(`[DEBUG] ⚠️ All primary strategies failed. Current text length: ${text.length}`);
+      console.log(`[DEBUG] Page info:`, {
+        url: window.location.href,
+        hostname: window.location.hostname,
+        title: document.title,
+        bodyTextLength: document.body.textContent?.length || 0,
+        articleElements: document.querySelectorAll('article').length,
+        mainElements: document.querySelectorAll('main').length,
+        paragraphElements: document.querySelectorAll('p').length
+      });
     }
 
     // If still no good content, try the alternative method
@@ -1366,6 +1602,24 @@
         "[DEBUG] All strategies failed, trying alternative extraction"
       );
       text = extractLargeContent();
+      
+      // Final fallback: if everything fails, use a basic body text extraction
+      if (text.length < 200) {
+        console.log("[DEBUG] Alternative extraction also failed, using basic fallback");
+        try {
+          // Remove script and style elements first
+          const clone = document.body.cloneNode(true);
+          const scripts = clone.querySelectorAll('script, style, nav, footer, aside');
+          scripts.forEach(el => el.remove());
+          
+          text = clone.textContent || clone.innerText || "";
+          text = text.replace(/\s+/g, ' ').trim();
+          console.log("[DEBUG] Basic fallback extraction length:", text.length);
+        } catch (error) {
+          console.warn("[DEBUG] Basic fallback also failed:", error);
+          text = ""; // Ensure we have a string
+        }
+      }
     }
 
     // Clean up whitespace and formatting
@@ -1393,14 +1647,28 @@
         : null;
 
     return {
-      text: text,
+      text: text || "",
       structuredContent: {},
-      metadata: metadata,
+      metadata: metadata || {},
       wordCount: text ? text.split(/\s+/).length : 0,
       readingTime: text ? Math.ceil(text.split(/\s+/).length / 200) : 0,
       bannerImage: bannerImage,
-      images: metadata.bannerImages || [],
+      images: metadata?.bannerImages || [],
     };
+    
+    } catch (error) {
+      console.error("[DEBUG] extractCleanContent failed:", error);
+      // Return a safe fallback object
+      return {
+        text: "",
+        structuredContent: {},
+        metadata: {},
+        wordCount: 0,
+        readingTime: 0,
+        bannerImage: null,
+        images: [],
+      };
+    }
   }
 
   // Extract relevant banner images from the article

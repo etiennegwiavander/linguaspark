@@ -14,6 +14,7 @@ import { useAuth } from "./auth-wrapper"
 import { LessonInterfaceBridge, LessonInterfaceUtils } from "@/lib/lesson-interface-bridge"
 import type { LessonPreConfiguration } from "@/lib/lesson-interface-bridge"
 import result from "postcss/lib/result"
+import error from "next/error"
 
 const LESSON_TYPES = [
   { value: "discussion", label: "Discussion", icon: Users, description: "Conversation-focused lessons" },
@@ -98,34 +99,62 @@ export default function LessonGenerator({
 
   // Update selectedText when initialText prop changes
   useEffect(() => {
-    console.log('[LessonGenerator] Props received - initialText length:', initialText.length, 'sourceUrl:', sourceUrl)
-    if (initialText && initialText !== selectedText) {
-      console.log('[LessonGenerator] Updating selectedText from initialText:', initialText.substring(0, 100) + '...')
-      setSelectedText(initialText)
-
-      // CRITICAL FIX: Also set lesson type and level from URL parameters
-      const urlParams = new URLSearchParams(window.location.search)
-      const urlType = urlParams.get('type')
-      const urlLevel = urlParams.get('level')
-
-      if (urlType && !lessonType) {
-        console.log('[LessonGenerator] Setting lesson type from URL:', urlType)
-        setLessonType(urlType)
+    console.log('[LessonGenerator] 🚀 useEffect triggered - Props received:', {
+      initialTextLength: initialText.length,
+      sourceUrl: sourceUrl,
+      currentSelectedTextLength: selectedText.length,
+      propsChanged: initialText !== selectedText
+    })
+    
+    // Force update selectedText if initialText is provided and different
+    if (initialText && initialText.length > 0) {
+      if (initialText !== selectedText) {
+        console.log('[LessonGenerator] 🎯 Updating selectedText from initialText:', initialText.substring(0, 100) + '...')
+        setSelectedText(initialText)
+        console.log('[LessonGenerator] ✅ selectedText updated to length:', initialText.length)
+      } else {
+        console.log('[LessonGenerator] ℹ️ initialText same as current selectedText, no update needed')
       }
+    } else if (!initialText || initialText.length === 0) {
+      console.log('[LessonGenerator] ⚠️ No initialText provided or empty:', initialText?.length || 0)
+    }
 
-      if (urlLevel && !studentLevel) {
-        console.log('[LessonGenerator] Setting student level from URL:', urlLevel)
-        setStudentLevel(urlLevel)
-      }
+    // CRITICAL FIX: Also set lesson type and level from URL parameters
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlType = urlParams.get('type')
+    const urlLevel = urlParams.get('level')
 
-      if (!targetLanguage) {
-        console.log('[LessonGenerator] Setting default target language: english')
-        setTargetLanguage("english")
-      }
+    if (urlType && !lessonType) {
+      console.log('[LessonGenerator] Setting lesson type from URL:', urlType)
+      setLessonType(urlType)
+    }
+
+    if (urlLevel && !studentLevel) {
+      console.log('[LessonGenerator] Setting student level from URL:', urlLevel)
+      setStudentLevel(urlLevel)
+    }
+
+    if (!targetLanguage) {
+      console.log('[LessonGenerator] Setting default target language: english')
+      setTargetLanguage("english")
     }
     // Only depend on initialText and sourceUrl to avoid infinite loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialText, sourceUrl])
+
+  // Additional useEffect specifically for initialText changes (backup)
+  useEffect(() => {
+    console.log('[LessonGenerator] 🔄 Backup useEffect - initialText changed:', {
+      initialTextLength: initialText?.length || 0,
+      currentSelectedTextLength: selectedText.length,
+      willUpdate: initialText && initialText.length > 0 && initialText !== selectedText
+    })
+    
+    if (initialText && initialText.length > 0 && initialText !== selectedText) {
+      console.log('[LessonGenerator] 🚀 BACKUP: Force updating selectedText')
+      setSelectedText(initialText)
+    }
+  }, [initialText])
 
   // Clear error when user makes changes
   const clearError = () => {
@@ -691,6 +720,16 @@ export default function LessonGenerator({
               </div>
             )}
 
+            {(() => {
+              console.log('[LessonGenerator] 🎯 Rendering textarea with selectedText:', {
+                length: selectedText.length,
+                preview: selectedText.substring(0, 100) + '...',
+                isEmpty: selectedText === '',
+                isUndefined: selectedText === undefined,
+                actualValue: selectedText
+              })
+              return null
+            })()}
             <Textarea
               value={selectedText}
               onChange={(e) => { setSelectedText(e.target.value); clearError(); }}
