@@ -419,14 +419,30 @@ export class ProgressiveGeneratorImpl implements ProgressiveGenerator {
   private async generateLessonTitle(sourceText: string, lessonType: string, studentLevel: CEFRLevel, metadata?: any): Promise<string> {
     console.log("🎯 Generating lesson title with format: 'Original Title - AI Generated Title'...")
     
-    // Extract original article title from metadata
-    const originalTitle = metadata?.title 
-      ? metadata.title
-          .replace(/\s*-\s*Wikipedia$/i, '')
-          .replace(/\s*\|\s*.+$/i, '')
-          .trim()
-          .substring(0, 60)
-      : null
+    // Extract original article title from metadata with smart truncation
+    let originalTitle = null
+    if (metadata?.title) {
+      let cleanTitle = metadata.title
+        .replace(/\s*-\s*Wikipedia$/i, '')
+        .replace(/\s*\|\s*.+$/i, '')
+        .trim()
+      
+      // Smart truncation: if longer than 150 chars, truncate at word boundary
+      if (cleanTitle.length > 150) {
+        const words = cleanTitle.split(' ')
+        let truncated = ''
+        for (const word of words) {
+          if ((truncated + ' ' + word).length <= 150) {
+            truncated += (truncated ? ' ' : '') + word
+          } else {
+            break
+          }
+        }
+        originalTitle = truncated
+      } else {
+        originalTitle = cleanTitle
+      }
+    }
     
     console.log("📰 Original article title:", originalTitle || "Not available")
     
@@ -445,20 +461,20 @@ Engoo-style titles are:
 
 Generate title:`
 
-      const response = await this.getOpenRouterAI().prompt(engooPrompt, { maxTokens: 60 })
+      const response = await this.getOpenRouterAI().prompt(engooPrompt, { maxTokens: 80 })
       const aiTitle = response.trim()
         .replace(/['"]/g, '')
         .replace(/^(Title:?|Generate title:?)\s*/i, '')
         .replace(/\.$/, '') // Remove trailing period
-        .substring(0, 60)
+        .substring(0, 90) // Increased from 60 to 90 characters
       
       console.log("🤖 AI generated Engoo-style title:", aiTitle)
       
       // Validate the AI title - should be engaging and appropriate length
-      if (aiTitle.length > 5 && aiTitle.length < 80 && 
+      if (aiTitle.length > 5 && aiTitle.length < 150 && 
           !aiTitle.toLowerCase().includes('lesson') && 
           !aiTitle.toLowerCase().includes('article') &&
-          aiTitle.split(' ').length >= 2 && aiTitle.split(' ').length <= 8) {
+          aiTitle.split(' ').length >= 2 && aiTitle.split(' ').length <= 10) {
         
         // Format: "Original Title - AI Generated Title"
         if (originalTitle) {
@@ -487,10 +503,23 @@ Generate title:`
       return fallbackTitle
     }
     
-    // Option 2: Generate from first sentence
+    // Option 2: Generate from first sentence with smart truncation
     const firstSentence = sourceText.split(/[.!?]/)[0]?.trim()
-    if (firstSentence && firstSentence.length > 10 && firstSentence.length < 100) {
-      const simpleTitle = firstSentence.substring(0, 60) + (firstSentence.length > 60 ? '...' : '')
+    if (firstSentence && firstSentence.length > 10 && firstSentence.length < 150) {
+      let simpleTitle = firstSentence
+      // Smart truncation at word boundary if too long
+      if (simpleTitle.length > 150) {
+        const words = simpleTitle.split(' ')
+        let truncated = ''
+        for (const word of words) {
+          if ((truncated + ' ' + word).length <= 150) {
+            truncated += (truncated ? ' ' : '') + word
+          } else {
+            break
+          }
+        }
+        simpleTitle = truncated + '...'
+      }
       console.log("✅ Using content-based title:", simpleTitle)
       return simpleTitle
     }
