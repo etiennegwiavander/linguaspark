@@ -36,14 +36,61 @@ export function validatePublicLessonContent(content: LessonContent): ValidationR
     errors.push('Lesson title is required');
   }
 
-  // Validate warmup section
-  if (!content.warmup || !content.warmup.questions || content.warmup.questions.length === 0) {
-    errors.push('Warmup section with at least one question is required');
+  // Validate warmup section - handle multiple formats
+  if (!content.warmup) {
+    errors.push('Warmup section is required');
+  } else {
+    // Check if it's an array format (direct from progressive generator)
+    if (Array.isArray(content.warmup)) {
+      if (content.warmup.length === 0) {
+        errors.push('Warmup section must contain at least one question or instruction');
+      }
+    }
+    // Check if it's an object format with questions array (current format from lesson generator)
+    else if (typeof content.warmup === 'object' && content.warmup !== null && 'questions' in content.warmup) {
+      if (!Array.isArray(content.warmup.questions) || content.warmup.questions.length === 0) {
+        errors.push('Warmup section must contain at least one question');
+      }
+    }
+    // Invalid format
+    else {
+      errors.push('Warmup section must be either an array of questions or an object with questions array');
+    }
   }
 
-  // Validate wrapup section
-  if (!content.wrapup || !content.wrapup.summary || content.wrapup.summary.trim().length === 0) {
-    errors.push('Wrapup section with summary is required');
+  // Validate wrapup section - handle multiple formats
+  if (!content.wrapup) {
+    errors.push('Wrapup section is required');
+  } else {
+    // Check if it's an array format (direct from progressive generator)
+    if (Array.isArray(content.wrapup)) {
+      if (content.wrapup.length === 0) {
+        errors.push('Wrapup section must contain at least one question or instruction');
+      }
+    } 
+    // Check if it's an object format
+    else if (typeof content.wrapup === 'object' && content.wrapup !== null) {
+      // Object with questions array (current format from lesson generator)
+      if ('questions' in content.wrapup && Array.isArray(content.wrapup.questions)) {
+        if (content.wrapup.questions.length === 0) {
+          errors.push('Wrapup section must contain at least one question or instruction');
+        }
+      }
+      // Legacy object format with summary
+      else if ('summary' in content.wrapup) {
+        if (!content.wrapup.summary || content.wrapup.summary.trim().length === 0) {
+          errors.push('Wrapup section summary cannot be empty');
+        }
+      }
+      // Invalid object format
+      else {
+        errors.push('Wrapup section object must contain either questions array or summary');
+      }
+    }
+    // Invalid format
+    else {
+      errors.push('Wrapup section must be either an array of questions or an object with questions/summary');
+    }
   }
 
   // Validate at least one main content section exists

@@ -20,35 +20,36 @@ export async function DELETE(
       );
     }
 
-    // Get authenticated user - try both cookie-based and Bearer token auth
-    const supabase = await createServerSupabaseClient();
-    
-    // First try cookie-based auth
-    let user = null;
-    let authError = null;
+    // Check for Bearer token first
+    const authHeader = request.headers.get('authorization');
     let accessToken: string | undefined = undefined;
+    let supabase;
     
-    const cookieAuth = await supabase.auth.getUser();
-    if (cookieAuth.data.user) {
-      user = cookieAuth.data.user;
+    console.log('[DELETE] Auth header present:', !!authHeader);
+    
+    if (authHeader?.startsWith('Bearer ')) {
+      accessToken = authHeader.substring(7);
+      console.log('[DELETE] Extracted Bearer token (first 20 chars):', accessToken.substring(0, 20));
+      // Create Supabase client with the access token
+      supabase = await createServerSupabaseClient(accessToken);
     } else {
-      // Try Bearer token from Authorization header
-      const authHeader = request.headers.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        accessToken = token; // Store token for RLS
-        const tokenAuth = await supabase.auth.getUser(token);
-        if (tokenAuth.data.user) {
-          user = tokenAuth.data.user;
-        } else {
-          authError = tokenAuth.error;
-        }
-      } else {
-        authError = cookieAuth.error;
-      }
+      console.log('[DELETE] Using cookie-based auth');
+      // Use cookie-based auth
+      supabase = await createServerSupabaseClient();
     }
+    
+    // Get authenticated user
+    console.log('[DELETE] Calling supabase.auth.getUser()...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log('[DELETE] Auth result - user:', user?.id, 'error:', authError?.message);
 
     if (authError || !user) {
+      console.error('[DELETE] Auth failed:', {
+        error: authError,
+        hasToken: !!accessToken,
+        authHeader: authHeader?.substring(0, 30)
+      });
       return NextResponse.json(
         {
           success: false,
@@ -58,6 +59,9 @@ export async function DELETE(
         { status: 401 }
       );
     }
+
+    console.log('[DELETE] ✅ Authenticated user:', user.id);
+    console.log('[DELETE] Using access token:', !!accessToken);
 
     // Attempt to delete the lesson (admin verification happens in the function)
     // Skip auth check since we already verified the user above

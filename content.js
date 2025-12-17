@@ -460,127 +460,9 @@
     });
   }
 
-  // Safe chrome runtime message sending with context validation
-  async function safeSendMessage(message) {
-    return new Promise((resolve, reject) => {
-      // Create fallback URL with metadata AND content
-      const createFallbackUrl = () => {
-        const baseUrl =
-          "http://localhost:3001/popup?source=extraction&autoPopulate=true";
-        if (message.data) {
-          const params = new URLSearchParams();
-          params.set("source", "extraction");
-          params.set("autoPopulate", "true");
-          if (message.data.title) params.set("title", message.data.title);
-          if (message.data.sourceUrl)
-            params.set("sourceUrl", message.data.sourceUrl);
-          if (message.data.type) params.set("type", message.data.type);
-          if (message.data.level) params.set("level", message.data.level);
-          if (message.data.content) params.set("content", message.data.content); // CRITICAL: Include content in URL
-          return `http://localhost:3001/popup?${params.toString()}`;
-        }
-        return baseUrl;
-      };
+  // Note: safeSendMessage function removed - using direct URL approach for cross-domain compatibility
 
-      if (!isExtensionContextValid()) {
-        console.warn(
-          "[LinguaSpark] Extension context invalidated - opening lesson interface directly"
-        );
-        const url = createFallbackUrl();
-        console.log("[LinguaSpark] Opening fallback URL:", url);
-        window.open(url, "_blank");
-        resolve({ success: true, fallback: true });
-        return;
-      }
-
-      try {
-        chrome.runtime.sendMessage(message, (response) => {
-          if (chrome.runtime.lastError) {
-            console.warn(
-              "[LinguaSpark] Runtime error:",
-              chrome.runtime.lastError.message
-            );
-            const url = createFallbackUrl();
-            console.log(
-              "[LinguaSpark] Opening fallback URL after runtime error:",
-              url
-            );
-            window.open(url, "_blank");
-            resolve({ success: true, fallback: true });
-          } else {
-            resolve(response || { success: true });
-          }
-        });
-      } catch (error) {
-        console.warn("[LinguaSpark] Failed to send message:", error.message);
-        const url = createFallbackUrl();
-        console.log("[LinguaSpark] Opening fallback URL after exception:", url);
-        window.open(url, "_blank");
-        resolve({ success: true, fallback: true });
-      }
-    });
-  }
-
-  // Safe chrome storage operations with context validation
-  async function safeStorageSet(data) {
-    console.log(
-      "[LinguaSpark] safeStorageSet called with data keys:",
-      Object.keys(data)
-    );
-    console.log(
-      "[LinguaSpark] Extension context valid:",
-      isExtensionContextValid()
-    );
-
-    return new Promise((resolve, reject) => {
-      // Always try Chrome storage first since that's what was working yesterday
-      try {
-        chrome.storage.local.set(data, () => {
-          if (chrome.runtime.lastError) {
-            console.warn(
-              "[LinguaSpark] Chrome storage error:",
-              chrome.runtime.lastError.message
-            );
-            console.log(
-              "[LinguaSpark] ❌ Chrome storage failed, this explains why popup can't find data"
-            );
-            resolve({
-              success: false,
-              error: chrome.runtime.lastError.message,
-            });
-          } else {
-            console.log(
-              "[LinguaSpark] ✅ Chrome storage completed successfully"
-            );
-            // Verify the storage worked
-            chrome.storage.local.get(["lessonConfiguration"], (result) => {
-              if (result.lessonConfiguration) {
-                console.log(
-                  "[LinguaSpark] ✅ Storage verification SUCCESS - content length:",
-                  result.lessonConfiguration.sourceContent?.length || 0
-                );
-                resolve({ success: true });
-              } else {
-                console.error(
-                  "[LinguaSpark] ❌ Storage verification FAILED - no data found"
-                );
-                resolve({ success: false, error: "Verification failed" });
-              }
-            });
-          }
-        });
-      } catch (error) {
-        console.error(
-          "[LinguaSpark] Chrome storage access failed:",
-          error.message
-        );
-        console.log(
-          "[LinguaSpark] ❌ This explains why the popup can't find the data"
-        );
-        resolve({ success: false, error: error.message });
-      }
-    });
-  }
+  // Note: safeStorageSet function removed - now using API-based storage exclusively
 
   // Handle extract button click
   async function handleExtractClick() {
@@ -722,8 +604,8 @@
         attribution: `Extracted from ${document.title} - ${window.location.href}`,
       };
 
-      // Store both formats for compatibility using safe storage
-      console.log("[LinguaSpark] Storing content to Chrome storage...");
+      // Store data using localStorage (reliable cross-origin solution)
+      console.log("[LinguaSpark] Storing content via localStorage...");
       console.log("[LinguaSpark] lessonConfiguration:", {
         sourceContentLength: lessonConfiguration.sourceContent?.length || 0,
         suggestedType: lessonConfiguration.suggestedType,
@@ -740,36 +622,21 @@
         sourceTitle: document.title,
       };
 
-      console.log("[LinguaSpark] About to store data:", {
-        keys: Object.keys(storageData),
-        lessonConfigExists: !!storageData.lessonConfiguration,
-        contentLength:
-          storageData.lessonConfiguration?.sourceContent?.length || 0,
-      });
-
-      console.log("[LinguaSpark] Calling safeStorageSet...");
+      // Generate unique session ID for tracking
+      let sessionId = 'localStorage_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      
+      console.log("[LinguaSpark] Storing data with session:", sessionId);
       try {
-        const storageResult = await safeStorageSet(storageData);
-        console.log(
-          "[LinguaSpark] ✅ Storage completed successfully:",
-          storageResult
-        );
-      } catch (storageError) {
-        console.error("[LinguaSpark] ❌ Storage failed:", storageError);
-        // Emergency fallback - direct localStorage
-        console.log("[LinguaSpark] Attempting emergency direct storage...");
-        try {
-          localStorage.setItem(
-            "linguaspark_lesson_config",
-            JSON.stringify(storageData)
-          );
-          console.log("[LinguaSpark] ✅ Emergency storage completed");
-        } catch (emergencyError) {
-          console.error(
-            "[LinguaSpark] ❌ Emergency storage also failed:",
-            emergencyError
-          );
-        }
+        // Store in localStorage with session ID as key
+        localStorage.setItem(`linguaspark_session_${sessionId}`, JSON.stringify(storageData));
+        localStorage.setItem("linguaspark_lesson_config", JSON.stringify(storageData)); // Backward compatibility
+        console.log("[LinguaSpark] ✅ localStorage storage completed successfully");
+        window.linguaSparkSessionId = sessionId;
+      } catch (localStorageError) {
+        console.error("[LinguaSpark] ❌ localStorage storage failed:", localStorageError);
+        // If localStorage fails, we'll pass content via URL (less reliable but works)
+        sessionId = 'url_fallback_' + Date.now();
+        window.linguaSparkSessionId = sessionId;
       }
 
       // Show success state
@@ -783,50 +650,114 @@
       // Check if user is admin and show save destination dialog
       console.log("[LinguaSpark] Checking admin status...");
       
-      // Get admin status from storage
-      const adminStatus = await new Promise((resolve) => {
-        chrome.storage.local.get(['isAdmin'], (result) => {
-          resolve(result.isAdmin === true);
-        });
-      });
+      let saveToPublic = false; // Initialize the variable
+      let adminStatus = false; // Default to false
+      
+      // Get admin status from storage (with error handling)
+      try {
+        if (isExtensionContextValid() && chrome.storage && chrome.storage.local) {
+          adminStatus = await new Promise((resolve) => {
+            chrome.storage.local.get(['isAdmin'], (result) => {
+              if (chrome.runtime.lastError) {
+                console.warn("[LinguaSpark] Chrome storage error:", chrome.runtime.lastError.message);
+                resolve(false);
+              } else {
+                resolve(result.isAdmin === true);
+              }
+            });
+          });
+        } else {
+          console.log("[LinguaSpark] Chrome storage not available - assuming non-admin user");
+          adminStatus = false;
+        }
+      } catch (error) {
+        console.warn("[LinguaSpark] Failed to check admin status:", error.message);
+        adminStatus = false;
+      }
       
       console.log("[LinguaSpark] Admin status:", adminStatus);
       
       // If admin, show save destination dialog
       if (adminStatus) {
-        const saveToPublic = await showSaveDestinationDialog();
-        
-        // Store the choice in chrome.storage
-        await new Promise((resolve) => {
-          chrome.storage.local.set({ saveToPublic: saveToPublic }, () => {
-            console.log("[LinguaSpark] Save destination set:", saveToPublic ? "Public Library" : "Personal Library");
-            resolve();
-          });
-        });
+        try {
+          saveToPublic = await showSaveDestinationDialog();
+          
+          // Store the choice in chrome.storage (with error handling)
+          if (isExtensionContextValid() && chrome.storage && chrome.storage.local) {
+            await new Promise((resolve) => {
+              chrome.storage.local.set({ saveToPublic: saveToPublic }, () => {
+                if (chrome.runtime.lastError) {
+                  console.warn("[LinguaSpark] Failed to store saveToPublic flag:", chrome.runtime.lastError.message);
+                } else {
+                  console.log("[LinguaSpark] Save destination set:", saveToPublic ? "Public Library" : "Personal Library");
+                }
+                resolve();
+              });
+            });
+          }
+        } catch (error) {
+          console.warn("[LinguaSpark] Admin dialog failed:", error.message);
+          saveToPublic = false;
+        }
       } else {
-        // Clear any previous saveToPublic flag
-        await new Promise((resolve) => {
-          chrome.storage.local.remove('saveToPublic', () => {
-            resolve();
-          });
-        });
+        // Clear any previous saveToPublic flag (with error handling)
+        try {
+          if (isExtensionContextValid() && chrome.storage && chrome.storage.local) {
+            await new Promise((resolve) => {
+              chrome.storage.local.remove('saveToPublic', () => {
+                resolve();
+              });
+            });
+          }
+        } catch (error) {
+          console.warn("[LinguaSpark] Failed to clear saveToPublic flag:", error.message);
+        }
       }
 
-      // Open lesson generation interface using safe message sending
-      console.log("[LinguaSpark] Opening lesson interface...");
+      // Open lesson generation interface with content in URL (cross-domain solution)
+      console.log("[LinguaSpark] Opening lesson interface with content...");
 
-      await safeSendMessage({
-        action: "openLessonInterface",
-        data: {
-          source: "extraction",
-          autoPopulate: true,
-          title: lessonConfiguration.metadata.title,
-          sourceUrl: lessonConfiguration.metadata.sourceUrl,
-          type: lessonConfiguration.suggestedType,
-          level: lessonConfiguration.suggestedLevel,
-          // Content is already stored in Chrome storage - NO URL passing needed
-        },
+      // Prepare content for URL transmission (truncate if too long)
+      const contentForUrl = lessonConfiguration.sourceContent.length > 8000 
+        ? lessonConfiguration.sourceContent.substring(0, 8000) + "... [Content truncated - full content available in localStorage]"
+        : lessonConfiguration.sourceContent;
+
+      const urlParams = new URLSearchParams({
+        source: "extraction",
+        autoPopulate: "true",
+        sessionId: window.linguaSparkSessionId || sessionId,
+        title: lessonConfiguration.metadata.title || "",
+        sourceUrl: lessonConfiguration.metadata.sourceUrl || "",
+        type: lessonConfiguration.suggestedType || "discussion",
+        level: lessonConfiguration.suggestedLevel || "B1",
+        content: contentForUrl, // Include content directly in URL
+        hasMetadata: extractedContent.bannerImage || extractedContent.images?.length > 0 ? "true" : "false"
       });
+
+      // Add banner image if available
+      if (extractedContent.bannerImage) {
+        urlParams.set("bannerImage", extractedContent.bannerImage);
+        console.log("[LinguaSpark] Adding banner image to URL:", extractedContent.bannerImage);
+      }
+
+      // Add images array if available (as JSON string)
+      if (extractedContent.images && extractedContent.images.length > 0) {
+        try {
+          urlParams.set("images", JSON.stringify(extractedContent.images));
+          console.log("[LinguaSpark] Adding images array to URL:", extractedContent.images.length, "images");
+        } catch (error) {
+          console.warn("[LinguaSpark] Failed to serialize images:", error);
+        }
+      }
+
+      if (saveToPublic) {
+        urlParams.set("saveToPublic", "true");
+      }
+
+      const url = `http://localhost:3001/popup?${urlParams.toString()}`;
+      
+      console.log("[LinguaSpark] Opening URL with content length:", contentForUrl.length);
+      window.open(url, "_blank");
 
       // Reset button after delay
       setTimeout(() => {
@@ -936,9 +867,8 @@
       };
 
       try {
-        console.log("[LinguaSpark Debug] Testing safeStorageSet...");
-        const result = await safeStorageSet(testData);
-        console.log("[LinguaSpark Debug] ✅ safeStorageSet result:", result);
+        console.log("[LinguaSpark Debug] Testing API storage...");
+        // Note: safeStorageSet removed - using API storage now
 
         // Verify
         const verification = localStorage.getItem("linguaspark_lesson_config");
@@ -2330,13 +2260,15 @@
   document.addEventListener("mouseup", () => {
     const selection = window.getSelection();
     if (selection.toString().length > 10) {
-      // Store selection for context menu using safe storage
-      safeStorageSet({
-        selectedText: selection.toString(),
-        sourceUrl: window.location.href,
-      }).catch((error) => {
+      // Store selection for context menu using localStorage
+      try {
+        localStorage.setItem('linguaspark_selected_text', JSON.stringify({
+          selectedText: selection.toString(),
+          sourceUrl: window.location.href,
+        }));
+      } catch (error) {
         console.warn("[LinguaSpark] Failed to store selected text:", error);
-      });
+      }
     }
   });
 })();

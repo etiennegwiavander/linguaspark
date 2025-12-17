@@ -7,6 +7,8 @@ export async function POST(request: NextRequest) {
   try {
     const { action, data, sessionId } = await request.json();
     
+    console.log('[API] Received request:', { action, sessionId, hasData: !!data });
+    
     if (action === 'store') {
       // Store content from background script
       contentStorage.set(sessionId, {
@@ -16,7 +18,13 @@ export async function POST(request: NextRequest) {
       
       console.log('[API] Stored content for session:', sessionId, 'length:', data.lessonConfiguration?.sourceContent?.length || 0);
       
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        }
+      });
     }
     
     if (action === 'retrieve') {
@@ -24,20 +32,56 @@ export async function POST(request: NextRequest) {
       const content = contentStorage.get(sessionId);
       
       if (content) {
-        // Clean up after retrieval
-        contentStorage.delete(sessionId);
+        // Don't clean up immediately - let it expire naturally
         console.log('[API] Retrieved content for session:', sessionId, 'length:', content.lessonConfiguration?.sourceContent?.length || 0);
-        return NextResponse.json({ success: true, data: content });
+        return NextResponse.json({ success: true, data: content }, {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          }
+        });
       } else {
         console.log('[API] No content found for session:', sessionId);
-        return NextResponse.json({ success: false, error: 'No content found' });
+        console.log('[API] Available sessions:', Array.from(contentStorage.keys()));
+        return NextResponse.json({ success: false, error: 'No content found' }, {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          }
+        });
       }
     }
     
-    return NextResponse.json({ success: false, error: 'Invalid action' });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      }
+    });
     
   } catch (error) {
     console.error('[API] Error handling extracted content:', error);
-    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Server error' }, { 
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      }
+    });
   }
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }

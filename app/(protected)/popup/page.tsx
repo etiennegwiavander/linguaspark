@@ -208,51 +208,95 @@ export default function PopupPage() {
           console.log('[LinguaSpark Popup] Extraction source detected - checking for session ID');
           console.log('[LinguaSpark Popup] URL params:', Object.fromEntries(urlParams));
 
-          // NEW: Check for session ID and retrieve content from API
-          const sessionId = urlParams.get('sessionId');
-          if (sessionId) {
-            console.log('[LinguaSpark Popup] Found session ID, retrieving content from API:', sessionId);
-
-            try {
-              const response = await fetch('/api/get-extracted-content', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'retrieve',
-                  sessionId: sessionId
-                })
-              });
-
-              const apiResult = await response.json();
-              if (apiResult.success && apiResult.data.lessonConfiguration) {
-                const content = apiResult.data.lessonConfiguration.sourceContent;
-                const metadata = apiResult.data.lessonConfiguration.metadata;
-                console.log('[LinguaSpark Popup] ✅ Retrieved content from API, length:', content.length);
-                console.log('[LinguaSpark Popup] 📸 Banner image:', metadata.bannerImage || 'None');
-                console.log('[LinguaSpark Popup] 🖼️ Images count:', metadata.images?.length || 0);
-                if (metadata.images && metadata.images.length > 0) {
-                  console.log('[LinguaSpark Popup] First image:', metadata.images[0]);
-                }
-                setSelectedText(content);
-                setSourceUrl(metadata.sourceUrl || '');
-                setExtractedMetadata(metadata); // ← STORE METADATA
-                console.log('[LinguaSpark Popup] ✅ Metadata stored in state');
-                return;
-              } else {
-                console.error('[LinguaSpark Popup] Failed to retrieve content from API:', apiResult.error);
-              }
-            } catch (error) {
-              console.error('[LinguaSpark Popup] API request failed:', error);
-            }
-          }
-
-          // Fallback: Check for content in URL parameters (legacy support)
+          // Primary: Check for content in URL parameters (cross-domain solution)
           if (contentParam && sourceParam) {
             const decodedContent = decodeURIComponent(contentParam);
+            const decodedSourceUrl = decodeURIComponent(sourceParam);
             console.log('[LinguaSpark Popup] ✅ Found content in URL parameters, length:', decodedContent.length);
+            console.log('[LinguaSpark Popup] Source URL:', decodedSourceUrl);
+            
             setSelectedText(decodedContent);
-            setSourceUrl(decodeURIComponent(sourceParam));
+            setSourceUrl(decodedSourceUrl);
+            
+            // Check if there's metadata available
+            const hasMetadata = urlParams.get('hasMetadata') === 'true';
+            if (hasMetadata) {
+              console.log('[LinguaSpark Popup] Metadata available - creating enhanced metadata object');
+              
+              // Get banner image from URL parameters
+              const bannerImage = urlParams.get('bannerImage');
+              
+              // Get images array from URL parameters
+              let images = [];
+              try {
+                const imagesParam = urlParams.get('images');
+                if (imagesParam) {
+                  images = JSON.parse(imagesParam);
+                }
+              } catch (error) {
+                console.warn('[LinguaSpark Popup] Failed to parse images from URL:', error);
+              }
+              
+              const enhancedMetadata = {
+                title: urlParams.get('title') || document.title,
+                sourceUrl: decodedSourceUrl,
+                domain: new URL(decodedSourceUrl).hostname,
+                extractedAt: new Date(),
+                wordCount: decodedContent.split(' ').length,
+                readingTime: Math.ceil(decodedContent.split(' ').length / 200),
+                bannerImage: bannerImage || null, // Direct banner image URL
+                bannerImages: images || [], // Array of image objects (for compatibility)
+                images: images || [] // Array of image objects
+              };
+              
+              console.log('[LinguaSpark Popup] 📸 Banner image from URL:', bannerImage || 'None');
+              console.log('[LinguaSpark Popup] 🖼️ Images from URL:', images.length, 'images');
+              
+              setExtractedMetadata(enhancedMetadata);
+            }
+            
+            console.log('[LinguaSpark Popup] ✅ Content loaded from URL parameters');
             return;
+          }
+
+          // Fallback: Check for session ID and retrieve content from localStorage (same-domain only)
+          const sessionId = urlParams.get('sessionId');
+          if (sessionId) {
+            console.log('[LinguaSpark Popup] No URL content, trying localStorage with session:', sessionId);
+
+            try {
+              // Try session-specific localStorage key first
+              let localData = localStorage.getItem(`linguaspark_session_${sessionId}`);
+              
+              // Fallback to general localStorage key
+              if (!localData && sessionId.startsWith('localStorage_')) {
+                localData = localStorage.getItem('linguaspark_lesson_config');
+              }
+              
+              if (localData) {
+                const parsed = JSON.parse(localData);
+                console.log('[LinguaSpark Popup] Found localStorage data:', {
+                  hasLessonConfig: !!parsed.lessonConfiguration,
+                  contentLength: parsed.lessonConfiguration?.sourceContent?.length || 0
+                });
+                
+                if (parsed.lessonConfiguration?.sourceContent) {
+                  const content = parsed.lessonConfiguration.sourceContent;
+                  const metadata = parsed.lessonConfiguration.metadata;
+                  
+                  console.log('[LinguaSpark Popup] ✅ Retrieved content from localStorage, length:', content.length);
+                  setSelectedText(content);
+                  setSourceUrl(metadata?.sourceUrl || '');
+                  setExtractedMetadata(metadata);
+                  console.log('[LinguaSpark Popup] ✅ Content and metadata stored in state');
+                  return;
+                }
+              } else {
+                console.warn('[LinguaSpark Popup] ⚠️ No localStorage data found (expected for cross-domain)');
+              }
+            } catch (error) {
+              console.error('[LinguaSpark Popup] ❌ localStorage retrieval failed:', error);
+            }
           }
 
           // For extraction sources, check storage as final fallback
@@ -318,19 +362,11 @@ export default function PopupPage() {
           setSourceUrl(result.sourceUrl)
         }
 
-        // If no content found in storage and this is an extraction source, use URL fallback
+        // If no content found anywhere for extraction source
         if (isExtractionSource && !result.lessonConfiguration && !result.extractedContent && !result.selectedText) {
-          console.log('[LinguaSpark Popup] No content in storage - checking URL parameters as fallback');
-          // CRITICAL FIX: Use URL content as primary fallback (cross-domain solution)
-          if (contentParam && sourceParam) {
-            const decodedContent = decodeURIComponent(contentParam);
-            console.log('[LinguaSpark Popup] ✅ Using URL content fallback, length:', decodedContent.length);
-            setSelectedText(decodedContent);
-            setSourceUrl(decodeURIComponent(sourceParam));
-            return;
-          } else {
-            console.error('[LinguaSpark Popup] ❌ No content in storage OR URL - extraction failed completely');
-          }
+          console.error('[LinguaSpark Popup] ❌ No content found - this indicates an extraction failure');
+          console.error('[LinguaSpark Popup] Expected content in URL parameters for cross-domain extraction');
+          console.error('[LinguaSpark Popup] URL params available:', Object.fromEntries(urlParams));
         }
 
         // If no content found and we're in extension context, try to get current tab content
