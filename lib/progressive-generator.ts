@@ -3341,12 +3341,26 @@ CRITICAL: You MUST include the "Answers:" line with the correct words that fill 
           validation.warnings.length
         )
 
-        // Generate follow-up questions
-        const followUpPrompt = `Create 3 follow-up discussion questions for ${context.difficultyLevel} level students about the dialogue topic. Return only questions, one per line:`
+        // Generate follow-up questions based on the actual dialogue content
+        const dialogueText = dialogueLines.map(line => `${line.speaker}: ${line.text}`).join('\n')
+        const followUpPrompt = `Based on this specific dialogue conversation, create 3 follow-up discussion questions for ${context.difficultyLevel} level students.
+
+DIALOGUE:
+${dialogueText}
+
+REQUIREMENTS:
+- Questions must relate directly to the ideas, topics, and points discussed in this specific dialogue
+- Questions should encourage students to expand on what was said in the conversation
+- Use vocabulary and complexity appropriate for ${context.difficultyLevel} level
+- Questions should help students think deeper about the specific points raised in the dialogue
+- Return only the questions, one per line, no numbering or extra text
+
+Follow-up questions:`
         const followUpResponse = await this.getOpenRouterAI().prompt(followUpPrompt)
         const followUpQuestions = followUpResponse.split('\n')
           .map(line => line.trim())
           .filter(line => line.endsWith('?') && line.length > 10)
+          .map(line => line.replace(/^\d+\.?\s*/, '').replace(/^-\s*/, '').trim())
           .slice(0, 3)
 
         // Convert back to original format for compatibility

@@ -1752,9 +1752,9 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
           { character: "Tutor", line: `Let's explore ${topic} together.` }
         ],
         followUpQuestions: [
-          `What interests you most about ${topic}?`,
-          "What would you like to know more about?",
-          "How can this help you in daily life?"
+          `What interests you most about learning ${topic}?`,
+          `What would you like to know more about ${topic}?`,
+          `How can understanding ${topic} help you in daily life?`
         ]
       },
       'A2': {
@@ -1766,9 +1766,9 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
           { character: "Tutor", line: `Can you share what you learned about ${topic}?` }
         ],
         followUpQuestions: [
-          `How does ${topic} relate to your experience?`,
-          "What surprised you the most?",
-          "Would you recommend this topic to others?"
+          `How does ${topic} relate to your personal experience?`,
+          `What surprised you the most about ${topic}?`,
+          `Would you recommend learning about ${topic} to others? Why?`
         ]
       },
       'B1': {
@@ -1780,9 +1780,9 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
           { character: "Tutor", line: `Let's explore those factors. What do you think is most important about ${topic}?` }
         ],
         followUpQuestions: [
-          `What are the advantages and disadvantages of ${topic}?`,
-          "How might this impact different groups of people?",
-          "What solutions would you propose?"
+          `What are the main advantages and disadvantages of ${topic}?`,
+          `How might ${topic} impact different groups of people?`,
+          `What solutions would you propose for issues related to ${topic}?`
         ]
       },
       'B2': {
@@ -1795,8 +1795,8 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         ],
         followUpQuestions: [
           `How do cultural differences influence perspectives on ${topic}?`,
-          "What long-term consequences should we consider?",
-          "How would you evaluate the effectiveness of current approaches?"
+          `What long-term consequences of ${topic} should we consider?`,
+          `How would you evaluate the effectiveness of current approaches to ${topic}?`
         ]
       },
       'C1': {
@@ -1809,8 +1809,8 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
         ],
         followUpQuestions: [
           `How do philosophical underpinnings shape our understanding of ${topic}?`,
-          "What paradigm shifts might be necessary for progress?",
-          "How do you envision the evolution of thought regarding this matter?"
+          `What paradigm shifts might be necessary for progress in ${topic}?`,
+          `How do you envision the evolution of thought regarding ${topic}?`
         ]
       }
     }
