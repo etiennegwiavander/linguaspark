@@ -1874,6 +1874,20 @@ Make examples relevant to the content and appropriate for ${studentLevel} level.
 
     return levelGapDialogues[studentLevel as keyof typeof levelGapDialogues] || levelGapDialogues['B1']
   }
+
+  /**
+   * Clean AI-generated definitions by removing unwanted prefixes and formatting
+   */
+  private cleanDefinition(rawDefinition: string, level: string): string {
+    return rawDefinition
+      .replace(/^Definition:?\s*/i, '') // Remove "Definition:" prefix
+      .replace(/^For an? [A-Z]\d+ student,?\s*/i, '') // Remove level prefixes
+      .replace(/^The word ["'].*?["'] means:?\s*/i, '') // Remove "The word X means:" prefix
+      .replace(/^["'].*?["'] is defined as:?\s*/i, '') // Remove "X is defined as:" prefix
+      .replace(/^\*\*(.*?)\*\*:?\s*/, '$1: ') // Clean markdown formatting
+      .replace(/^\*(.*?)\*:?\s*/, '$1: ') // Clean italic formatting
+      .trim()
+  }
 }
 
 export const lessonAIServerGenerator = new LessonAIServerGenerator()

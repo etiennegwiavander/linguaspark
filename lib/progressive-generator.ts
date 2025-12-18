@@ -801,8 +801,9 @@ Requirements:
 - Match ${context.difficultyLevel} level: ${levelGuidelines[context.difficultyLevel]}
 - Show different uses of "${word}"
 - Use context-specific terms
+- Bold the word "${word}" using **word** format in each sentence
 
-Return ${exampleCount} sentences, one per line, no numbering:`
+Return ${exampleCount} sentences, one per line, no numbering or prefixes:`
 
     return prompt
   }
@@ -968,8 +969,9 @@ Return ${exampleCount} sentences, one per line, no numbering:`
 
         try {
           // Generate definition
-          const definitionPrompt = `Define "${word}" simply for ${context.difficultyLevel} level. Context: ${context.contentSummary.substring(0, 100)}. Give only the definition:`
-          const meaning = await this.getOpenRouterAI().prompt(definitionPrompt)
+          const definitionPrompt = `Define "${word}" simply for ${context.difficultyLevel} level. Context: ${context.contentSummary.substring(0, 100)}. Give only the definition without any prefix or label:`
+          const rawMeaning = await this.getOpenRouterAI().prompt(definitionPrompt)
+          const meaning = this.cleanDefinition(rawMeaning)
 
           // Generate contextually relevant examples with enhanced prompt
           const examplesPrompt = this.buildVocabularyExamplePrompt(word, context, exampleCount)
@@ -994,6 +996,7 @@ Return ${exampleCount} sentences, one per line, no numbering:`
               // Remove numbering if present
               return line.replace(/^\d+[\.)]\s*/, '').trim()
             })
+            .map(line => this.cleanExampleText(line, word))
             .filter(line => line.length > 10)
             .slice(0, exampleCount)
 
@@ -3564,5 +3567,57 @@ Follow-up questions:`
 
   private capitalizeWord(word: string): string {
     return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  }
+
+  /**
+   * Clean AI-generated definitions by removing unwanted prefixes and formatting
+   */
+  private cleanDefinition(rawDefinition: string): string {
+    return rawDefinition
+      .replace(/^Definition:?\s*/i, '') // Remove "Definition:" prefix
+      .replace(/^For an? [A-Z]\d+ student,?\s*/i, '') // Remove level prefixes
+      .replace(/^The word ["'].*?["'] means:?\s*/i, '') // Remove "The word X means:" prefix
+      .replace(/^["'].*?["'] is defined as:?\s*/i, '') // Remove "X is defined as:" prefix
+      .replace(/^\*\*(.*?)\*\*:?\s*/, '$1: ') // Clean markdown formatting
+      .replace(/^\*(.*?)\*:?\s*/, '$1: ') // Clean italic formatting
+      .trim()
+  }
+
+  /**
+   * Clean example text by removing unwanted formatting and ensuring proper vocabulary bolding
+   */
+  private cleanExampleText(example: string, targetWord: string): string {
+    // Remove markdown formatting except for the target word
+    let cleaned = example
+      .replace(/\*\*(.*?)\*\*/g, (match, content) => {
+        // Only keep bold formatting if it contains the target word
+        const contentLower = content.toLowerCase()
+        const targetLower = targetWord.toLowerCase()
+        if (contentLower.includes(targetLower)) {
+          return `**${content}**`
+        }
+        return content
+      })
+      .replace(/\*(.*?)\*/g, '$1') // Remove italic formatting
+      .replace(/__(.*?)__/g, '$1') // Remove underline formatting
+      .trim()
+
+    // Ensure the target word is bolded if it appears in the example
+    const targetLower = targetWord.toLowerCase()
+    const words = cleaned.split(/(\s+)/)
+    
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i]
+      const wordClean = word.replace(/[.,!?;:()]/g, '').toLowerCase()
+      
+      if (wordClean === targetLower && !word.includes('**')) {
+        // Replace the word with bolded version, preserving punctuation
+        const punctuation = word.match(/[.,!?;:()]+$/) || ['']
+        const wordWithoutPunct = word.replace(/[.,!?;:()]+$/, '')
+        words[i] = `**${wordWithoutPunct}**${punctuation[0]}`
+      }
+    }
+
+    return words.join('')
   }
 }

@@ -699,7 +699,12 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
                     <Volume2 className="h-3 w-3" />
                   </Button>
                 </div>
-                <p className="text-base text-muted-foreground mb-1.5 leading-relaxed">{item.meaning}</p>
+                <p 
+                  className="text-base text-muted-foreground mb-1.5 leading-relaxed"
+                  dangerouslySetInnerHTML={{
+                    __html: item.meaning.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  }}
+                />
                 {examples.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -723,6 +728,87 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
               </div>
             )
           })}
+        </div>
+      ),
+    },
+    {
+      id: "grammar",
+      title: "Grammar Focus",
+      icon: BookOpen,
+      enabled: sectionStates.grammar,
+      content: (
+        <div className="space-y-1.5 px-2">
+          <div>
+            <h4 className="font-semibold text-base mb-1.5">{safeLesson.sections.grammar.focus}</h4>
+
+            {/* Grammar Explanation */}
+            {safeLesson.sections.grammar.explanation && (
+              <div className="space-y-1.5 mb-1.5 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-sm border border-blue-200 dark:border-blue-800">
+                {safeLesson.sections.grammar.explanation.form && (
+                  <div>
+                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Form:</h5>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">{safeLesson.sections.grammar.explanation.form}</p>
+                  </div>
+                )}
+                {safeLesson.sections.grammar.explanation.usage && (
+                  <div>
+                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Usage:</h5>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">{safeLesson.sections.grammar.explanation.usage}</p>
+                  </div>
+                )}
+                {safeLesson.sections.grammar.explanation.levelNotes && (
+                  <div>
+                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Note:</h5>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 italic">{safeLesson.sections.grammar.explanation.levelNotes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Examples */}
+            <div className="mb-1.5">
+              <h5 className="font-medium text-sm mb-1.5">Examples:</h5>
+              <div className="space-y-1">
+                {safeLesson.sections.grammar.examples.map((example, index) => (
+                  <p key={index} className="text-base bg-muted/30 rounded px-3 py-2 border-l-2 border-primary/50">
+                    {example}
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            {/* Practice Exercises */}
+            <div>
+              <h5 className="font-medium text-sm mb-1.5">Practice Exercises:</h5>
+              <div className="space-y-2">
+                {safeLesson.sections.grammar.exercises ? (
+                  // New format with structured exercises
+                  safeLesson.sections.grammar.exercises.map((exercise: any, index: number) => (
+                    <div key={index} className="bg-accent/30 rounded px-3 py-2 space-y-1">
+                      <p className="text-base text-foreground font-medium">{index + 1}. {exercise.prompt}</p>
+                      {exercise.answer && (
+                        <p className="text-sm text-muted-foreground ml-4">
+                          <span className="font-medium">Answer:</span> {exercise.answer}
+                        </p>
+                      )}
+                      {exercise.explanation && (
+                        <p className="text-sm ml-4 italic text-muted-foreground">
+                          {exercise.explanation}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  // Fallback for old format
+                  safeLesson.sections.grammar.exercise?.map((exercise, index) => (
+                    <p key={index} className="text-base font-mono bg-accent/30 rounded px-3 py-2">
+                      {exercise}
+                    </p>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       ),
     },
@@ -933,88 +1019,10 @@ export default function LessonDisplay({ lesson, onExportPDF, onExportWord, onNew
       ),
     },
     {
-      id: "grammar",
-      title: "Grammar Focus",
-      icon: BookOpen,
-      enabled: sectionStates.grammar,
-      content: (
-        <div className="space-y-1.5 px-2">
-          <div>
-            <h4 className="font-semibold text-base mb-1.5">{safeLesson.sections.grammar.focus}</h4>
-
-            {/* Grammar Explanation */}
-            {safeLesson.sections.grammar.explanation && (
-              <div className="space-y-1.5 mb-1.5 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-sm border border-blue-200 dark:border-blue-800">
-                {safeLesson.sections.grammar.explanation.form && (
-                  <div>
-                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Form:</h5>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">{safeLesson.sections.grammar.explanation.form}</p>
-                  </div>
-                )}
-                {safeLesson.sections.grammar.explanation.usage && (
-                  <div>
-                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Usage:</h5>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">{safeLesson.sections.grammar.explanation.usage}</p>
-                  </div>
-                )}
-                {safeLesson.sections.grammar.explanation.levelNotes && (
-                  <div>
-                    <h5 className="font-medium text-sm text-blue-900 dark:text-blue-100 mb-1">Note:</h5>
-                    <p className="text-sm text-blue-800 dark:text-blue-200 italic">{safeLesson.sections.grammar.explanation.levelNotes}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Examples */}
-            <div className="mb-1.5">
-              <h5 className="font-medium text-sm mb-1.5">Examples:</h5>
-              <div className="space-y-1">
-                {safeLesson.sections.grammar.examples.map((example, index) => (
-                  <p key={index} className="text-base bg-muted/30 rounded px-3 py-2 border-l-2 border-primary/50">
-                    {example}
-                  </p>
-                ))}
-              </div>
-            </div>
-
-            {/* Practice Exercises */}
-            <div>
-              <h5 className="font-medium text-sm mb-1.5">Practice Exercises:</h5>
-              <div className="space-y-2">
-                {safeLesson.sections.grammar.exercises ? (
-                  // New format with structured exercises
-                  safeLesson.sections.grammar.exercises.map((exercise: any, index: number) => (
-                    <div key={index} className="bg-accent/30 rounded px-3 py-2 space-y-1">
-                      <p className="text-base text-foreground font-medium">{index + 1}. {exercise.prompt}</p>
-                      {exercise.answer && (
-                        <p className="text-sm text-muted-foreground ml-4">
-                          <span className="font-medium">Answer:</span> {exercise.answer}
-                        </p>
-                      )}
-                      {exercise.explanation && (
-                        <p className="text-sm ml-4 italic text-muted-foreground">
-                          {exercise.explanation}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  // Fallback for old format
-                  safeLesson.sections.grammar.exercise?.map((exercise, index) => (
-                    <p key={index} className="text-base font-mono bg-accent/30 rounded px-3 py-2">
-                      {exercise}
-                    </p>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
       id: "pronunciation",
+      title: "Pronunciation Practice",
+      icon: Volume2,
+      enabled: sectionStates.pronunciation,
       title: "Pronunciation Practice",
       icon: Volume2,
       enabled: sectionStates.pronunciation,
